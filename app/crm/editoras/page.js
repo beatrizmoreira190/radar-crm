@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Bookmark, Building2, Filter, Plus, Search, UserCheck, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 import Pagination from '@/components/Pagination';
@@ -14,14 +14,14 @@ export default function PublishersPage(){
   const org=membership?.organization_id;
   const [rows,setRows]=useState([]); const [stages,setStages]=useState([]); const [count,setCount]=useState(0);
   const [page,setPage]=useState(1); const [filters,setFilters]=useState(EMPTY_FILTERS); const [moreFilters,setMoreFilters]=useState(false);
-  const [savedViews,setSavedViews]=useState([]); const [activeView,setActiveView]=useState(''); const [showSaveView,setShowSaveView]=useState(false);
+  const [savedViews,setSavedViews]=useState([]); const [activeView,setActiveView]=useState(''); const [showSaveView,setShowSaveView]=useState(false); const defaultApplied=useRef(false);
   const [loading,setLoading]=useState(true); const [showNew,setShowNew]=useState(false); const [notice,setNotice]=useState('');
   const setF=(key,value)=>{setFilters(f=>({...f,[key]:value}));setPage(1);setActiveView('')};
 
   async function loadViews(){
     if(!org||!user?.id)return;
     const {data,error}=await supabase.from('saved_views').select('id,name,filters,is_default,created_at').eq('organization_id',org).eq('user_id',user.id).eq('entity_type','publishers').order('is_default',{ascending:false}).order('name');
-    if(error)setNotice(error.message); else setSavedViews(data||[]);
+    if(error)setNotice(error.message); else {const list=data||[];setSavedViews(list);if(!defaultApplied.current){defaultApplied.current=true;const d=list.find(v=>v.is_default);if(d){setFilters({...EMPTY_FILTERS,...(d.filters||{})});setActiveView(d.id);setPage(1)}}}
   }
 
   async function load(){
