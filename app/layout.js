@@ -1,4 +1,5 @@
 import './globals.css';
+import './improvements.css';
 
 export const metadata = {
   title: 'RADAR - CRM EDITORAS',
