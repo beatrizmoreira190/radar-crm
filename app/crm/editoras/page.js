@@ -16,12 +16,21 @@ export default function PublishersPage(){
   const [page,setPage]=useState(1); const [filters,setFilters]=useState(EMPTY_FILTERS); const [moreFilters,setMoreFilters]=useState(false);
   const [savedViews,setSavedViews]=useState([]); const [activeView,setActiveView]=useState(''); const [showSaveView,setShowSaveView]=useState(false); const defaultApplied=useRef(false);
   const [loading,setLoading]=useState(true); const [showNew,setShowNew]=useState(false); const [notice,setNotice]=useState('');
+  const [editorialProfileOptions,setEditorialProfileOptions]=useState(EDITORIAL_PROFILE_OPTIONS.map(value=>({value,publisher_count:null})));
   const setF=(key,value)=>{setFilters(f=>({...f,[key]:value}));setPage(1);setActiveView('')};
 
   async function loadViews(){
     if(!org||!user?.id)return;
     const {data,error}=await supabase.from('saved_views').select('id,name,filters,is_default,created_at').eq('organization_id',org).eq('user_id',user.id).eq('entity_type','publishers').order('is_default',{ascending:false}).order('name');
     if(error)setNotice(error.message); else {const list=data||[];setSavedViews(list);if(!defaultApplied.current){defaultApplied.current=true;const d=list.find(v=>v.is_default);if(d){setFilters({...EMPTY_FILTERS,...(d.filters||{})});setActiveView(d.id);setPage(1)}}}
+  }
+
+  async function loadEditorialProfileOptions(){
+    if(!org)return;
+    const {data,error}=await supabase.rpc('get_editorial_profile_options',{p_organization_id:org});
+    if(error)return;
+    const dynamic=(data||[]).filter(item=>item?.value);
+    if(dynamic.length)setEditorialProfileOptions(dynamic);
   }
 
   async function load(){
@@ -43,6 +52,7 @@ export default function PublishersPage(){
   }
 
   useEffect(()=>{loadViews()},[org,user?.id]);
+  useEffect(()=>{loadEditorialProfileOptions()},[org]);
   useEffect(()=>{const t=setTimeout(()=>load(),filters.q?250:0);return()=>clearTimeout(t)},[org,page,filters,user?.id]);
   const stageMap=useMemo(()=>Object.fromEntries(stages.map(s=>[s.id,s])),[stages]);
   const totalPages=Math.max(1,Math.ceil(count/PAGE_SIZE));
@@ -70,7 +80,7 @@ export default function PublishersPage(){
 
     <div className="toolbar"><div className="search-box"><Search size={17}/><input className="input" value={filters.q} onChange={e=>setF('q',e.target.value)} placeholder="Nome, nome fantasia ou CNPJ"/></div><select className="filter-select" value={filters.stage} onChange={e=>setF('stage',e.target.value)}><option value="">Todas as etapas</option><option value="__none__">Sem etapa</option>{stages.map(s=><option value={s.id} key={s.id}>{s.name}</option>)}</select><select className="filter-select" value={filters.priority} onChange={e=>setF('priority',e.target.value)}><option value="">Todas as prioridades</option>{Object.entries(PRIORITY_LABELS).map(([k,v])=><option value={k} key={k}>{v}</option>)}</select><button className="btn secondary" onClick={()=>setMoreFilters(v=>!v)}><Filter size={15}/> Mais filtros</button>{hasFilters&&<button className="btn secondary" onClick={reset}>Limpar</button>}</div>
 
-    {moreFilters&&<div className="card panel" style={{marginBottom:16}}><div className="form-grid"><label>UF<select value={filters.state} onChange={e=>setF('state',e.target.value)}><option value="">Todos os estados</option>{BRAZIL_STATES.map(uf=><option key={uf}>{uf}</option>)}</select></label><label>Perfil editorial<select value={filters.editorialProfile} onChange={e=>setF('editorialProfile',e.target.value)}><option value="">Todos os perfis</option>{EDITORIAL_PROFILE_OPTIONS.map(p=><option value={p} key={p}>{p}</option>)}</select></label><label>Responsável<select value={filters.owner} onChange={e=>setF('owner',e.target.value)}><option value="">Qualquer responsável</option><option value="mine">Minhas editoras</option><option value="unassigned">Sem responsável</option>{team.filter(m=>m.active).map(m=><option key={m.user_id} value={m.user_id}>{m.full_name||m.email}</option>)}</select></label><label>Contato<select value={filters.contact} onChange={e=>setF('contact',e.target.value)}><option value="">Qualquer situação</option><option value="never">Nunca contatada</option><option value="contacted">Já contatada</option></select></label><label>Enriquecimento<select value={filters.enrichment} onChange={e=>setF('enrichment',e.target.value)}><option value="">Qualquer status</option>{Object.entries(EDITORIAL_PROFILE_STATUS_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label><label>Score mínimo<input className="input" type="number" min="0" max="100" value={filters.scoreMin} onChange={e=>setF('scoreMin',e.target.value)} placeholder="Ex.: 80"/></label></div></div>}
+    {moreFilters&&<div className="card panel" style={{marginBottom:16}}><div className="form-grid"><label>UF<select value={filters.state} onChange={e=>setF('state',e.target.value)}><option value="">Todos os estados</option>{BRAZIL_STATES.map(uf=><option key={uf}>{uf}</option>)}</select></label><label>Perfil editorial<select value={filters.editorialProfile} onChange={e=>setF('editorialProfile',e.target.value)}><option value="">Todos os perfis</option>{editorialProfileOptions.map(item=><option value={item.value} key={item.value}>{item.value}{item.publisher_count===null?'':` (${item.publisher_count})`}</option>)}</select></label><label>Responsável<select value={filters.owner} onChange={e=>setF('owner',e.target.value)}><option value="">Qualquer responsável</option><option value="mine">Minhas editoras</option><option value="unassigned">Sem responsável</option>{team.filter(m=>m.active).map(m=><option key={m.user_id} value={m.user_id}>{m.full_name||m.email}</option>)}</select></label><label>Contato<select value={filters.contact} onChange={e=>setF('contact',e.target.value)}><option value="">Qualquer situação</option><option value="never">Nunca contatada</option><option value="contacted">Já contatada</option></select></label><label>Enriquecimento<select value={filters.enrichment} onChange={e=>setF('enrichment',e.target.value)}><option value="">Qualquer status</option>{Object.entries(EDITORIAL_PROFILE_STATUS_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label><label>Score mínimo<input className="input" type="number" min="0" max="100" value={filters.scoreMin} onChange={e=>setF('scoreMin',e.target.value)} placeholder="Ex.: 80"/></label></div></div>}
 
     <div className="chips" style={{marginBottom:12}}><button className={`chip ${filters.owner==='mine'?'active':''}`} onClick={()=>setF('owner',filters.owner==='mine'?'':'mine')}>Minha carteira</button><button className={`chip ${filters.owner==='unassigned'?'active':''}`} onClick={()=>setF('owner',filters.owner==='unassigned'?'':'unassigned')}>Sem responsável</button><button className={`chip ${filters.contact==='never'?'active':''}`} onClick={()=>setF('contact',filters.contact==='never'?'':'never')}>Nunca contatadas</button><span className="badge">{count.toLocaleString('pt-BR')} resultado{count===1?'':'s'}</span></div>
 
