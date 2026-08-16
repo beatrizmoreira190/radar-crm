@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Activity, BarChart3, BookOpenCheck, Building2, ClipboardList, HeartPulse, LayoutDashboard, ListChecks, LogOut, MessageSquareText, Target, UserCircle2, Users } from 'lucide-react';
+import { Activity, BarChart3, BookOpenCheck, Building2, ClipboardList, Gauge, HeartPulse, LayoutDashboard, ListChecks, LogOut, MessageSquareText, Target, UserCircle2, Users, Workflow } from 'lucide-react';
 import { useCrm } from './CrmProvider';
 import Avatar from './Avatar';
 
@@ -9,10 +9,12 @@ const NAV = [
   ['/app', 'Visão geral', LayoutDashboard],
   ['/app/prioridades', 'Prioridades', ListChecks],
   ['/app/tarefas', 'Minha fila', ClipboardList],
+  ['/app/cadencias', 'Cadências', Workflow],
   ['/app/editoras', 'Editoras', Building2],
   ['/app/pipeline', 'Pipeline', Target],
   ['/app/atividade', 'Atividade', Activity],
   ['/app/relatorios', 'Relatórios', BarChart3],
+  ['/app/desempenho', 'Desempenho', Gauge],
   ['/app/qualidade', 'Qualidade da base', HeartPulse],
   ['/app/modelos', 'Modelos', MessageSquareText],
   ['/app/equipe', 'Equipe', Users],
