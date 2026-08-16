@@ -1,0 +1,19 @@
+{
+  "name": "radar-crm-editoras",
+  "version": "3.1.0",
+  "private": true,
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "next dev",
+    "build": "cat source.part* | base64 -d > source.tgz && echo 'c09a0d2c38b1bf39300d2f364ad28d81ecaee58426fcad0cb84ffde6fca8f8b8  source.tgz' | sha256sum -c - && tar -xzf source.tgz && next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.55.0",
+    "exceljs": "4.4.0",
+    "lucide-react": "0.468.0",
+    "next": "16.2.11",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  }
+}
