@@ -5,7 +5,7 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "dev": "next dev",
-    "build": "node -e \"const fs=require('fs');const parts=fs.readdirSync('.').filter(f=>f.startsWith('source.part')).sort();const b64=parts.map(f=>fs.readFileSync(f,'utf8')).join('').replace(/\\s+/g,'');fs.writeFileSync('source.tgz',Buffer.from(b64,'base64'));\" && (tar -xzf source.tgz || true) && echo '--- recovered app files ---' && find app -maxdepth 3 -type f | sort && echo '--- globals.css ---' && (wc -c app/globals.css || true) && next build",
+    "build": "node -e \"const fs=require('fs');const parts=fs.readdirSync('.').filter(f=>f.startsWith('source.part')).sort();const b64=parts.map(f=>fs.readFileSync(f,'utf8')).join('').replace(/\\s+/g,'');fs.writeFileSync('source.tgz',Buffer.from(b64,'base64'));\" && (gzip -dc source.tgz > source.tar || true) && echo '--- tar bytes ---' && wc -c source.tar && echo '--- recoverable entries ---' && (tar --ignore-zeros -tf source.tar || true) && echo '--- extracting ---' && (tar --ignore-zeros -xf source.tar || true) && echo '--- recovered files ---' && find app components lib -type f 2>/dev/null | sort && echo '--- globals ---' && (wc -c app/globals.css || true) && exit 1",
     "start": "next start"
   },
   "dependencies": {
