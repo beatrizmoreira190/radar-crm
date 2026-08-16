@@ -2,6 +2,7 @@ import './globals.css';
 import './improvements.css';
 import './wave2.css';
 import './wave3.css';
+import './tooltip-modal-fix.css';
 
 export const metadata = {
   title: 'RADAR - CRM EDITORAS',
