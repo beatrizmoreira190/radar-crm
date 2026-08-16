@@ -6,24 +6,36 @@ import { Activity, BarChart3, Bell, BookOpenCheck, Building2, ClipboardList, Fil
 import { useCrm } from './CrmProvider';
 import Avatar from './Avatar';
 
-const NAV = [
-  ['/app', 'Visão geral', LayoutDashboard],
-  ['/app/prioridades', 'Prioridades', ListChecks],
-  ['/app/lembretes', 'Lembretes', Bell],
-  ['/app/tarefas', 'Minha fila', ClipboardList],
-  ['/app/cadencias', 'Cadências', Workflow],
-  ['/app/editoras', 'Editoras', Building2],
-  ['/app/anexos', 'Anexos', Paperclip],
-  ['/app/pipeline', 'Pipeline', Target],
-  ['/app/atividade', 'Atividade', Activity],
-  ['/app/relatorios', 'Relatórios', BarChart3],
-  ['/app/desempenho', 'Desempenho', Gauge],
-  ['/app/qualidade', 'Qualidade da base', HeartPulse],
-  ['/app/importar', 'Importar', FileUp],
-  ['/app/modelos', 'Modelos', MessageSquareText],
-  ['/app/equipe', 'Equipe', Users],
-  ['/app/perfil', 'Meu perfil', UserCircle2],
-  ['/app/manual', 'Manual', BookOpenCheck],
+const NAV_GROUPS = [
+  { label:'Trabalho do dia', items:[
+    ['/app', 'Visão geral', LayoutDashboard],
+    ['/app/prioridades', 'Prioridades', ListChecks],
+    ['/app/tarefas', 'Minha fila', ClipboardList],
+    ['/app/lembretes', 'Lembretes', Bell],
+  ]},
+  { label:'Prospecção', items:[
+    ['/app/editoras', 'Editoras', Building2],
+    ['/app/cadencias', 'Cadências', Workflow],
+    ['/app/pipeline', 'Pipeline', Target],
+    ['/app/modelos', 'Modelos', MessageSquareText],
+    ['/app/anexos', 'Anexos', Paperclip],
+  ]},
+  { label:'Acompanhamento', items:[
+    ['/app/desempenho', 'Desempenho', Gauge],
+    ['/app/relatorios', 'Relatórios', BarChart3],
+    ['/app/atividade', 'Atividade', Activity],
+  ]},
+  { label:'Gestão', managerOnly:true, items:[
+    ['/app/qualidade', 'Qualidade da base', HeartPulse],
+    ['/app/equipe', 'Equipe', Users],
+  ]},
+  { label:'Administração', adminOnly:true, items:[
+    ['/app/importar', 'Importar', FileUp],
+  ]},
+  { label:'Conta e ajuda', items:[
+    ['/app/perfil', 'Meu perfil', UserCircle2],
+    ['/app/manual', 'Manual', BookOpenCheck],
+  ]},
 ];
 
 export default function CrmShell({ children }) {
@@ -38,12 +50,16 @@ export default function CrmShell({ children }) {
   return <div className="crm-shell">
     <aside className="sidebar">
       <Link href="/app" className="brand">RADAR <span>—</span><small>CRM EDITORAS</small></Link>
-      <nav>{NAV.map(([href,label,Icon]) => {
-        if (href === '/app/equipe' && !isAdmin && membership.role !== 'supervisor') return null;
-        if (href === '/app/qualidade' && !isManager) return null;
-        if (href === '/app/importar' && !isAdmin) return null;
-        const active = href === '/app' ? path === href : path.startsWith(href);
-        return <Link key={href} href={href} className={active?'active':''}><Icon size={18}/><span>{label}</span>{href==='/app/lembretes'&&unread>0&&<b className="nav-count">{unread>99?'99+':unread}</b>}</Link>;
+      <nav>{NAV_GROUPS.map(group=>{
+        if(group.managerOnly&&!isManager)return null;
+        if(group.adminOnly&&!isAdmin)return null;
+        return <div className="nav-section" key={group.label}>
+          <div className="nav-section-title">{group.label}</div>
+          {group.items.map(([href,label,Icon])=>{
+            const active=href==='/app'?path===href:path.startsWith(href);
+            return <Link key={href} href={href} className={active?'active':''}><Icon size={18}/><span>{label}</span>{href==='/app/lembretes'&&unread>0&&<b className="nav-count">{unread>99?'99+':unread}</b>}</Link>;
+          })}
+        </div>;
       })}</nav>
       <div className="sidebar-footer">
         <Link href="/app/perfil" className="profile-link"><Avatar member={membership} size={38}/><div><strong>{membership.full_name || user?.email}</strong><small>{membership.role==='owner'||membership.role==='admin'?'Administrador':membership.role==='supervisor'?'Supervisor':'Prospectador'}</small></div></Link>
