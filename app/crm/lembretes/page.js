@@ -1,0 +1,21 @@
+'use client';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import { Bell, BellRing, CheckCheck, Clock3, RefreshCw, X } from 'lucide-react';
+import { useCrm } from '@/components/CrmProvider';
+import { formatDate } from '@/lib/constants';
+
+export default function RemindersPage(){
+  const {supabase,membership,user,activityVersion}=useCrm(); const org=membership?.organization_id;
+  const [rows,setRows]=useState([]); const [filter,setFilter]=useState('unread'); const [loading,setLoading]=useState(true); const [notice,setNotice]=useState('');
+  async function load(){if(!org||!user)return;setLoading(true);const {error:re}=await supabase.rpc('crm_refresh_notifications',{p_organization_id:org});if(re)setNotice(re.message);const {data,error}=await supabase.from('notifications').select('*').eq('organization_id',org).eq('user_id',user.id).is('resolved_at',null).order('created_at',{ascending:false}).limit(200);if(error)setNotice(error.message);setRows(data||[]);setLoading(false);window.dispatchEvent(new Event('crm-notifications-changed'))}
+  useEffect(()=>{load()},[org,user?.id,activityVersion]);
+  const visible=useMemo(()=>filter==='unread'?rows.filter(r=>!r.read_at):rows,[rows,filter]);
+  const unread=rows.filter(r=>!r.read_at).length;
+  async function mark(id){await supabase.from('notifications').update({read_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',id);setRows(x=>x.map(r=>r.id===id?{...r,read_at:new Date().toISOString()}:r));window.dispatchEvent(new Event('crm-notifications-changed'))}
+  async function markAll(){const now=new Date().toISOString();const {error}=await supabase.from('notifications').update({read_at:now,updated_at:now}).eq('organization_id',org).eq('user_id',user.id).is('resolved_at',null).is('read_at',null);if(error)setNotice(error.message);else{setRows(x=>x.map(r=>({...r,read_at:r.read_at||now})));setNotice('Lembretes marcados como lidos.');window.dispatchEvent(new Event('crm-notifications-changed'))}}
+  return <div className="page-wrap"><div className="page-head"><div><div className="eyebrow">Organização pessoal</div><h1>Lembretes</h1><p>Alertas internos gerados a partir das suas tarefas e próximas ações. Não dependem de e-mail, WhatsApp ou outro serviço.</p></div><div className="chips"><button className="btn secondary" onClick={load}><RefreshCw size={15}/> Atualizar</button>{unread>0&&<button className="btn" onClick={markAll}><CheckCheck size={16}/> Marcar lidos</button>}</div></div>{notice&&<div className="notice-bar"><span>{notice}</span><button onClick={()=>setNotice('')}><X size={15}/></button></div>}
+    <div className="reminder-toolbar"><div className="chips"><button className={`chip ${filter==='unread'?'active':''}`} onClick={()=>setFilter('unread')}>Não lidos · {unread}</button><button className={`chip ${filter==='all'?'active':''}`} onClick={()=>setFilter('all')}>Todos ativos · {rows.length}</button></div><span className="reminder-hint"><Clock3 size={14}/> A lista é recalculada quando você usa o CRM.</span></div>
+    <section className="card panel">{loading?<div className="table-empty">Atualizando lembretes…</div>:visible.length?<div className="reminder-list">{visible.map(r=><article className={`reminder-row ${r.read_at?'read':''} ${r.severity}`} key={r.id}><div className="reminder-icon">{r.severity==='urgent'?<BellRing/>:<Bell/>}</div><div className="reminder-main"><div><strong>{r.title}</strong><span className={`badge ${r.severity==='urgent'?'red':r.severity==='warning'?'amber':'blue'}`}>{r.severity==='urgent'?'Urgente':r.severity==='warning'?'Atenção':'Informação'}</span></div><p>{r.body||'Há uma ação esperando por você.'}</p><small>{formatDate(r.created_at,true)}</small></div><div className="reminder-actions">{r.href&&<Link className="btn secondary small" href={r.href} onClick={()=>mark(r.id)}>Abrir</Link>}{!r.read_at&&<button className="link-btn" onClick={()=>mark(r.id)}>Marcar como lido</button>}</div></article>)}</div>:<div className="empty-state"><Bell/><strong>{filter==='unread'?'Nenhum lembrete não lido.':'Nenhum lembrete ativo.'}</strong><p>Quando uma tarefa vencer ou uma ação se aproximar, ela aparecerá aqui.</p></div>}</section>
+  </div>
+}
