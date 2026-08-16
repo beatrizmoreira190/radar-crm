@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { CheckCircle2, Download, FileSpreadsheet, Upload, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 
@@ -17,10 +17,10 @@ function autoMap(headers){const used=new Set();return headers.map(h=>{const n=no
 export default function ImportPage(){
   const {supabase,membership,isAdmin}=useCrm(); const org=membership?.organization_id;
   const [fileName,setFileName]=useState(''); const [headers,setHeaders]=useState([]); const [rawRows,setRawRows]=useState([]); const [mapping,setMapping]=useState([]); const [mode,setMode]=useState('skip'); const [progress,setProgress]=useState(0); const [busy,setBusy]=useState(false); const [result,setResult]=useState(null); const [notice,setNotice]=useState('');
+  const transformed=rawRows.map((row,idx)=>{const obj={_row:String(idx+2)};mapping.forEach((key,i)=>{if(key)obj[key]=String(row[i]??'').trim()});return obj});
+  const valid=transformed.filter(r=>r.name?.trim()); const invalidCount=transformed.length-valid.length; const nameMapped=mapping.includes('name');
   if(!isAdmin)return <div className="page-wrap"><div className="card panel"><h2>Acesso restrito</h2><p className="muted">A importação de dados cadastrais é exclusiva de administradores.</p></div></div>;
   async function choose(e){const file=e.target.files?.[0];if(!file)return;setNotice('');setResult(null);const text=await file.text();const delimiter=detectDelimiter(text);const matrix=parseDelimited(text,delimiter);if(matrix.length<2){setNotice('O arquivo precisa ter uma linha de cabeçalho e pelo menos uma linha de dados.');return}const hs=matrix[0].map((h,i)=>String(h).replace(/^\uFEFF/,'').trim()||`Coluna ${i+1}`);setFileName(file.name);setHeaders(hs);setRawRows(matrix.slice(1).filter(r=>r.some(v=>String(v).trim())));setMapping(autoMap(hs));setProgress(0)}
-  const transformed=useMemo(()=>rawRows.map((row,idx)=>{const obj={_row:String(idx+2)};mapping.forEach((key,i)=>{if(key)obj[key]=String(row[i]??'').trim()});return obj}),[rawRows,mapping]);
-  const valid=transformed.filter(r=>r.name?.trim()); const invalidCount=transformed.length-valid.length; const nameMapped=mapping.includes('name');
   function setMap(index,value){setMapping(m=>m.map((x,i)=>i===index?value:(value&&x===value?'':x)))}
   async function runImport(){if(!nameMapped||!valid.length)return;setBusy(true);setNotice('');setResult(null);setProgress(0);const totals={inserted:0,updated:0,skipped:invalidCount,errors:0,details:[]};const BATCH=200;for(let i=0;i<valid.length;i+=BATCH){const batch=valid.slice(i,i+BATCH);const {data,error}=await supabase.rpc('crm_import_publishers',{p_organization_id:org,p_rows:batch,p_mode:mode});if(error){setNotice(`A importação parou no lote ${Math.floor(i/BATCH)+1}: ${error.message}`);setBusy(false);return}totals.inserted+=Number(data?.inserted||0);totals.updated+=Number(data?.updated||0);totals.skipped+=Number(data?.skipped||0);totals.errors+=Number(data?.errors||0);totals.details.push(...(data?.details||[]));setProgress(Math.min(100,Math.round((Math.min(i+BATCH,valid.length)/valid.length)*100)))}setResult(totals);setNotice('Importação concluída.');setBusy(false)}
   function downloadTemplate(){const csv='Nome da editora;Razão social;CNPJ;Site;Cidade;UF;Telefone;E-mail geral;Porte;Tipos de livros;Prioridade;Etapa;Observações\nEditora Exemplo Ltda;Editora Exemplo Ltda;00.000.000/0001-00;https://exemplo.com;São Paulo;SP;(11) 0000-0000;contato@exemplo.com;Médio;Literatura;medium;A prospectar;Exemplo de linha\n';const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='modelo-importacao-editoras.csv';a.click();URL.revokeObjectURL(a.href)}
