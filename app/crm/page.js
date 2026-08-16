@@ -31,7 +31,7 @@ export default function CrmHome(){
   function actor(id){return teamMap[id]||{full_name:'Sistema'};}
   function activityPublisher(a){return a.after_data?.name || a.after_data?.title || a.after_data?.summary || a.before_data?.name || '';}
   return <div className="page-wrap">
-    <div className="page-head"><div><div className="eyebrow">Visão geral</div><h1>Bom trabalho{membership?.full_name?`, ${membership.full_name.split(' ')[0]}`:''}.</h1><p>Acompanhe o que precisa de atenção e o que a equipe movimentou recentemente.</p></div><Link href="/app/editoras" className="btn">Abrir editoras <ArrowRight size={17}/></Link></div>
+    <div className="page-head"><div><div className="eyebrow">Visão geral</div><h1>Bom trabalho{membership?.full_name?`, ${membership.full_name.split(' ')[0]}`:''}.</h1><p>Veja suas prioridades do dia, tarefas, editoras em destaque e o andamento da operação.</p></div><Link href="/app/editoras" className="btn">Abrir editoras <ArrowRight size={17}/></Link></div>
     <div className="metric-grid">
       <div className="metric-card"><div className="metric-icon"><Building2/></div><div><span>Editoras</span><strong>{metrics.publishers.toLocaleString('pt-BR')}</strong><small>base ativa</small></div></div>
       <div className="metric-card"><div className="metric-icon"><PhoneCall/></div><div><span>Já contatadas</span><strong>{metrics.contacted.toLocaleString('pt-BR')}</strong><small>{metrics.publishers?Math.round(metrics.contacted/metrics.publishers*100):0}% da base</small></div></div>
