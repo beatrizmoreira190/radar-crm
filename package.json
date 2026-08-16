@@ -5,7 +5,7 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "dev": "next dev",
-    "build": "cat source.part* | base64 -d > source.tgz && echo 'c09a0d2c38b1bf39300d2f364ad28d81ecaee58426fcad0cb84ffde6fca8f8b8  source.tgz' | sha256sum -c - && tar -xzf source.tgz && next build",
+    "build": "next build",
     "start": "next start"
   },
   "dependencies": {
