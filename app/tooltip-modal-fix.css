@@ -1,0 +1,14 @@
+/* Keep contextual help visible around modal fields.
+   The backdrop owns vertical scrolling so help popovers can escape the modal box
+   instead of being clipped by the modal's previous overflow:auto. */
+.modal-backdrop{
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  overflow-y:auto;
+}
+.modal{
+  max-height:none;
+  overflow:visible;
+  margin:auto 0;
+}
