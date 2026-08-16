@@ -1,6 +1,7 @@
 import './globals.css';
 import './improvements.css';
 import './wave2.css';
+import './wave3.css';
 
 export const metadata = {
   title: 'RADAR - CRM EDITORAS',
