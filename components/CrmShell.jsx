@@ -1,17 +1,19 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Activity, BarChart3, BookOpenCheck, Building2, ClipboardList, LayoutDashboard, LogOut, MessageSquareText, Target, UserCircle2, Users } from 'lucide-react';
+import { Activity, BarChart3, BookOpenCheck, Building2, ClipboardList, HeartPulse, LayoutDashboard, ListChecks, LogOut, MessageSquareText, Target, UserCircle2, Users } from 'lucide-react';
 import { useCrm } from './CrmProvider';
 import Avatar from './Avatar';
 
 const NAV = [
   ['/app', 'Visão geral', LayoutDashboard],
+  ['/app/prioridades', 'Prioridades', ListChecks],
   ['/app/tarefas', 'Minha fila', ClipboardList],
   ['/app/editoras', 'Editoras', Building2],
   ['/app/pipeline', 'Pipeline', Target],
   ['/app/atividade', 'Atividade', Activity],
   ['/app/relatorios', 'Relatórios', BarChart3],
+  ['/app/qualidade', 'Qualidade da base', HeartPulse],
   ['/app/modelos', 'Modelos', MessageSquareText],
   ['/app/equipe', 'Equipe', Users],
   ['/app/perfil', 'Meu perfil', UserCircle2],
@@ -20,7 +22,7 @@ const NAV = [
 
 export default function CrmShell({ children }) {
   const path = usePathname(); const router = useRouter();
-  const { loading, user, membership, isAdmin } = useCrm();
+  const { loading, user, membership, isAdmin, isManager } = useCrm();
   async function logout(){ const { supabase } = await import('@/lib/supabase'); await supabase.auth.signOut(); router.replace('/login'); }
   if (loading) return <div className="full-loader"><div className="spinner"/><p>Carregando RADAR - CRM EDITORAS…</p></div>;
   if (!membership) return <div className="access-pending"><div className="login-card"><div className="brand-dark">RADAR <span>—</span> CRM EDITORAS</div><h1>Acesso aguardando liberação</h1><p>Seu login existe, mas ainda não foi vinculado à equipe Radar. Peça a um administrador para liberar seu perfil.</p><button className="btn secondary" onClick={logout}>Sair</button></div></div>;
@@ -29,6 +31,7 @@ export default function CrmShell({ children }) {
       <Link href="/app" className="brand">RADAR <span>—</span><small>CRM EDITORAS</small></Link>
       <nav>{NAV.map(([href,label,Icon]) => {
         if (href === '/app/equipe' && !isAdmin && membership.role !== 'supervisor') return null;
+        if (href === '/app/qualidade' && !isManager) return null;
         const active = href === '/app' ? path === href : path.startsWith(href);
         return <Link key={href} href={href} className={active?'active':''}><Icon size={18}/><span>{label}</span></Link>;
       })}</nav>
