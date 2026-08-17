@@ -30,31 +30,57 @@ export default function ReportsPage(){
   async function exportReport(){
     if(!summary||!org)return;setExporting(true);setNotice('');
     try{
-      const [rows,mod]=await Promise.all([fetchAllPublishers(),import('exceljs')]);
-      const ExcelJS=mod.default||mod; const wb=new ExcelJS.Workbook(); wb.creator='RADAR CRM'; wb.created=new Date();
+      const rows=await fetchAllPublishers();
       const stageMap=Object.fromEntries(stageStats.map(s=>[s.id,s.name]));
+      const lines=['sep=;'];
+      const addRow=(values=[])=>lines.push(values.map(csvCell).join(';'));
 
-      const ws=wb.addWorksheet('Resumo executivo'); ws.columns=[{width:34},{width:24}];
-      ws.addRow([personal?'RADAR — Relatório pessoal':'RADAR — Relatório comercial','']); ws.addRow(['Gerado em',new Date().toLocaleString('pt-BR')]); ws.addRow(['Período de atividade',`${days} dias`]); ws.addRow([]);
-      ws.addRow(['INDICADOR','VALOR']); ws.addRow([personal?'Editoras na minha carteira':'Editoras ativas',total]); ws.addRow(['Editoras já contatadas',contacted]); ws.addRow(['Cobertura da carteira',total?`${Math.round(contacted/total*100)}%`:'0%']); if(!personal)ws.addRow(['Editoras sem responsável',unassigned]); ws.addRow(['Radar Score médio',avgScore]); ws.addRow(['Interações no período',Number(summary.interactions?.period_total||0)]); ws.addRow(['Oportunidades abertas',openOpps]); ws.addRow(['Valor de oportunidades abertas',Number(summary.opportunities?.open_value||0)]); ws.addRow(['Oportunidades ganhas',won]); ws.addRow(['Tarefas pendentes',pending]); ws.addRow(['Tarefas atrasadas',overdue]);
-      ws.addRow([]);ws.addRow(['PIPELINE','EDITORAS']);stageStats.forEach(s=>ws.addRow([s.name,Number(s.count)||0]));
-      ws.addRow([]);ws.addRow(['PRIORIDADE','EDITORAS']);priorityStats.forEach(p=>ws.addRow([p.label,p.count]));
-      ws.addRow([]);ws.addRow(['ESTADOS COM MAIOR BASE','EDITORAS']);(summary.top_states||[]).forEach(s=>ws.addRow([s.state,Number(s.count)||0]));
-      ws.getRow(1).font={bold:true,size:16};
+      addRow([personal?'RADAR — Relatório pessoal':'RADAR — Relatório comercial','']);
+      addRow(['Gerado em',new Date().toLocaleString('pt-BR')]);
+      addRow(['Período de atividade',`${days} dias`]);
+      addRow();
+      addRow(['INDICADOR','VALOR']);
+      addRow([personal?'Editoras na minha carteira':'Editoras ativas',total]);
+      addRow(['Editoras já contatadas',contacted]);
+      addRow(['Cobertura da carteira',total?`${Math.round(contacted/total*100)}%`:'0%']);
+      if(!personal)addRow(['Editoras sem responsável',unassigned]);
+      addRow(['Radar Score médio',avgScore]);
+      addRow(['Interações no período',Number(summary.interactions?.period_total||0)]);
+      addRow(['Oportunidades abertas',openOpps]);
+      addRow(['Valor de oportunidades abertas',Number(summary.opportunities?.open_value||0)]);
+      addRow(['Oportunidades ganhas',won]);
+      addRow(['Tarefas pendentes',pending]);
+      addRow(['Tarefas atrasadas',overdue]);
+      addRow();
+      addRow(['PIPELINE','EDITORAS']);
+      stageStats.forEach(s=>addRow([s.name,Number(s.count)||0]));
+      addRow();
+      addRow(['PRIORIDADE','EDITORAS']);
+      priorityStats.forEach(p=>addRow([p.label,p.count]));
+      addRow();
+      addRow(['ESTADOS COM MAIOR BASE','EDITORAS']);
+      (summary.top_states||[]).forEach(s=>addRow([s.state,Number(s.count)||0]));
+      addRow();
+      addRow(['ANÁLISE AUTOMÁTICA']);
+      insights.forEach(text=>addRow([text]));
+      addRow();
+      addRow(['EDITORAS']);
+      addRow(['Editora','Nome fantasia','CNPJ','Cidade','UF','Etapa','Prioridade','Score','Responsável','Último contato','Próxima ação','E-mail','Telefone','Site']);
+      rows.forEach(p=>addRow([
+        p.name,p.trade_name||'',p.cnpj||'',p.city||'',p.state||'',stageMap[p.stage_id]||'Sem etapa',PRIORITY_LABELS[p.priority]||p.priority||'',p.score??0,
+        teamMap[p.owner_user_id]?.full_name||teamMap[p.owner_user_id]?.email||'',
+        p.last_contact_at?new Date(p.last_contact_at).toLocaleString('pt-BR'):'',
+        p.next_action_at?new Date(p.next_action_at).toLocaleString('pt-BR'):'',
+        p.general_email||'',p.phone||'',p.website||''
+      ]));
 
-      const wi=wb.addWorksheet('Análise');wi.columns=[{header:'Leitura automática dos dados',key:'text',width:110}];insights.forEach(x=>wi.addRow({text:x}));wi.getRow(1).font={bold:true};wi.views=[{state:'frozen',ySplit:1}];
-
-      const wd=wb.addWorksheet('Editoras');wd.columns=[
-        {header:'Editora',key:'name',width:38},{header:'Nome fantasia',key:'trade_name',width:28},{header:'CNPJ',key:'cnpj',width:18},{header:'Cidade',key:'city',width:22},{header:'UF',key:'state',width:8},{header:'Etapa',key:'stage',width:25},{header:'Prioridade',key:'priority',width:14},{header:'Score',key:'score',width:10},{header:'Responsável',key:'owner',width:28},{header:'Último contato',key:'last_contact',width:20},{header:'Próxima ação',key:'next_action',width:20},{header:'E-mail',key:'email',width:30},{header:'Telefone',key:'phone',width:18},{header:'Site',key:'website',width:32}
-      ];
-      rows.forEach(p=>wd.addRow({name:p.name,trade_name:p.trade_name||'',cnpj:p.cnpj||'',city:p.city||'',state:p.state||'',stage:stageMap[p.stage_id]||'Sem etapa',priority:PRIORITY_LABELS[p.priority]||p.priority||'',score:p.score??0,owner:teamMap[p.owner_user_id]?.full_name||teamMap[p.owner_user_id]?.email||'',last_contact:p.last_contact_at?new Date(p.last_contact_at).toLocaleString('pt-BR'):'',next_action:p.next_action_at?new Date(p.next_action_at).toLocaleString('pt-BR'):'',email:p.general_email||'',phone:p.phone||'',website:p.website||''}));
-      wd.getRow(1).font={bold:true};wd.views=[{state:'frozen',ySplit:1}];wd.autoFilter={from:'A1',to:'N1'};
-
-      const buffer=await wb.xlsx.writeBuffer();const blob=new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`radar-relatorio-${new Date().toISOString().slice(0,10)}.xlsx`;a.click();URL.revokeObjectURL(url);setNotice(`Relatório exportado com ${rows.length.toLocaleString('pt-BR')} editoras.`);
+      const blob=new Blob(['\uFEFF',lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
+      const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`radar-relatorio-${new Date().toISOString().slice(0,10)}.csv`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),0);
+      setNotice(`Relatório CSV exportado com ${rows.length.toLocaleString('pt-BR')} editoras.`);
     }catch(e){setNotice(e?.message||'Não foi possível exportar o relatório.')}finally{setExporting(false)}
   }
 
-  return <div className="page-wrap"><div className="page-head"><div><div className="eyebrow">Indicadores</div><h1>Relatórios</h1><p>{personal?'Acompanhe os indicadores da sua carteira e da sua atividade comercial.':'Acompanhe os principais indicadores da operação e exporte os dados para análise.'}</p></div><div className="toolbar" style={{margin:0}}><select className="filter-select" value={days} onChange={e=>setDays(Number(e.target.value))}><option value={30}>Últimos 30 dias</option><option value={60}>Últimos 60 dias</option><option value={90}>Últimos 90 dias</option></select><button className="btn" onClick={exportReport} disabled={exporting||loading}><Download size={16}/>{exporting?'Preparando arquivo…':'Exportar análise (.xlsx)'}</button></div></div>
+  return <div className="page-wrap"><div className="page-head"><div><div className="eyebrow">Indicadores</div><h1>Relatórios</h1><p>{personal?'Acompanhe os indicadores da sua carteira e da sua atividade comercial.':'Acompanhe os principais indicadores da operação e exporte os dados para análise.'}</p></div><div className="toolbar" style={{margin:0}}><select className="filter-select" value={days} onChange={e=>setDays(Number(e.target.value))}><option value={30}>Últimos 30 dias</option><option value={60}>Últimos 60 dias</option><option value={90}>Últimos 90 dias</option></select><button className="btn" onClick={exportReport} disabled={exporting||loading}><Download size={16}/>{exporting?'Preparando arquivo…':'Exportar análise (.csv)'}</button></div></div>
     {notice&&<div className="notice-bar"><span>{notice}</span><button onClick={()=>setNotice('')}><X size={15}/></button></div>}
     {loading?<div className="card table-empty">Calculando indicadores…</div>:<><div className="metric-grid"><Metric icon={<Building2/>} label={personal?'Minha carteira':'Base ativa'} value={total} sub={`${contacted.toLocaleString('pt-BR')} já contatadas`}/><Metric icon={<MessageSquareText/>} label={`Interações / ${days} dias`} value={summary?.interactions?.period_total||0} sub="contatos registrados"/><Metric icon={<Target/>} label="Oportunidades abertas" value={openOpps} sub={`${won} ganhas no histórico`}/><Metric icon={<BarChart3/>} label="Tarefas atrasadas" value={overdue} sub={`${pending} pendentes`}/></div>
       <section className="card panel" style={{marginBottom:16}}><div className="panel-head"><div><h2>Leitura automática</h2><p>Use estes destaques para identificar onde merece mais atenção.</p></div><Lightbulb size={20}/></div><div className="stat-list">{insights.map((text,i)=><div className="stat-row" key={i}><span>{text}</span></div>)}</div></section>
@@ -62,6 +88,7 @@ export default function ReportsPage(){
   </div>;
 }
 
+function csvCell(value){if(value===null||value===undefined)return '""';if(typeof value==='number'&&Number.isFinite(value))return String(value).replace('.',',');let text=String(value);if(/^[=+\-@\t\r]/.test(text))text=`'${text}`;return `"${text.replace(/"/g,'""')}"`;}
 function buildInsights(summary){if(!summary)return[];const personal=summary.scope==='personal';const total=Number(summary.publishers?.total||0);const contacted=Number(summary.publishers?.contacted||0);const unassigned=Number(summary.publishers?.unassigned||0);const coverage=total?Math.round(contacted/total*100):0;const stages=summary.stages||[];const biggest=[...stages].sort((a,b)=>Number(b.count)-Number(a.count))[0];const priorities=summary.priorities||[];const hot=priorities.filter(p=>p.key==='high'||p.key==='urgent').reduce((a,p)=>a+Number(p.count||0),0);const overdue=Number(summary.tasks?.overdue||0);const open=Number(summary.opportunities?.open||0);const interactions=Number(summary.interactions?.period_total||0);const topState=summary.top_states?.[0];const out=[];out.push(`${personal?'Cobertura da carteira':'Cobertura comercial'}: ${coverage}% ${personal?'das suas editoras':'da base'} já recebeu ao menos um contato; ${Math.max(0,total-contacted).toLocaleString('pt-BR')} ainda não têm contato registrado.`);if(biggest)out.push(`Maior concentração do pipeline: “${biggest.name}”, com ${Number(biggest.count).toLocaleString('pt-BR')} editoras (${total?Math.round(Number(biggest.count)/total*100):0}% ${personal?'da sua carteira':'da base'}).`);if(!personal)out.push(`${unassigned.toLocaleString('pt-BR')} editoras estão sem responsável definido; elas podem ser assumidas diretamente pelos prospectadores.`);if(hot)out.push(`${hot.toLocaleString('pt-BR')} editoras estão classificadas como prioridade alta ou urgente.`);out.push(overdue?`Há ${overdue.toLocaleString('pt-BR')} tarefa${overdue===1?'':'s'} atrasada${overdue===1?'':'s'} que merece${overdue===1?'':'m'} atenção.`:'Não há tarefas atrasadas no momento.');out.push(interactions?`Foram registradas ${interactions.toLocaleString('pt-BR')} interações no período selecionado e existem ${open.toLocaleString('pt-BR')} oportunidades abertas.`:`Ainda não há interações registradas no período selecionado.`);if(topState)out.push(`${topState.state} concentra a maior quantidade de editoras ${personal?'da sua carteira':'na base'} (${Number(topState.count).toLocaleString('pt-BR')}).`);return out;}
 function Metric({icon,label,value,sub}){return <div className="metric-card"><div className="metric-icon">{icon}</div><div><span>{label}</span><strong>{Number(value).toLocaleString('pt-BR')}</strong><small>{sub}</small></div></div>}
 function Bar({label,count,max}){return <div className="report-bar-row"><span>{label}</span><div className="bar-track"><div className="bar-fill" style={{width:`${Math.max(count?4:0,count/max*100)}%`}}/></div><strong className="report-number">{count.toLocaleString('pt-BR')}</strong></div>}
