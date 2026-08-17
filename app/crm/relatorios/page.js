@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BarChart3, Building2, Download, Lightbulb, MessageSquareText, Target, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
-import { PRIORITY_LABELS, RESULT_LABELS, currency } from '@/lib/constants';
+import { PRIORITY_LABELS, RADAR_PRODUCT_LABELS, RESULT_LABELS, currency } from '@/lib/constants';
 
 export default function ReportsPage(){
   const {supabase,membership,teamMap,activityVersion,isManager,user}=useCrm();
@@ -23,7 +23,7 @@ export default function ReportsPage(){
 
   async function fetchAllPublishers(){
     const all=[];const chunk=1000;let from=0;
-    while(true){let query=supabase.from('publishers').select('id,name,trade_name,cnpj,city,state,priority,score,stage_id,owner_user_id,last_contact_at,next_action_at,commercial_temperature,general_email,phone,website').eq('organization_id',org).eq('archived',false);if(!isManager)query=query.eq('owner_user_id',user?.id);const {data,error}=await query.order('name').range(from,from+chunk-1);if(error)throw error;all.push(...(data||[]));if(!data||data.length<chunk)break;from+=chunk;}
+    while(true){let query=supabase.from('publishers').select('id,name,trade_name,cnpj,city,state,priority,score,radar_fit_score,commercial_potential_score,data_quality_score,best_product,fit_pnld_literario,fit_pnld_didatico,fit_pnld_tecnico_metodologico,fit_radar_licitacoes,fit_radar_oportunidades,stage_id,owner_user_id,last_contact_at,next_action_at,commercial_temperature,general_email,phone,website').eq('organization_id',org).eq('archived',false);if(!isManager)query=query.eq('owner_user_id',user?.id);const {data,error}=await query.order('name').range(from,from+chunk-1);if(error)throw error;all.push(...(data||[]));if(!data||data.length<chunk)break;from+=chunk;}
     return all;
   }
 
@@ -38,6 +38,7 @@ export default function ReportsPage(){
       addRow([personal?'RADAR — Relatório pessoal':'RADAR — Relatório comercial','']);
       addRow(['Gerado em',new Date().toLocaleString('pt-BR')]);
       addRow(['Período de atividade',`${days} dias`]);
+      addRow(['Radar Score','70% aderência aos serviços + 20% potencial comercial + 10% prospectabilidade']);
       addRow();
       addRow(['INDICADOR','VALOR']);
       addRow([personal?'Editoras na minha carteira':'Editoras ativas',total]);
@@ -65,9 +66,9 @@ export default function ReportsPage(){
       insights.forEach(text=>addRow([text]));
       addRow();
       addRow(['EDITORAS']);
-      addRow(['Editora','Nome fantasia','CNPJ','Cidade','UF','Etapa','Prioridade','Score','Responsável','Último contato','Próxima ação','E-mail','Telefone','Site']);
+      addRow(['Editora','Nome fantasia','CNPJ','Cidade','UF','Etapa','Prioridade','Radar Score','Aderência Radar','Potencial comercial','Qualidade dos dados','Melhor produto','PNLD Literário','PNLD Didático','PNLD Técnico-Metodológico','Radar de Licitações','Radar de Oportunidades','Responsável','Último contato','Próxima ação','E-mail','Telefone','Site']);
       rows.forEach(p=>addRow([
-        p.name,p.trade_name||'',p.cnpj||'',p.city||'',p.state||'',stageMap[p.stage_id]||'Sem etapa',PRIORITY_LABELS[p.priority]||p.priority||'',p.score??0,
+        p.name,p.trade_name||'',p.cnpj||'',p.city||'',p.state||'',stageMap[p.stage_id]||'Sem etapa',PRIORITY_LABELS[p.priority]||p.priority||'',p.score??0,p.radar_fit_score??0,p.commercial_potential_score??0,p.data_quality_score??0,RADAR_PRODUCT_LABELS[p.best_product]||'',p.fit_pnld_literario??0,p.fit_pnld_didatico??0,p.fit_pnld_tecnico_metodologico??0,p.fit_radar_licitacoes??0,p.fit_radar_oportunidades??0,
         teamMap[p.owner_user_id]?.full_name||teamMap[p.owner_user_id]?.email||'',
         p.last_contact_at?new Date(p.last_contact_at).toLocaleString('pt-BR'):'',
         p.next_action_at?new Date(p.next_action_at).toLocaleString('pt-BR'):'',
@@ -76,7 +77,7 @@ export default function ReportsPage(){
 
       const blob=new Blob(['\uFEFF',lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
       const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`radar-relatorio-${new Date().toISOString().slice(0,10)}.csv`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),0);
-      setNotice(`Relatório CSV exportado com ${rows.length.toLocaleString('pt-BR')} editoras.`);
+      setNotice(`Relatório CSV exportado com ${rows.length.toLocaleString('pt-BR')} editoras e os cinco índices de aderência.`);
     }catch(e){setNotice(e?.message||'Não foi possível exportar o relatório.')}finally{setExporting(false)}
   }
 
