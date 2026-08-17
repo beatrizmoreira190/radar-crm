@@ -1,14 +1,19 @@
-name: Validate build
+name: Security and build
 
 on:
+  pull_request:
+    branches: [main]
   push:
-    branches:
-      - agent/fix-vercel-build
+    branches: [main, agent/security-hardening]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  build:
+  validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -17,9 +22,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm install --no-fund
+
+      - name: Fail on high/critical dependency vulnerabilities
+        run: npm audit --audit-level=high
 
       - name: Build
         run: npm run build
