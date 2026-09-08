@@ -20,18 +20,17 @@ export default function PublisherRadarDetailMount(){
     let cancelled=false;
     async function load(){
       if(!org||!id)return;
-      const [p,c,i,g,f]=await Promise.all([
+      const [p,c,i,g]=await Promise.all([
         supabase.from('publishers').select('*').eq('organization_id',org).eq('id',id).maybeSingle(),
         supabase.from('contacts').select('*').eq('organization_id',org).eq('publisher_id',id).eq('active',true).order('is_decision_maker',{ascending:false}).order('full_name'),
         supabase.from('interactions').select('*').eq('organization_id',org).eq('publisher_id',id).order('occurred_at',{ascending:false}).limit(30),
-        supabase.rpc('crm_publisher_guidance',{p_organization_id:org,p_publisher_id:id}),
-        supabase.rpc('crm_publisher_fit_signals',{p_organization_id:org,p_publisher_id:id})
+        supabase.rpc('crm_publisher_guidance',{p_organization_id:org,p_publisher_id:id})
       ]);
       if(cancelled)return;
       setPublisher(p.data||null);
       setContacts(c.data||[]);
       setInteractions(i.data||[]);
-      setGuidance(g.data?{...g.data,profile_fit_signals:f.data?.profile_fit_signals||[]}:null);
+      setGuidance(g.data||null);
     }
     load();
     return()=>{cancelled=true};
