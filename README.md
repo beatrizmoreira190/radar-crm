@@ -23,7 +23,7 @@ npm run build
 
 ## Segurança
 
-- Este repositório deve permanecer **privado**.
+- O repositório está **temporariamente público** durante o desenvolvimento para permitir deployments no plano Hobby da Vercel. Ao estabilizar o fluxo de deploy autenticado, deve voltar a privado.
 - Nunca adicionar chave `service_role`/secret do Supabase ao frontend ou ao repositório.
 - A chave publishable do Supabase pode existir no cliente; a autorização dos dados depende de Auth + RLS.
 - Dados comerciais não ficam no GitHub; ficam no Supabase.
