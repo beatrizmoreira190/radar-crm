@@ -12,10 +12,10 @@
     "security:audit": "npm audit --audit-level=high"
   },
   "dependencies": {
-    "@supabase/supabase-js": "2.55.0",
-    "lucide-react": "0.468.0",
+    "@supabase/supabase-js": "2.116.0",
+    "lucide-react": "1.45.0",
     "next": "16.3.5",
-    "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   }
 }
