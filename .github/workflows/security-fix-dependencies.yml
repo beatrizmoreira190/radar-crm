@@ -1,0 +1,43 @@
+name: Temporary security dependency fix
+
+on:
+  push:
+    branches: [security/hardening-2026-09-14]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: security/hardening-2026-09-14
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Update vulnerable framework dependency
+        run: npm install next@16.3.5 --save-exact --no-fund
+
+      - name: Verify dependency audit
+        run: npm audit --audit-level=high
+
+      - name: Verify production build
+        run: npm run build
+
+      - name: Commit secure lockfile
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git diff --cached --quiet && exit 0
+          git commit -m "security: update vulnerable Next.js dependencies"
+          git push origin HEAD:security/hardening-2026-09-14
