@@ -3,14 +3,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams } from 'next/navigation';
-import { CalendarClock, CheckCircle2, Clock3, ContactRound, Plus, Target, UsersRound } from 'lucide-react';
+import { CalendarClock, CheckCircle2, Clock3, ContactRound, Target } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
-import { OPPORTUNITY_STAGE_LABELS, PRIORITY_LABELS, formatDate } from '@/lib/constants';
+import { OPPORTUNITY_STAGE_LABELS, formatDate } from '@/lib/constants';
 
 const ACTIVE_OPPORTUNITY_STAGES=new Set(['identified','qualified','proposal','negotiation','on_hold']);
 
 function clickAction(label){
-  const buttons=[...document.querySelectorAll('.page-wrap button')];
+  const buttons=[...document.querySelectorAll('.page-wrap button')].filter(item=>!item.closest('[data-publisher-ux-overview]'));
   const button=buttons.find(item=>item.textContent?.replace(/\s+/g,' ').trim().toLowerCase().includes(label.toLowerCase()));
   if(button){button.click();return true}
   return false;
@@ -22,7 +22,7 @@ function sectionByHeading(root,label){
 
 export default function PublisherUxHierarchyMount(){
   const {id}=useParams();
-  const {supabase,membership,user,isManager,hasCommercialFunction,teamMap,activityVersion}=useCrm();
+  const {supabase,membership,isManager,hasCommercialFunction,teamMap,activityVersion}=useCrm();
   const org=membership?.organization_id;
   const [mount,setMount]=useState(null);
   const [publisher,setPublisher]=useState(null);
