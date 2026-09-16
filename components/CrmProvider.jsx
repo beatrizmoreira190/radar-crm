@@ -44,6 +44,8 @@ export function CrmProvider({ children }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'opportunities' }, () => setActivityVersion(v => v + 1))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'publishers' }, () => setActivityVersion(v => v + 1))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'publisher_materials' }, () => setActivityVersion(v => v + 1))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'meetings' }, () => setActivityVersion(v => v + 1))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'meeting_participants' }, () => setActivityVersion(v => v + 1))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_events' }, () => setActivityVersion(v => v + 1))
       .subscribe();
     return () => { supabase.removeChannel(channel); };

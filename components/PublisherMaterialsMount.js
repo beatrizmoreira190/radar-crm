@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams } from 'next/navigation';
-import { ExternalLink, FileText, Pencil, Plus, X } from 'lucide-react';
+import { CalendarClock, ExternalLink, FileText, Pencil, Plus, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 import { MATERIAL_STATUS_LABELS, MATERIAL_TYPE_LABELS, formatDate } from '@/lib/constants';
 
@@ -20,10 +20,11 @@ function statusClass(status){
 
 export default function PublisherMaterialsMount(){
   const {id}=useParams();
-  const {supabase,membership,user,team,teamMap,isManager,hasCommercialFunction}=useCrm();
+  const {supabase,membership,user,team,teamMap,isManager,hasCommercialFunction,activityVersion}=useCrm();
   const org=membership?.organization_id;
   const [mount,setMount]=useState(null);
   const [materials,setMaterials]=useState([]);
+  const [meetings,setMeetings]=useState([]);
   const [loading,setLoading]=useState(true);
   const [notice,setNotice]=useState('');
   const [editing,setEditing]=useState(null);
@@ -31,32 +32,33 @@ export default function PublisherMaterialsMount(){
 
   const canManage=isManager||hasCommercialFunction('pre_meeting_materials')||hasCommercialFunction('negotiation_materials');
   const activeTeam=useMemo(()=>team.filter(member=>member.active),[team]);
+  const meetingMap=useMemo(()=>Object.fromEntries(meetings.map(m=>[m.id,m])),[meetings]);
 
   async function load(){
     if(!org||!id)return;
     setLoading(true);
-    const {data,error}=await supabase.from('publisher_materials')
-      .select('*')
-      .eq('organization_id',org)
-      .eq('publisher_id',id)
-      .order('created_at',{ascending:false});
-    if(error)setNotice(error.message);
-    else setMaterials(data||[]);
+    const [mr,meetingsResult]=await Promise.all([
+      supabase.from('publisher_materials').select('*').eq('organization_id',org).eq('publisher_id',id).order('created_at',{ascending:false}),
+      supabase.from('meetings').select('id,title,scheduled_start,status').eq('organization_id',org).eq('publisher_id',id).order('scheduled_start',{ascending:false}).limit(40)
+    ]);
+    if(mr.error)setNotice(mr.error.message);else setMaterials(mr.data||[]);
+    if(meetingsResult.error)setNotice(meetingsResult.error.message);else setMeetings(meetingsResult.data||[]);
     setLoading(false);
   }
 
-  useEffect(()=>{load()},[org,id]);
+  useEffect(()=>{load()},[org,id,activityVersion]);
 
   useEffect(()=>{
     let node=null;let timer=null;let attempts=0;
     function attach(){
       const stack=document.querySelector('.detail-grid > .detail-stack');
       if(!stack){if(attempts++<30)timer=setTimeout(attach,50);return;}
+      const meetingMount=stack.querySelector('[data-publisher-meetings="commercial-meetings"]');
       const contactSection=Array.from(stack.children).find(child=>child.querySelector?.('h2')?.textContent?.trim()==='Contatos');
       if(!contactSection){if(attempts++<30)timer=setTimeout(attach,50);return;}
       node=document.createElement('div');
       node.dataset.publisherMaterials='commercial-materials';
-      contactSection.insertAdjacentElement('afterend',node);
+      (meetingMount||contactSection).insertAdjacentElement('afterend',node);
       setMount(node);
     }
     attach();
@@ -81,11 +83,13 @@ export default function PublisherMaterialsMount(){
       {notice&&<div className="notice-bar" style={{marginBottom:12}}><span>{notice}</span><button type="button" onClick={()=>setNotice('')}><X size={14}/></button></div>}
       {loading?<div className="table-empty">Carregando materiais…</div>:materials.length?<div className="publisher-material-list">{materials.map(material=>{
         const responsible=teamMap[material.responsible_user_id]?.full_name||teamMap[material.responsible_user_id]?.email||'Equipe';
+        const relatedMeeting=meetingMap[material.meeting_id];
         return <article className="publisher-material-row" key={material.id}>
           <div className="publisher-material-icon"><FileText size={18}/></div>
           <div className="publisher-material-main">
             <div className="publisher-material-title"><strong>{material.title}</strong><span className={`badge ${statusClass(material.status)}`}>{MATERIAL_STATUS_LABELS[material.status]||material.status}</span></div>
             <div className="publisher-meta"><span>{MATERIAL_TYPE_LABELS[material.material_type]||material.material_type}</span><span>{responsible}</span><span>{formatDate(material.updated_at||material.created_at)}</span></div>
+            {relatedMeeting&&<div className="publisher-meta material-meeting"><span><CalendarClock size={12}/>{relatedMeeting.title} · {formatDate(relatedMeeting.scheduled_start,true)}</span></div>}
             {material.description&&<p>{material.description}</p>}
             <a className="text-link" href={material.url} target="_blank" rel="noreferrer"><ExternalLink size={13}/>{linkHost(material.url)}</a>
           </div>
@@ -93,7 +97,7 @@ export default function PublisherMaterialsMount(){
         </article>
       })}</div>:<div className="empty-state"><FileText/><strong>Nenhum material comercial cadastrado.</strong><p>{canManage?'Adicione o link quando houver uma apresentação, projeto, proposta ou curadoria para esta editora.':'Os materiais preparados pela equipe aparecerão aqui.'}</p></div>}
     </section>
-    {showModal&&<MaterialModal supabase={supabase} org={org} publisherId={id} user={user} team={activeTeam} material={editing} onClose={close} onSaved={async mode=>{close();setNotice(mode==='updated'?'Material atualizado.':'Material adicionado.');await load()}}/>}
+    {showModal&&<MaterialModal supabase={supabase} org={org} publisherId={id} user={user} team={activeTeam} meetings={meetings} material={editing} onClose={close} onSaved={async mode=>{close();setNotice(mode==='updated'?'Material atualizado.':'Material adicionado.');await load()}}/>}
     <style jsx>{`
       .publisher-material-list{display:grid;gap:10px}
       .publisher-material-row{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:12px;align-items:start;padding:12px 0;border-top:1px solid #eaecf0}
@@ -101,13 +105,13 @@ export default function PublisherMaterialsMount(){
       .publisher-material-icon{width:34px;height:34px;border-radius:9px;background:#f2f4f7;display:grid;place-items:center;color:#475467}
       .publisher-material-main{min-width:0}
       .publisher-material-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-      .publisher-material-main p{font-size:12px;line-height:1.45;color:#475467;margin:7px 0}
+      .publisher-material-main p{font-size:12px;line-height:1.45;color:#475467;margin:7px 0}.material-meeting span{display:flex;align-items:center;gap:4px}
       @media(max-width:700px){.publisher-material-row{grid-template-columns:34px minmax(0,1fr)}.publisher-material-row>.btn{grid-column:2;justify-self:start}.publisher-material-card :global(.section-title){align-items:flex-start}}
     `}</style>
   </>,mount);
 }
 
-function MaterialModal({supabase,org,publisherId,user,team,material,onClose,onSaved}){
+function MaterialModal({supabase,org,publisherId,user,team,meetings,material,onClose,onSaved}){
   const editing=Boolean(material?.id);
   const [form,setForm]=useState({
     title:material?.title||'',
@@ -115,6 +119,7 @@ function MaterialModal({supabase,org,publisherId,user,team,material,onClose,onSa
     url:material?.url||'',
     status:material?.status||'draft',
     responsible_user_id:material?.responsible_user_id||user?.id||'',
+    meeting_id:material?.meeting_id||'',
     description:material?.description||''
   });
   const [error,setError]=useState('');
@@ -134,6 +139,7 @@ function MaterialModal({supabase,org,publisherId,user,team,material,onClose,onSa
       url,
       status:form.status,
       responsible_user_id:form.responsible_user_id||user?.id||null,
+      meeting_id:form.meeting_id||null,
       description:form.description.trim()||null,
       updated_at:new Date().toISOString()
     };
@@ -152,7 +158,8 @@ function MaterialModal({supabase,org,publisherId,user,team,material,onClose,onSa
     <label>Tipo<select value={form.material_type} onChange={e=>setForm(x=>({...x,material_type:e.target.value}))}>{Object.entries(MATERIAL_TYPE_LABELS).map(([key,label])=><option value={key} key={key}>{label}</option>)}</select></label>
     <label>Status<select value={form.status} onChange={e=>setForm(x=>({...x,status:e.target.value}))}>{Object.entries(MATERIAL_STATUS_LABELS).map(([key,label])=><option value={key} key={key}>{label}</option>)}</select></label>
     <label className="span-2">Link<input required type="url" className="input" value={form.url} onChange={e=>setForm(x=>({...x,url:e.target.value}))} placeholder="https://..."/></label>
-    <label className="span-2">Responsável<select value={form.responsible_user_id} onChange={e=>setForm(x=>({...x,responsible_user_id:e.target.value}))}>{team.map(member=><option value={member.user_id} key={member.user_id}>{member.full_name||member.email||'Equipe'}</option>)}</select></label>
+    <label>Responsável<select value={form.responsible_user_id} onChange={e=>setForm(x=>({...x,responsible_user_id:e.target.value}))}>{team.map(member=><option value={member.user_id} key={member.user_id}>{member.full_name||member.email||'Equipe'}</option>)}</select></label>
+    <label>Reunião relacionada<select value={form.meeting_id} onChange={e=>setForm(x=>({...x,meeting_id:e.target.value}))}><option value="">Sem reunião vinculada</option>{meetings.map(m=><option value={m.id} key={m.id}>{formatDate(m.scheduled_start,true)} · {m.title}</option>)}</select></label>
     <label className="span-2">Observação<textarea rows={3} value={form.description} onChange={e=>setForm(x=>({...x,description:e.target.value}))} placeholder="Contexto ou orientação para uso deste material"/></label>
   </div><div className="modal-actions"><button className="btn secondary" type="button" onClick={onClose}>Cancelar</button><button className="btn" disabled={busy}>{busy?'Salvando…':editing?'Salvar alterações':'Adicionar material'}</button></div></form></div>;
 }
