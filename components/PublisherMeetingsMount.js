@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams } from 'next/navigation';
-import { CalendarClock, Clock3, Pencil, Plus, UserRound, UserRoundPlus, X } from 'lucide-react';
+import { AlertCircle, CalendarClock, CheckCircle2, Clock3, Pencil, Plus, RefreshCw, UserRound, UserRoundPlus, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 import { MEETING_STATUS_LABELS, MEETING_TYPE_LABELS, formatDate } from '@/lib/constants';
 
@@ -21,6 +21,18 @@ function statusClass(status){
 }
 
 function personLabel(member){return member?.full_name||member?.email||'Equipe'}
+function timeLabel(value){return new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit'}).format(new Date(value))}
+function overlaps(startMs,endMs,item){
+  const itemStart=new Date(item?.start).getTime();
+  const itemEnd=new Date(item?.end).getTime();
+  return Number.isFinite(itemStart)&&Number.isFinite(itemEnd)&&startMs<itemEnd&&endMs>itemStart;
+}
+function localDayRange(value){
+  const d=new Date(value);if(Number.isNaN(d.getTime()))return null;
+  const start=new Date(d);start.setHours(0,0,0,0);
+  const end=new Date(start);end.setDate(end.getDate()+1);
+  return {start,end};
+}
 
 export default function PublisherMeetingsMount(){
   const {id}=useParams();
@@ -160,24 +172,78 @@ function MeetingModal({supabase,org,publisherId,user,team,presenters,contacts,me
   const [manual,setManual]=useState(()=>participants.filter(p=>p.source==='manual').map(p=>({full_name:p.full_name||'',email:p.email||'',job_title:p.job_title||''})));
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
+  const [availability,setAvailability]=useState({status:'idle',busy:[],message:'',calendarEmail:null});
+  const [availabilityLoading,setAvailabilityLoading]=useState(false);
 
   function toggleContact(contactId){setSelectedContacts(x=>x.includes(contactId)?x.filter(id=>id!==contactId):[...x,contactId])}
   function addManual(){setManual(x=>[...x,{full_name:'',email:'',job_title:''}])}
   function updateManual(index,patch){setManual(x=>x.map((row,i)=>i===index?{...row,...patch}:row))}
   function removeManual(index){setManual(x=>x.filter((_,i)=>i!==index))}
 
+  async function calendarRequest(body){
+    const {data:{session}}=await supabase.auth.getSession();
+    if(!session?.access_token){const err=new Error('Sua sessão expirou. Entre novamente no CRM.');err.code='SESSION_EXPIRED';throw err}
+    const response=await fetch('/api/google-calendar',{
+      method:'POST',
+      headers:{Authorization:`Bearer ${session.access_token}`,'content-type':'application/json'},
+      body:JSON.stringify(body),cache:'no-store'
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok){const err=new Error(data.error||'Não foi possível consultar a disponibilidade do apresentador.');err.code=data.code||'CALENDAR_ERROR';throw err}
+    return data;
+  }
+
+  async function loadAvailability(){
+    if(!canEditScheduling||!form.presenter_user_id||!form.scheduled_start){setAvailability({status:'idle',busy:[],message:'',calendarEmail:null});return}
+    const range=localDayRange(form.scheduled_start);
+    if(!range)return;
+    setAvailabilityLoading(true);
+    try{
+      const data=await calendarRequest({action:'availability',presenterUserId:form.presenter_user_id,timeMin:range.start.toISOString(),timeMax:range.end.toISOString()});
+      setAvailability({status:'connected',busy:data.busy||[],message:'',calendarEmail:data.calendarEmail||null});
+    }catch(err){
+      if(err.code==='CALENDAR_NOT_CONNECTED')setAvailability({status:'not_connected',busy:[],message:'A agenda externa deste apresentador ainda não foi conectada. O CRM verificará apenas as reuniões internas.',calendarEmail:null});
+      else setAvailability({status:'error',busy:[],message:err.message||'Não foi possível consultar a agenda externa.',calendarEmail:null});
+    }finally{setAvailabilityLoading(false)}
+  }
+
+  useEffect(()=>{
+    if(!canEditScheduling||!form.presenter_user_id||!form.scheduled_start)return;
+    const timer=setTimeout(()=>{loadAvailability()},350);
+    return()=>clearTimeout(timer);
+  },[canEditScheduling,form.presenter_user_id,form.scheduled_start]);
+
+  const selectedStart=form.scheduled_start?new Date(form.scheduled_start):null;
+  const selectedStartMs=selectedStart&&!Number.isNaN(selectedStart.getTime())?selectedStart.getTime():NaN;
+  const selectedDuration=Number(form.duration_minutes)||0;
+  const selectedEndMs=Number.isFinite(selectedStartMs)?selectedStartMs+selectedDuration*60000:NaN;
+  const crmConflict=Number.isFinite(selectedStartMs)&&selectedDuration>0?meetings.find(m=>m.id!==meeting?.id&&m.status==='scheduled'&&m.presenter_user_id===form.presenter_user_id&&selectedStartMs<new Date(m.scheduled_start).getTime()+m.duration_minutes*60000&&selectedEndMs>new Date(m.scheduled_start).getTime()):null;
+  const externalConflict=Number.isFinite(selectedStartMs)&&selectedDuration>0?availability.busy.find(item=>overlaps(selectedStartMs,selectedEndMs,item)):null;
+
   async function save(event){
     event.preventDefault();setError('');
+    let start=null;let duration=0;let end=0;
     if(canEditScheduling){
       if(!form.presenter_user_id){setError('Selecione quem realizará a apresentação.');return}
       if(!form.scheduled_start){setError('Informe a data e o horário da reunião.');return}
-      const start=new Date(form.scheduled_start);if(Number.isNaN(start.getTime())){setError('Informe uma data e horário válidos.');return}
-      const duration=Number(form.duration_minutes);if(!Number.isFinite(duration)||duration<10||duration>480){setError('A duração deve ficar entre 10 e 480 minutos.');return}
-      const end=start.getTime()+duration*60000;
+      start=new Date(form.scheduled_start);if(Number.isNaN(start.getTime())){setError('Informe uma data e horário válidos.');return}
+      duration=Number(form.duration_minutes);if(!Number.isFinite(duration)||duration<10||duration>480){setError('A duração deve ficar entre 10 e 480 minutos.');return}
+      end=start.getTime()+duration*60000;
       const conflict=meetings.find(m=>m.id!==meeting?.id&&m.status==='scheduled'&&m.presenter_user_id===form.presenter_user_id&&start.getTime()<new Date(m.scheduled_start).getTime()+m.duration_minutes*60000&&end>new Date(m.scheduled_start).getTime());
       if(conflict){setError(`Este apresentador já tem outra reunião no CRM em ${formatDate(conflict.scheduled_start,true)}.`);return}
+
+      const schedulingChanged=!editing||form.presenter_user_id!==meeting?.presenter_user_id||localInput(meeting?.scheduled_start)!==form.scheduled_start||Number(meeting?.duration_minutes)!==duration;
+      if(schedulingChanged){
+        setBusy(true);
+        try{
+          const external=await calendarRequest({action:'availability',presenterUserId:form.presenter_user_id,timeMin:start.toISOString(),timeMax:new Date(end).toISOString()});
+          if((external.busy||[]).length){setBusy(false);setError(`O apresentador está indisponível nesse horário no Google Agenda (${timeLabel(external.busy[0].start)}–${timeLabel(external.busy[0].end)}). Escolha outro horário.`);return}
+        }catch(err){
+          if(err.code!=='CALENDAR_NOT_CONNECTED'){setBusy(false);setError(`Não foi possível confirmar a disponibilidade externa agora: ${err.message}`);return}
+        }
+      }
     }
-    setBusy(true);
+    if(!busy)setBusy(true);
     let meetingId=meeting?.id;
     let result;
     if(editing){
@@ -203,12 +269,17 @@ function MeetingModal({supabase,org,publisherId,user,team,presenters,contacts,me
   }
 
   const presenterName=personLabel(team.find(m=>m.user_id===form.presenter_user_id));
-  return <div className="modal-backdrop"><form className="modal" onSubmit={save}><div className="modal-head"><div><h3>{editing?'Editar reunião':'Agendar reunião'}</h3><p>{canEditScheduling?'Registre agora o compromisso comercial. A integração com Google Agenda será adicionada na próxima etapa.':`Você está atualizando a reunião como apresentador(a): ${presenterName}.`}</p></div><button type="button" onClick={onClose}><X/></button></div>{error&&<div className="notice error">{error}</div>}<div className="form-grid">
+  return <div className="modal-backdrop"><form className="modal" onSubmit={save}><div className="modal-head"><div><h3>{editing?'Editar reunião':'Agendar reunião'}</h3><p>{canEditScheduling?'O CRM verifica conflitos internos e, quando a agenda do apresentador está conectada, também os bloqueios do Google Agenda.':`Você está atualizando a reunião como apresentador(a): ${presenterName}.`}</p></div><button type="button" onClick={onClose}><X/></button></div>{error&&<div className="notice error">{error}</div>}<div className="form-grid">
     <label className="span-2">Título<input className="input" required disabled={!canEditScheduling} value={form.title} onChange={e=>setForm(x=>({...x,title:e.target.value}))}/></label>
     <label>Tipo<select disabled={!canEditScheduling} value={form.meeting_type} onChange={e=>setForm(x=>({...x,meeting_type:e.target.value}))}>{Object.entries(MEETING_TYPE_LABELS).map(([key,label])=><option value={key} key={key}>{label}</option>)}</select></label>
     <label>Apresentador<select required disabled={!canEditScheduling} value={form.presenter_user_id} onChange={e=>setForm(x=>({...x,presenter_user_id:e.target.value}))}><option value="">Selecione</option>{presenters.map(p=><option key={p.user_id} value={p.user_id}>{personLabel(p)}</option>)}</select></label>
     <label>Data e horário<input required disabled={!canEditScheduling} type="datetime-local" className="input" value={form.scheduled_start} onChange={e=>setForm(x=>({...x,scheduled_start:e.target.value}))}/></label>
     <label>Duração<select disabled={!canEditScheduling} value={form.duration_minutes} onChange={e=>setForm(x=>({...x,duration_minutes:Number(e.target.value)}))}><option value={20}>20 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>1 hora</option><option value={90}>1h30</option></select></label>
+    {canEditScheduling&&<div className="span-2 availability-panel">
+      <div className="availability-head"><div><strong>Disponibilidade do apresentador</strong><p>Validação automática do horário selecionado.</p></div><button type="button" className="btn secondary small" disabled={availabilityLoading||!form.scheduled_start||!form.presenter_user_id} onClick={loadAvailability}><RefreshCw size={13}/>{availabilityLoading?'Consultando…':'Atualizar'}</button></div>
+      {!form.scheduled_start?<div className="availability-state neutral"><Clock3 size={16}/><span>Escolha a data e o horário para verificar a disponibilidade.</span></div>:availabilityLoading?<div className="availability-state neutral"><RefreshCw size={16}/><span>Consultando agenda do apresentador…</span></div>:crmConflict?<div className="availability-state error"><AlertCircle size={16}/><span><b>Conflito no CRM.</b> Já existe outra reunião deste apresentador em {formatDate(crmConflict.scheduled_start,true)}.</span></div>:externalConflict?<div className="availability-state error"><AlertCircle size={16}/><span><b>Indisponível no Google Agenda.</b> Há um bloqueio entre {timeLabel(externalConflict.start)} e {timeLabel(externalConflict.end)}.</span></div>:availability.status==='connected'?<div className="availability-state success"><CheckCircle2 size={16}/><span><b>Horário disponível.</b> Nenhum conflito foi encontrado no CRM ou no Google Agenda.</span></div>:availability.status==='not_connected'?<div className="availability-state warning"><AlertCircle size={16}/><span>{availability.message}</span></div>:availability.status==='error'?<div className="availability-state warning"><AlertCircle size={16}/><span>{availability.message}</span></div>:<div className="availability-state neutral"><Clock3 size={16}/><span>Selecione um apresentador e horário.</span></div>}
+      {availability.status==='connected'&&availability.busy.length>0&&<div className="busy-blocks"><small>Outros bloqueios externos neste dia</small><div>{availability.busy.slice(0,8).map((item,index)=><span className="badge" key={`${item.start}-${index}`}>{timeLabel(item.start)}–{timeLabel(item.end)}</span>)}{availability.busy.length>8&&<span className="badge">+{availability.busy.length-8}</span>}</div></div>}
+    </div>}
     {editing&&<label>Status<select value={form.status} onChange={e=>setForm(x=>({...x,status:e.target.value}))}>{Object.entries(MEETING_STATUS_LABELS).map(([key,label])=><option value={key} key={key}>{label}</option>)}</select></label>}
     <label className="span-2">Observações antes da reunião<textarea rows={3} value={form.notes} onChange={e=>setForm(x=>({...x,notes:e.target.value}))} placeholder="Contexto, objetivo da apresentação, informações importantes para quem fará a reunião"/></label>
     {editing&&<label className="span-2">Resultado / observações após a reunião<textarea rows={3} value={form.outcome_notes} onChange={e=>setForm(x=>({...x,outcome_notes:e.target.value}))} placeholder="O que aconteceu, interesse percebido e encaminhamentos"/></label>}
@@ -218,6 +289,7 @@ function MeetingModal({supabase,org,publisherId,user,team,presenters,contacts,me
       <p className="muted participant-note">Participantes sem e-mail poderão constar no CRM, mas futuramente não receberão convite automático do Google Agenda.</p>
     </div>}
   </div><div className="modal-actions"><button className="btn secondary" type="button" onClick={onClose}>Cancelar</button><button className="btn" disabled={busy||(!editing&&!presenters.length)}>{busy?'Salvando…':editing?'Salvar reunião':'Agendar reunião'}</button></div><style jsx>{`
-    .participant-editor{border-top:1px solid #eaecf0;padding-top:14px;margin-top:3px}.participant-editor-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}.participant-editor-head p{font-size:11px;color:#667085;margin:3px 0 0}.contact-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.contact-option{display:grid;grid-template-columns:18px minmax(0,1fr);gap:7px;align-items:start;padding:8px;border:1px solid #eaecf0;border-radius:8px;cursor:pointer}.contact-option b,.contact-option small{display:block}.contact-option small{font-size:10px;color:#667085;margin-top:2px}.manual-participant{display:grid;grid-template-columns:20px 1fr 1fr 1fr 34px;gap:6px;align-items:center;margin-top:8px}.participant-note{font-size:10px!important;margin:8px 0 0!important}@media(max-width:700px){.contact-options{grid-template-columns:1fr}.manual-participant{grid-template-columns:20px 1fr 34px}.manual-participant input:nth-of-type(2),.manual-participant input:nth-of-type(3){grid-column:2/3}.participant-editor-head{display:grid}}
+    .availability-panel{border:1px solid #eaecf0;border-radius:10px;padding:11px;background:#fcfcfd;display:grid;gap:8px}.availability-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.availability-head strong{font-size:12px;color:#344054}.availability-head p{font-size:10px;color:#667085;margin:2px 0 0}.availability-state{display:flex;gap:7px;align-items:flex-start;border-radius:8px;padding:9px;font-size:11px;line-height:1.4}.availability-state svg{flex:0 0 auto;margin-top:1px}.availability-state.success{background:#ecfdf3;color:#027a48}.availability-state.error{background:#fef3f2;color:#b42318}.availability-state.warning{background:#fffaeb;color:#b54708}.availability-state.neutral{background:#f2f4f7;color:#475467}.busy-blocks{border-top:1px solid #eaecf0;padding-top:8px}.busy-blocks small{display:block;font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#667085;font-weight:700;margin-bottom:6px}.busy-blocks>div{display:flex;gap:5px;flex-wrap:wrap}
+    .participant-editor{border-top:1px solid #eaecf0;padding-top:14px;margin-top:3px}.participant-editor-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}.participant-editor-head p{font-size:11px;color:#667085;margin:3px 0 0}.contact-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.contact-option{display:grid;grid-template-columns:18px minmax(0,1fr);gap:7px;align-items:start;padding:8px;border:1px solid #eaecf0;border-radius:8px;cursor:pointer}.contact-option b,.contact-option small{display:block}.contact-option small{font-size:10px;color:#667085;margin-top:2px}.manual-participant{display:grid;grid-template-columns:20px 1fr 1fr 1fr 34px;gap:6px;align-items:center;margin-top:8px}.participant-note{font-size:10px!important;margin:8px 0 0!important}@media(max-width:700px){.contact-options{grid-template-columns:1fr}.manual-participant{grid-template-columns:20px 1fr 34px}.manual-participant input:nth-of-type(2),.manual-participant input:nth-of-type(3){grid-column:2/3}.participant-editor-head,.availability-head{display:grid}}
   `}</style></form></div>;
 }
