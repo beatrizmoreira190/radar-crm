@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Activity, BarChart3, Bell, BookOpenCheck, Building2, CalendarDays, ClipboardList, FileUp, Gauge, HeartPulse, LayoutDashboard, ListChecks, LogOut, MessageSquareText, Paperclip, Target, UserCircle2, Users, Workflow } from 'lucide-react';
+import { Activity, BarChart3, BookOpenCheck, Building2, CalendarDays, ClipboardList, FileUp, Gauge, HeartPulse, LayoutDashboard, ListChecks, LogOut, MessageSquareText, Target, UserCircle2, Users, Workflow } from 'lucide-react';
 import { useCrm } from './CrmProvider';
 import Avatar from './Avatar';
 
@@ -10,16 +10,14 @@ const NAV_GROUPS = [
   { label:'Trabalho do dia', items:[
     ['/app', 'Visão geral', LayoutDashboard],
     ['/app/agenda', 'Agenda', CalendarDays],
-    ['/app/prioridades', 'Prioridades', ListChecks],
     ['/app/tarefas', 'Minha fila', ClipboardList],
-    ['/app/lembretes', 'Lembretes', Bell],
+    ['/app/prioridades', 'Prioridades', ListChecks],
   ]},
-  { label:'Prospecção', items:[
+  { label:'Comercial', items:[
     ['/app/editoras', 'Editoras', Building2],
-    ['/app/cadencias', 'Cadências', Workflow],
     ['/app/pipeline', 'Pipeline', Target],
+    ['/app/cadencias', 'Cadências', Workflow],
     ['/app/modelos', 'Modelos', MessageSquareText],
-    ['/app/anexos', 'Anexos', Paperclip],
   ]},
   { label:'Acompanhamento', items:[
     ['/app/desempenho', 'Desempenho', Gauge],
@@ -58,7 +56,7 @@ export default function CrmShell({ children }) {
           <div className="nav-section-title">{group.label}</div>
           {group.items.map(([href,label,Icon])=>{
             const active=href==='/app'?path===href:path.startsWith(href);
-            return <Link key={href} href={href} className={active?'active':''}><Icon size={18}/><span>{label}</span>{href==='/app/lembretes'&&unread>0&&<b className="nav-count">{unread>99?'99+':unread}</b>}</Link>;
+            return <Link key={href} href={href} className={active?'active':''}><Icon size={18}/><span>{label}</span>{href==='/app/tarefas'&&unread>0&&<b className="nav-count">{unread>99?'99+':unread}</b>}</Link>;
           })}
         </div>;
       })}</nav>
