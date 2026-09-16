@@ -2,13 +2,14 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Activity, BarChart3, Bell, BookOpenCheck, Building2, ClipboardList, FileUp, Gauge, HeartPulse, LayoutDashboard, ListChecks, LogOut, MessageSquareText, Paperclip, Target, UserCircle2, Users, Workflow } from 'lucide-react';
+import { Activity, BarChart3, Bell, BookOpenCheck, Building2, CalendarDays, ClipboardList, FileUp, Gauge, HeartPulse, LayoutDashboard, ListChecks, LogOut, MessageSquareText, Paperclip, Target, UserCircle2, Users, Workflow } from 'lucide-react';
 import { useCrm } from './CrmProvider';
 import Avatar from './Avatar';
 
 const NAV_GROUPS = [
   { label:'Trabalho do dia', items:[
     ['/app', 'Visão geral', LayoutDashboard],
+    ['/app/agenda', 'Agenda', CalendarDays],
     ['/app/prioridades', 'Prioridades', ListChecks],
     ['/app/tarefas', 'Minha fila', ClipboardList],
     ['/app/lembretes', 'Lembretes', Bell],
