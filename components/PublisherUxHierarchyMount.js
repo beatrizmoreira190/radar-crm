@@ -22,7 +22,7 @@ function sectionByHeading(root,label){
 
 export default function PublisherUxHierarchyMount(){
   const {id}=useParams();
-  const {supabase,membership,isManager,hasCommercialFunction,teamMap,activityVersion}=useCrm();
+  const {supabase,membership,user,isManager,hasCommercialFunction,teamMap,activityVersion}=useCrm();
   const org=membership?.organization_id;
   const [mount,setMount]=useState(null);
   const [publisher,setPublisher]=useState(null);
@@ -32,7 +32,8 @@ export default function PublisherUxHierarchyMount(){
   const [interactions,setInteractions]=useState([]);
   const [notice,setNotice]=useState('');
 
-  const canSchedule=isManager||hasCommercialFunction('meeting_scheduling');
+  const canWork=Boolean(publisher&&(isManager||publisher.owner_user_id===user?.id));
+  const canSchedule=canWork&&(isManager||hasCommercialFunction('meeting_scheduling'));
 
   async function load(){
     if(!org||!id)return;
@@ -105,12 +106,12 @@ export default function PublisherUxHierarchyMount(){
   return createPortal(<>
     <section className="publisher-command-center">
       <div className="publisher-action-bar">
-        <div className="publisher-action-copy"><span className="eyebrow">Jornada comercial</span><strong>Próximo movimento</strong></div>
-        <div className="publisher-primary-actions">
+        <div className="publisher-action-copy"><span className="eyebrow">Jornada comercial</span><strong>{canWork?'Próximo movimento':'Visão comercial'}</strong></div>
+        {canWork?<div className="publisher-primary-actions">
           <button className="btn" type="button" onClick={()=>action('Registrar contato','relacionamento')}><ContactRound size={15}/> Registrar contato</button>
           <button className="btn secondary" type="button" onClick={()=>action('Oportunidade','oportunidades')}><Target size={15}/> Criar oportunidade</button>
           {canSchedule&&<button className="btn secondary" type="button" onClick={()=>action('Agendar reunião','reunioes')}><CalendarClock size={15}/> Agendar reunião</button>}
-        </div>
+        </div>:<span className="publisher-readonly-note">Modo leitura · ações permanecem com o responsável da conta</span>}
       </div>
       {notice&&<div className="publisher-ux-notice">{notice}<button type="button" onClick={()=>setNotice('')}>×</button></div>}
       <div className="publisher-now-grid">
@@ -133,7 +134,7 @@ export default function PublisherUxHierarchyMount(){
       </nav>
     </section>
     <style jsx>{`
-      .publisher-command-center{display:grid;gap:10px;margin:0 0 18px}.publisher-action-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border:1px solid #e4e7ec;border-radius:14px;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.04)}.publisher-action-copy{display:grid;gap:2px}.publisher-action-copy strong{font-size:15px;color:#101828}.publisher-primary-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.publisher-ux-notice{display:flex;justify-content:space-between;gap:12px;padding:9px 12px;border-radius:10px;background:#fffaeb;color:#8a6116;font-size:11px}.publisher-ux-notice button{border:0;background:transparent;cursor:pointer;color:inherit}.publisher-now-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid #e4e7ec;border-radius:14px;background:#fff;overflow:hidden}.publisher-now-grid article{padding:13px 15px;min-width:0;border-right:1px solid #eaecf0;display:grid;gap:4px}.publisher-now-grid article:last-child{border-right:0}.publisher-now-grid article.clickable{cursor:pointer}.publisher-now-grid article.clickable:hover{background:#f9fafb}.publisher-now-grid small{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#98a2b3;font-weight:800}.publisher-now-grid strong{font-size:12px;color:#101828;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.publisher-now-grid span{font-size:10px;color:#667085;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.publisher-task-strip{display:flex;align-items:center;gap:16px;padding:9px 13px;border:1px solid #eaecf0;border-radius:11px;background:#fcfcfd;font-size:10px;color:#667085}.publisher-task-strip>div:first-child{display:flex;align-items:center;gap:6px;white-space:nowrap;color:#344054}.publisher-task-items{display:flex;gap:12px;min-width:0;overflow:hidden}.publisher-task-items span{display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.publisher-section-nav{position:sticky;top:0;z-index:8;display:flex;gap:4px;overflow:auto;padding:5px;border:1px solid #eaecf0;border-radius:11px;background:rgba(255,255,255,.96);backdrop-filter:blur(8px)}.publisher-section-nav button{border:0;background:transparent;border-radius:7px;padding:7px 10px;font-size:10px;font-weight:700;color:#667085;cursor:pointer;white-space:nowrap}.publisher-section-nav button:hover{background:#f2f4f7;color:#101828}
+      .publisher-command-center{display:grid;gap:10px;margin:0 0 18px}.publisher-action-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border:1px solid #e4e7ec;border-radius:14px;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.04)}.publisher-action-copy{display:grid;gap:2px}.publisher-action-copy strong{font-size:15px;color:#101828}.publisher-primary-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.publisher-readonly-note{font-size:10px;color:#667085}.publisher-ux-notice{display:flex;justify-content:space-between;gap:12px;padding:9px 12px;border-radius:10px;background:#fffaeb;color:#8a6116;font-size:11px}.publisher-ux-notice button{border:0;background:transparent;cursor:pointer;color:inherit}.publisher-now-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid #e4e7ec;border-radius:14px;background:#fff;overflow:hidden}.publisher-now-grid article{padding:13px 15px;min-width:0;border-right:1px solid #eaecf0;display:grid;gap:4px}.publisher-now-grid article:last-child{border-right:0}.publisher-now-grid article.clickable{cursor:pointer}.publisher-now-grid article.clickable:hover{background:#f9fafb}.publisher-now-grid small{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#98a2b3;font-weight:800}.publisher-now-grid strong{font-size:12px;color:#101828;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.publisher-now-grid span{font-size:10px;color:#667085;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.publisher-task-strip{display:flex;align-items:center;gap:16px;padding:9px 13px;border:1px solid #eaecf0;border-radius:11px;background:#fcfcfd;font-size:10px;color:#667085}.publisher-task-strip>div:first-child{display:flex;align-items:center;gap:6px;white-space:nowrap;color:#344054}.publisher-task-items{display:flex;gap:12px;min-width:0;overflow:hidden}.publisher-task-items span{display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.publisher-section-nav{position:sticky;top:0;z-index:8;display:flex;gap:4px;overflow:auto;padding:5px;border:1px solid #eaecf0;border-radius:11px;background:rgba(255,255,255,.96);backdrop-filter:blur(8px)}.publisher-section-nav button{border:0;background:transparent;border-radius:7px;padding:7px 10px;font-size:10px;font-weight:700;color:#667085;cursor:pointer;white-space:nowrap}.publisher-section-nav button:hover{background:#f2f4f7;color:#101828}
       :global(.detail-grid>.detail-stack:first-child){display:grid!important;align-content:start!important}.publisher-command-center :global(.btn){white-space:nowrap}
       :global(.detail-grid .detail-stack>.card.panel),:global(.detail-grid .detail-stack>[data-radar-intelligence]),:global(.detail-grid .detail-stack>[data-publisher-meetings]),:global(.detail-grid .detail-stack>[data-publisher-materials]){scroll-margin-top:58px}
       :global(.detail-grid .detail-stack>.card.panel){box-shadow:0 1px 2px rgba(16,24,40,.03)}
