@@ -1,0 +1,1 @@
+create index if not exists meetings_follow_up_assigned_to_idx on public.meetings(follow_up_assigned_to);
