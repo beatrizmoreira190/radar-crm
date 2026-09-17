@@ -73,7 +73,7 @@ export default function PublisherUxHierarchyMount(){
       if(aside){
         [...aside.children].forEach(child=>{
           const title=child.querySelector?.('h3,h2')?.textContent?.replace(/\?/g,'').trim();
-          if(title==='Resumo')child.style.display='none';
+          if(title==='Resumo')child.classList.add('publisher-sidebar-summary');
           if(title==='Tarefas')child.classList.add('publisher-sidebar-tasks');
           if(title==='Acompanhamento')child.classList.add('publisher-sidebar-tracking');
         });
