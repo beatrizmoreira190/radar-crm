@@ -1,0 +1,28 @@
+name: Generate FullCalendar lockfile
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lockfile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Resolve dependencies
+        run: npm install --package-lock-only --no-fund
+      - name: Upload package-lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: fullcalendar-package-lock
+          path: package-lock.json
+          if-no-files-found: error
