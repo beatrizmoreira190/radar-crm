@@ -22,6 +22,7 @@ const HELP={
   'Reuniões':'Reuniões comerciais vinculadas à editora, incluindo preparação, participantes, resultado e próximos passos.',
   'Materiais comerciais':'Apresentações, projetos, propostas, curadorias e outros materiais preparados para esta editora.',
   'Acompanhamento':'Situação comercial atual da conta: etapa, prioridade, responsável, próxima ação e notas.',
+  'Resumo':'Síntese automática de indicadores básicos da conta. Os dados completos continuam nas respectivas seções da ficha.',
   'Etapa':'Ponto atual da editora no processo de prospecção.',
   'Prioridade':'Nível de atenção que esta conta deve receber na rotina comercial.',
   'Responsável':'Pessoa da equipe encarregada de conduzir a prospecção desta editora.',
@@ -39,6 +40,7 @@ const HELP={
   'Status':'Situação atual deste item no fluxo comercial.',
   'Tipo':'Categoria usada para organizar este item no CRM.',
   'Último contato':'Data da interação comercial mais recente registrada nesta editora.',
+  'Temperatura':'Sinal qualitativo do momento comercial da conta, usado como contexto de priorização.',
   'Oportunidade ativa':'Negócio em andamento que ainda não foi ganho, perdido ou encerrado.',
   'Próxima reunião':'Próxima reunião comercial agendada para esta editora.'
 };
