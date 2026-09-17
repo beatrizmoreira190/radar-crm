@@ -12,6 +12,7 @@ import { MEETING_STATUS_LABELS, MEETING_TYPE_LABELS } from '@/lib/constants';
 import { availabilityRuleCheck, normalizeAvailabilityRule, ruleSummary } from '@/lib/meetingAvailability';
 
 const DEFAULT_RANGE={start:null,end:null};
+const ALLOWED_DURATIONS=[20,30,45,60,90];
 
 function addMinutes(value,minutes){return new Date(new Date(value).getTime()+Number(minutes||0)*60000)}
 function overlaps(aStart,aEnd,bStart,bEnd){return new Date(aStart)<new Date(bEnd)&&new Date(aEnd)>new Date(bStart)}
@@ -29,6 +30,10 @@ function dayHeader(info){
   return <div className="radar-fc-day-head"><strong>{new Intl.DateTimeFormat('pt-BR',{weekday:'short'}).format(date).replace('.','')}</strong><span>{new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit'}).format(date)}</span>{dateKey(date)===dateKey(new Date())&&<em>Hoje</em>}</div>;
 }
 function meetingStatusClass(status){return `meeting-${status||'scheduled'}`}
+function normalizedDuration(minutes){
+  const value=Math.max(15,Number(minutes)||30);
+  return ALLOWED_DURATIONS.reduce((best,item)=>Math.abs(item-value)<Math.abs(best-value)?item:best,ALLOWED_DURATIONS[0]);
+}
 
 export default function CommercialAgendaFullCalendar(){
   const router=useRouter();
@@ -95,14 +100,20 @@ export default function CommercialAgendaFullCalendar(){
     setLoading(false);
   }
 
+  async function fetchExternalBusy(presenterId,start,end){
+    if(!presenterId||presenterId==='all'||!start||!end)return {busy:[],notConnected:true};
+    const token=await accessToken();if(!token)throw new Error('Sua sessão expirou.');
+    const response=await fetch('/api/google-calendar',{method:'POST',headers:{Authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({action:'availability',presenterUserId:presenterId,timeMin:start,timeMax:end}),cache:'no-store'});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok){const error=new Error(data.error||'Não foi possível consultar a agenda externa.');error.code=data.code;throw error}
+    return data;
+  }
+
   async function loadExternal(presenterId=presenterFilter,start=range.start,end=range.end){
     if(presenterId==='all'||!start||!end){setExternalBusy([]);setCalendarMessage('Selecione um apresentador para ver os bloqueios externos.');return}
     setExternalLoading(true);
     try{
-      const token=await accessToken();if(!token)throw new Error('Sua sessão expirou.');
-      const response=await fetch('/api/google-calendar',{method:'POST',headers:{Authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({action:'availability',presenterUserId:presenterId,timeMin:start,timeMax:end}),cache:'no-store'});
-      const data=await response.json().catch(()=>({}));
-      if(!response.ok){const error=new Error(data.error||'Não foi possível consultar a agenda externa.');error.code=data.code;throw error}
+      const data=await fetchExternalBusy(presenterId,start,end);
       setExternalBusy(data.busy||[]);setCalendarMessage(data.calendarEmail?`Google Agenda: ${data.calendarEmail}`:'Google Agenda sincronizado.');
     }catch(error){setExternalBusy([]);setCalendarMessage(error.code==='CALENDAR_NOT_CONNECTED'?'Google Agenda ainda não conectado.':'Agenda externa indisponível no momento.');}
     finally{setExternalLoading(false)}
@@ -135,8 +146,9 @@ export default function CommercialAgendaFullCalendar(){
 
   const visibleExternal=useMemo(()=>{
     if(presenterFilter==='all')return [];
-    return externalBusy.filter(block=>!filteredMeetings.some(meeting=>meeting.status==='scheduled'&&overlaps(block.start,block.end,meeting.scheduled_start,addMinutes(meeting.scheduled_start,meeting.duration_minutes))));
-  },[externalBusy,filteredMeetings,presenterFilter]);
+    const scheduledForPresenter=meetings.filter(meeting=>meeting.presenter_user_id===presenterFilter&&meeting.status==='scheduled');
+    return externalBusy.filter(block=>!scheduledForPresenter.some(meeting=>overlaps(block.start,block.end,meeting.scheduled_start,addMinutes(meeting.scheduled_start,meeting.duration_minutes))));
+  },[externalBusy,meetings,presenterFilter]);
 
   const calendarEvents=useMemo(()=>{
     const radar=filteredMeetings.map(meeting=>({
@@ -144,13 +156,13 @@ export default function CommercialAgendaFullCalendar(){
       title:meeting.publishers?.name||meeting.title||'Reunião Radar',
       start:meeting.scheduled_start,
       end:addMinutes(meeting.scheduled_start,meeting.duration_minutes).toISOString(),
-      classNames:['radar-calendar-event',meetingStatusClass(meeting.status)],
+      className:`radar-calendar-event ${meetingStatusClass(meeting.status)}`,
       extendedProps:{kind:'radar',meeting,publisherId:meeting.publisher_id,presenter:teamMap[meeting.presenter_user_id],participants:participantMap[meeting.id]||[]},
     }));
     const external=visibleExternal.map((block,index)=>({
       id:`external-${index}-${block.start}`,
       title:'Indisponível',start:block.start,end:block.end,
-      editable:false,overlap:false,classNames:['radar-calendar-external'],
+      editable:false,overlap:false,className:'radar-calendar-external',
       extendedProps:{kind:'external'},
     }));
     const breaks=[];
@@ -160,7 +172,7 @@ export default function CommercialAgendaFullCalendar(){
         if(selectedRule.active_days.includes(cursor.getDay())){
           const y=cursor.getFullYear(),m=cursor.getMonth(),d=cursor.getDate();
           const [sh,sm]=selectedRule.break_start.split(':').map(Number);const [eh,em]=selectedRule.break_end.split(':').map(Number);
-          breaks.push({id:`break-${dateKey(cursor)}`,start:new Date(y,m,d,sh,sm).toISOString(),end:new Date(y,m,d,eh,em).toISOString(),display:'background',classNames:['radar-calendar-break'],extendedProps:{kind:'break'}});
+          breaks.push({id:`break-${dateKey(cursor)}`,start:new Date(y,m,d,sh,sm).toISOString(),end:new Date(y,m,d,eh,em).toISOString(),display:'background',className:'radar-calendar-break',extendedProps:{kind:'break'}});
         }
         cursor.setDate(cursor.getDate()+1);
       }
@@ -178,13 +190,14 @@ export default function CommercialAgendaFullCalendar(){
   function today(){api()?.today()}
   function setMode(mode){setViewMode(mode);api()?.changeView(mode==='day'?'timeGridDay':'timeGridWeek')}
 
-  function slotValidation(presenterId,start,duration){
+  function slotValidation(presenterId,start,duration,busyOverride=null){
     const rule=normalizeAvailabilityRule(rules[presenterId]);
     const check=availabilityRuleCheck(rule,start,duration,new Date());if(!check.allowed)return check;
     const startMs=new Date(start).getTime(),endMs=startMs+duration*60000;
     const conflict=meetings.find(row=>row.presenter_user_id===presenterId&&row.status==='scheduled'&&startMs<addMinutes(row.scheduled_start,row.duration_minutes+rule.buffer_minutes).getTime()&&endMs>addMinutes(row.scheduled_start,-rule.buffer_minutes).getTime());
     if(conflict)return {allowed:false,reason:'Esse horário conflita com outra reunião do apresentador.'};
-    const external=externalBusy.find(block=>startMs<new Date(block.end).getTime()&&endMs>new Date(block.start).getTime());
+    const busyRows=busyOverride??(presenterId===presenterFilter?externalBusy:[]);
+    const external=busyRows.find(block=>startMs<new Date(block.end).getTime()&&endMs>new Date(block.start).getTime());
     if(external)return {allowed:false,reason:'Esse horário está bloqueado na agenda externa do apresentador.'};
     return {allowed:true,reason:''};
   }
@@ -192,24 +205,32 @@ export default function CommercialAgendaFullCalendar(){
   function openQuick(startValue,durationValue=null){
     if(!canSchedule||!presenterOptions.length)return;
     const presenterId=presenterFilter!=='all'?presenterFilter:presenterOptions[0].user_id;
-    const rule=normalizeAvailabilityRule(rules[presenterId]);const duration=Number(durationValue||rule.default_duration_minutes||30);
+    const rule=normalizeAvailabilityRule(rules[presenterId]);const duration=normalizedDuration(durationValue||rule.default_duration_minutes||30);
     const check=slotValidation(presenterId,startValue,duration);
     if(!check.allowed){setNotice(check.reason);return}
     setPublisherQuery('');setQuick({publisher_id:'',presenter_user_id:presenterId,scheduled_start:localInput(startValue),duration_minutes:duration});
   }
 
   function handleDateClick(info){openQuick(info.date)}
-  function handleSelect(info){const duration=Math.max(15,Math.round((info.end.getTime()-info.start.getTime())/60000));openQuick(info.start,duration);api()?.unselect()}
+  function handleSelect(info){const duration=normalizedDuration(Math.round((info.end.getTime()-info.start.getTime())/60000));openQuick(info.start,duration);api()?.unselect()}
   function handleEventClick(info){if(info.event.extendedProps.kind==='radar')router.push(`/app/editoras/${info.event.extendedProps.publisherId}`)}
   function handleDatesSet(info){setRange({start:info.start.toISOString(),end:info.end.toISOString()})}
 
   function changeQuickPresenter(presenterId){
     const rule=normalizeAvailabilityRule(rules[presenterId]);setQuick(value=>({...value,presenter_user_id:presenterId,duration_minutes:rule.default_duration_minutes||30}));
   }
-  function continueQuick(){
+  async function continueQuick(){
     if(!quick?.publisher_id){setNotice('Escolha a editora antes de continuar.');return}
     const start=new Date(quick.scheduled_start);if(Number.isNaN(start.getTime())){setNotice('Informe data e horário válidos.');return}
-    const check=slotValidation(quick.presenter_user_id,start,Number(quick.duration_minutes||30));if(!check.allowed){setNotice(check.reason);return}
+    let busyRows=quick.presenter_user_id===presenterFilter?externalBusy:[];
+    if(quick.presenter_user_id!==presenterFilter){
+      try{
+        const end=addMinutes(start,Number(quick.duration_minutes||30));
+        const data=await fetchExternalBusy(quick.presenter_user_id,addMinutes(start,-1).toISOString(),addMinutes(end,1).toISOString());
+        busyRows=data.busy||[];
+      }catch(error){if(error.code!=='CALENDAR_NOT_CONNECTED'){setNotice('Não foi possível confirmar a agenda externa desse apresentador. Tente novamente.');return}}
+    }
+    const check=slotValidation(quick.presenter_user_id,start,Number(quick.duration_minutes||30),busyRows);if(!check.allowed){setNotice(check.reason);return}
     const params=new URLSearchParams({schedule:'1',presenter:quick.presenter_user_id,start:start.toISOString(),duration:String(quick.duration_minutes||30)});
     router.push(`/app/editoras/${quick.publisher_id}?${params.toString()}`);
   }
@@ -262,7 +283,7 @@ export default function CommercialAgendaFullCalendar(){
         initialView={viewMode==='day'?'timeGridDay':'timeGridWeek'}
         headerToolbar={false}
         firstDay={1}
-        weekends={viewDays===7}
+        weekends={viewMode==='day'?true:viewDays===7}
         allDaySlot={false}
         slotMinTime="08:00:00"
         slotMaxTime="19:00:00"
@@ -295,7 +316,7 @@ export default function CommercialAgendaFullCalendar(){
     {quick&&<div className="modal-backdrop"><div className="modal quick-agenda-modal"><div className="modal-head"><div><h3>Agendar reunião</h3><p>Defina o contexto e continue para a ficha da editora.</p></div><button type="button" onClick={()=>setQuick(null)}><X/></button></div><div className="form-grid">
       <label className="span-2">Editora<div className="search-box quick-publisher-search"><Search size={14}/><input value={publisherQuery} onChange={e=>setPublisherQuery(e.target.value)} placeholder="Buscar editora"/></div><select size={Math.min(6,Math.max(3,publisherChoices.length))} value={quick.publisher_id} onChange={e=>setQuick(x=>({...x,publisher_id:e.target.value}))}>{publisherChoices.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
       <label>Apresentador<select value={quick.presenter_user_id} onChange={e=>changeQuickPresenter(e.target.value)}>{presenterOptions.map(member=><option key={member.user_id} value={member.user_id}>{member.full_name||member.email||'Equipe'}</option>)}</select></label>
-      <label>Duração<select value={quick.duration_minutes} onChange={e=>setQuick(x=>({...x,duration_minutes:Number(e.target.value)}))}><option value={20}>20 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>1 hora</option><option value={90}>1h30</option></select></label>
+      <label>Duração<select value={quick.duration_minutes} onChange={e=>setQuick(x=>({...x,duration_minutes:Number(e.target.value)}))}>{ALLOWED_DURATIONS.map(value=><option value={value} key={value}>{value===60?'1 hora':value===90?'1h30':`${value} min`}</option>)}</select></label>
       <label className="span-2">Data e horário<input className="input" type="datetime-local" value={quick.scheduled_start} onChange={e=>setQuick(x=>({...x,scheduled_start:e.target.value}))}/></label>
     </div><div className="modal-actions"><button className="btn secondary" type="button" onClick={()=>setQuick(null)}>Cancelar</button><button className="btn" type="button" onClick={continueQuick}>Continuar para a editora</button></div></div></div>}
   </div>;
