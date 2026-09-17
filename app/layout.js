@@ -8,6 +8,7 @@ import './wave3.css';
 import './tooltip-modal-fix.css';
 import './final-polish.css';
 import './fullcalendar-radar.css';
+import './publisher-record-v2.css';
 
 export const metadata = {
   title: 'RADAR - CRM EDITORAS',
