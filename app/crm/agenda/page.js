@@ -1,5 +1,5 @@
-import CommercialAgendaCalendar from '@/components/CommercialAgendaCalendar';
+import CommercialAgendaCalendarStable from '@/components/CommercialAgendaCalendarStable';
 
 export default function AgendaPage(){
-  return <CommercialAgendaCalendar/>;
+  return <CommercialAgendaCalendarStable/>;
 }
