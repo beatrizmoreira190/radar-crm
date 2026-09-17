@@ -1,0 +1,87 @@
+/* Final product polish — shared visual rhythm across the CRM */
+:root{
+  --bg:#f7f8fa;
+  --surface-2:#fafbfc;
+  --border:#e6e8ed;
+  --border-2:#cfd4dc;
+  --shadow:0 12px 36px rgba(16,24,40,.07);
+}
+body{background:linear-gradient(180deg,#f8f9fb 0,#f6f7f9 100%);}
+.crm-main{padding:26px 30px 34px;}
+.page-wrap{max-width:1480px;}
+.page-head{margin-bottom:18px;align-items:center;}
+.page-head h1{font-size:28px;line-height:1.12;margin:3px 0 4px;}
+.page-head p{font-size:13px;line-height:1.45;}
+.eyebrow{font-size:10px;letter-spacing:.12em;}
+.card{border-color:#e5e8ed;border-radius:13px;box-shadow:0 1px 2px rgba(16,24,40,.025),0 4px 12px rgba(16,24,40,.018);}
+.panel{padding:18px;}
+.section-title{margin-bottom:11px;}
+.section-title h2{font-size:18px;letter-spacing:-.018em;}
+.section-title p{line-height:1.4;}
+.btn{border-radius:8px;min-height:40px;box-shadow:0 1px 1px rgba(16,24,40,.04);}
+.btn.small{min-height:32px;font-size:12px;}
+.btn.secondary{box-shadow:0 1px 1px rgba(16,24,40,.025);}
+.input,select,textarea{border-radius:8px;border-color:#d5d9e0;}
+.icon-btn{border-radius:8px;transition:background .14s ease,border-color .14s ease,color .14s ease;}
+.badge{letter-spacing:-.005em;}
+
+/* Sidebar: quieter grouping and clearer current location */
+.sidebar{padding-top:18px;box-shadow:8px 0 28px rgba(16,24,40,.045);}
+.sidebar .brand{padding-bottom:16px;}
+.nav-section{margin-top:10px;}
+.nav-section-title{padding-bottom:4px;color:#7f899a;}
+.sidebar nav a{min-height:38px;padding:9px 10px;transition:background .14s ease,color .14s ease,transform .14s ease;}
+.sidebar nav a:hover{transform:translateX(1px);}
+.sidebar nav a.active{box-shadow:0 1px 2px rgba(0,0,0,.12);font-weight:780;}
+
+/* Dashboards, queues and pipeline should feel like the same product */
+.metric-grid,.priority-summary-grid,.health-grid{gap:11px;}
+.metric-card,.priority-summary,.health-card,.pipeline-stage-card,.pipeline-list-card{border-color:#e5e8ed;box-shadow:0 1px 2px rgba(16,24,40,.025);transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease;}
+.metric-card:hover,.priority-summary:hover,.health-card:hover,.pipeline-list-card:hover{border-color:#d9dde4;box-shadow:0 5px 16px rgba(16,24,40,.045);}
+.metric-card strong,.priority-summary strong,.health-card strong{letter-spacing:-.035em;}
+.pipeline-stage-card:hover{transform:translateY(-1px);box-shadow:0 5px 14px rgba(16,24,40,.045);}
+.smart-queue-row,.task-row,.activity-row,.hot-row,.quality-row{transition:background .12s ease;}
+.smart-queue-row:hover,.task-row:hover,.activity-row:hover,.hot-row:hover,.quality-row:hover{background:#fafbfc;}
+
+/* Tables */
+.table-card{border-radius:13px;box-shadow:0 1px 2px rgba(16,24,40,.025);}
+.data-table th{background:#fafbfc;color:#717b8d;font-size:10px;padding:10px 13px;}
+.data-table td{padding:11px 13px;}
+.data-table tbody tr{transition:background .12s ease;}
+.data-table tbody tr:hover{background:#fafbfc;}
+
+/* Publisher detail: stronger hierarchy, less form-like sidebar */
+.detail-grid{gap:16px!important;}
+.detail-stack{gap:14px!important;}
+.publisher-tracking-panel{background:#fcfcfd;}
+.publisher-tracking-panel label{font-size:11px;}
+.publisher-tracking-panel textarea{background:#fff;}
+.publisher-compact-tasks{background:#fcfcfd;}
+.publisher-compact-tasks .task-row{padding:9px 0;}
+.radar-intelligence-collapsible{border-color:#dfe3e9!important;box-shadow:0 4px 16px rgba(16,24,40,.035)!important;}
+.radar-intelligence-summary{background:linear-gradient(180deg,#fff,#fcfcfd);}
+
+/* Secondary meeting actions live under a quiet overflow menu */
+.meeting-more-actions{position:relative;display:inline-flex;}
+.meeting-more-actions>summary{list-style:none;width:30px;height:27px;border:1px solid #d0d5dd;border-radius:7px;background:#fff;display:grid;place-items:center;color:#667085;font-size:13px;font-weight:900;letter-spacing:.08em;cursor:pointer;user-select:none;}
+.meeting-more-actions>summary::-webkit-details-marker{display:none;}
+.meeting-more-actions[open]>summary,.meeting-more-actions>summary:hover{background:#f9fafb;color:#344054;}
+.meeting-more-menu{position:absolute;right:0;top:32px;z-index:50;width:165px;padding:5px;border:1px solid #e4e7ec;border-radius:9px;background:#fff;box-shadow:0 14px 30px rgba(16,24,40,.15);display:grid;}
+.meeting-more-menu button{border:0;background:transparent;border-radius:6px;padding:8px 9px;text-align:left;font-size:10px;font-weight:700;color:#475467;}
+.meeting-more-menu button:hover{background:#f2f4f7;}
+.meeting-more-menu button.danger{color:#b42318;}
+.meeting-more-menu button.danger:hover{background:#fff1f0;}
+
+/* Modals */
+.modal{border-radius:15px!important;box-shadow:0 28px 80px rgba(16,24,40,.2)!important;border:1px solid rgba(208,213,221,.8);}
+.modal-head{padding-bottom:13px;border-bottom:1px solid #f0f1f3;}
+.modal-head h3{letter-spacing:-.025em;}
+.modal-actions{padding-top:13px;border-top:1px solid #f0f1f3;}
+
+/* Notices and empty states */
+.notice-bar{border-radius:10px;}
+.empty-state{padding:24px 12px;}
+.empty-state p{max-width:520px;margin-left:auto;margin-right:auto;}
+
+@media(max-width:1100px){.crm-main{padding:22px;}.page-head{align-items:flex-start;}}
+@media(max-width:720px){.crm-main{padding:16px;}.page-head{margin-bottom:15px}.page-head h1{font-size:25px}.panel{padding:15px}.card{border-radius:11px}.meeting-more-menu{right:auto;left:0}}
