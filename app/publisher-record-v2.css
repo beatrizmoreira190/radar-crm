@@ -1,0 +1,89 @@
+/* Publisher record v2 — durable CRM record layout inspired by mature record-detail patterns */
+.publisher-record-overview{margin:0 0 12px;padding:0;overflow:visible;background:#fff;border:1px solid #e4e7ec;box-shadow:0 6px 18px rgba(16,24,40,.035)}
+.publisher-record-overview-head{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:15px 17px 12px;border-bottom:1px solid #eef0f3}
+.publisher-record-overview-head>div:first-child{display:grid;gap:2px;min-width:0}
+.publisher-record-overview-head strong{font-size:15px;color:#101828;letter-spacing:-.015em}
+.publisher-record-overview-head p{margin:0;color:#667085;font-size:10px;line-height:1.4}
+.publisher-record-state{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.publisher-record-state>span{display:flex;align-items:center;gap:5px;padding:6px 9px;border:1px solid #e4e7ec;border-radius:999px;background:#fcfcfd;color:#475467;font-size:10px;font-weight:750;white-space:nowrap}
+.publisher-record-overview-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));background:#fff}
+.publisher-record-overview-grid article{min-width:0;padding:12px 14px;border-right:1px solid #eef0f3;display:grid;gap:4px}
+.publisher-record-overview-grid article:last-child{border-right:0}
+.publisher-overview-label{display:flex;align-items:center;gap:5px;color:#667085;font-size:9px;text-transform:uppercase;letter-spacing:.055em;font-weight:850;min-width:0}
+.publisher-overview-label svg{width:13px;height:13px;flex:0 0 auto;color:#98a2b3}
+.publisher-record-overview-grid strong{font-size:11px;line-height:1.3;color:#101828;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.publisher-record-overview-grid small{font-size:9px;line-height:1.35;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Essential contact block — the fastest way to act on a record */
+.publisher-quick-contact{margin:0 0 14px;padding:12px 14px;display:grid;grid-template-columns:minmax(180px,.72fr) minmax(0,3.28fr);gap:14px;align-items:center;background:linear-gradient(180deg,#fff,#fcfcfd);border-color:#e4e7ec}
+.quick-contact-heading{display:flex;align-items:center;gap:7px;min-width:0}
+.quick-contact-heading>div{display:grid;gap:2px;min-width:0}
+.quick-contact-heading>div>small{font-size:8px;text-transform:uppercase;letter-spacing:.07em;color:#98a2b3;font-weight:850}
+.quick-contact-heading>div>strong{font-size:12px;line-height:1.25;color:#101828}
+.quick-contact-items{display:grid;grid-template-columns:1fr 1.35fr 1.15fr 1.25fr;gap:7px;min-width:0}
+.quick-contact-items>a,.quick-contact-empty,.quick-contact-location{display:flex;align-items:center;gap:8px;min-width:0;padding:8px 9px;border:1px solid #eaecf0;border-radius:9px;background:#fff;color:#475467;transition:border-color .14s ease,box-shadow .14s ease,transform .14s ease}
+.quick-contact-items>a:hover{border-color:#cfd4dc;box-shadow:0 4px 12px rgba(16,24,40,.05);transform:translateY(-1px)}
+.quick-contact-items svg{flex:0 0 auto;color:#667085}
+.quick-contact-items span{display:grid;min-width:0;gap:1px}
+.quick-contact-items small{display:flex;align-items:center;gap:4px;font-size:8px;text-transform:uppercase;letter-spacing:.055em;color:#98a2b3;font-weight:850;min-width:0}
+.quick-contact-items strong{font-size:10px;line-height:1.3;color:#344054;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.quick-contact-items em{font-size:8px;font-style:normal;color:#98a2b3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.quick-contact-empty{opacity:.65}
+
+/* Main record structure */
+.publisher-record-grid{grid-template-columns:minmax(0,1fr) 340px!important;gap:16px!important;align-items:start}
+.publisher-record-main{gap:14px!important}
+.publisher-record-aside{gap:12px!important;position:sticky;top:12px;align-self:start}
+.publisher-record-main>.card,.publisher-record-main>[data-radar-intelligence],.publisher-record-main>[data-publisher-meetings],.publisher-record-main>[data-publisher-materials]{scroll-margin-top:18px}
+.publisher-data-card,.publisher-score-card,.publisher-contacts-card,.publisher-history-card,.publisher-opportunities-card,.publisher-meetings-section,.publisher-materials-section{position:relative}
+.publisher-record-main .card.panel{padding:17px 18px}
+.publisher-record-main .section-title{align-items:flex-start}
+.publisher-record-main .section-title h2{font-size:17px}
+.publisher-record-main .info-grid{gap:8px 18px}
+.publisher-record-main .info-item{padding:8px 10px;border:1px solid #eef0f3;border-radius:9px;background:#fcfcfd}
+.publisher-record-main .info-item small{display:flex;align-items:center;gap:4px;margin-bottom:3px;font-size:8px;letter-spacing:.055em;text-transform:uppercase;color:#98a2b3;font-weight:850}
+.publisher-record-main .info-item span{font-size:11px;line-height:1.35;color:#344054}
+.publisher-sidebar-tracking,.publisher-sidebar-tasks{box-shadow:0 3px 12px rgba(16,24,40,.035)!important}
+.publisher-sidebar-tracking{border-top:3px solid #111827!important}
+.publisher-sidebar-tasks{border-top:3px solid #e5484d!important}
+.publisher-record-aside label{font-size:10px}
+.publisher-record-aside .section-title h3{font-size:15px}
+
+/* Compact, consistent inline help */
+.publisher-help-dot{position:relative;display:inline-grid!important;place-items:center;flex:0 0 auto;width:15px;height:15px;min-width:15px;padding:0!important;margin:0!important;border:1px solid #d0d5dd!important;border-radius:50%!important;background:#fff!important;color:#667085!important;font:800 9px/1 system-ui,sans-serif!important;box-shadow:none!important;cursor:help!important;vertical-align:middle;overflow:visible!important}
+.publisher-help-dot:hover,.publisher-help-dot:focus-visible{border-color:#98a2b3!important;color:#344054!important;background:#f9fafb!important;outline:none}
+.publisher-help-dot:after{content:attr(data-help);position:absolute;z-index:200;left:50%;bottom:calc(100% + 8px);width:260px;max-width:min(260px,78vw);padding:9px 10px;border-radius:8px;background:#101828;color:#fff;font-size:10px;font-weight:500;line-height:1.45;text-transform:none;letter-spacing:0;text-align:left;white-space:normal;box-shadow:0 12px 30px rgba(16,24,40,.22);opacity:0;visibility:hidden;pointer-events:none;transform:translate(-50%,4px);transition:.12s ease}
+.publisher-help-dot:before{content:"";position:absolute;z-index:201;left:50%;bottom:calc(100% + 3px);margin-left:-5px;border:5px solid transparent;border-top-color:#101828;opacity:0;visibility:hidden;transition:.12s ease}
+.publisher-help-dot:hover:after,.publisher-help-dot:focus-visible:after,.publisher-help-dot:hover:before,.publisher-help-dot:focus-visible:before{opacity:1;visibility:visible;transform:translate(-50%,0)}
+.page-head .badge .publisher-help-dot{width:13px;height:13px;min-width:13px;font-size:8px;margin-left:3px!important;background:rgba(255,255,255,.12)!important;color:inherit!important;border-color:rgba(255,255,255,.3)!important}
+.help-label,.help-heading{gap:5px}
+
+/* Gentle polish for relationship and activity content */
+.publisher-contacts-card .contact-row,.publisher-history-card .history-row,.publisher-opportunities-card .opportunity-row{border-radius:8px;transition:background .12s ease}
+.publisher-contacts-card .contact-row:hover,.publisher-history-card .history-row:hover,.publisher-opportunities-card .opportunity-row:hover{background:#fafbfc}
+.radar-intelligence-collapsible{border-top:3px solid #344054!important}
+.publisher-meetings-card{border-top:3px solid #4665d8!important}
+.publisher-materials-card{border-top:3px solid #8b5cf6!important}
+
+@media(max-width:1180px){
+  .publisher-record-grid{grid-template-columns:minmax(0,1fr) 300px!important}
+  .publisher-record-overview-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .publisher-record-overview-grid article:nth-child(3){border-right:0}
+  .publisher-record-overview-grid article:nth-child(n+4){border-top:1px solid #eef0f3}
+  .quick-contact-items{grid-template-columns:1fr 1fr}
+}
+@media(max-width:900px){
+  .publisher-record-grid{grid-template-columns:1fr!important}
+  .publisher-record-aside{position:static}
+  .publisher-quick-contact{grid-template-columns:1fr}
+  .publisher-record-overview-head{align-items:flex-start;flex-direction:column}
+  .publisher-record-state{justify-content:flex-start}
+}
+@media(max-width:650px){
+  .publisher-record-overview-grid{grid-template-columns:1fr}
+  .publisher-record-overview-grid article{border-right:0;border-top:1px solid #eef0f3}
+  .publisher-record-overview-grid article:first-child{border-top:0}
+  .quick-contact-items{grid-template-columns:1fr}
+  .publisher-record-overview-head{padding:14px}
+  .publisher-record-main .card.panel{padding:15px}
+}
