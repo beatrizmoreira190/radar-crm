@@ -54,7 +54,7 @@ export default function CommercialAgendaFullCalendar(){
   const [meetings,setMeetings]=useState([]);
   const [participants,setParticipants]=useState([]);
   const [rules,setRules]=useState({});
-  const [publishers,setPublishers]=useState([]);
+  const [publisherChoices,setPublisherChoices]=useState([]);
   const [presenterFilter,setPresenterFilter]=useState('all');
   const [statusFilter,setStatusFilter]=useState('scheduled');
   const [query,setQuery]=useState('');
@@ -65,6 +65,7 @@ export default function CommercialAgendaFullCalendar(){
   const [notice,setNotice]=useState('');
   const [quick,setQuick]=useState(null);
   const [publisherQuery,setPublisherQuery]=useState('');
+  const [publisherSearchLoading,setPublisherSearchLoading]=useState(false);
 
   useEffect(()=>{
     if(typeof window==='undefined')return;
@@ -83,13 +84,29 @@ export default function CommercialAgendaFullCalendar(){
 
   async function loadStatic(){
     if(!org)return;
-    const [ruleResult,publisherResult]=await Promise.all([
-      supabase.from('presenter_availability_rules').select('*').eq('organization_id',org),
-      supabase.from('publishers').select('id,name').eq('organization_id',org).eq('archived',false).order('name').limit(1500),
-    ]);
-    if(ruleResult.error||publisherResult.error)setNotice(ruleResult.error?.message||publisherResult.error?.message||'Não foi possível carregar os dados da agenda.');
-    setRules(Object.fromEntries((ruleResult.data||[]).map(row=>[row.user_id,normalizeAvailabilityRule(row)])));
-    setPublishers(publisherResult.data||[]);
+    const {data,error}=await supabase.from('presenter_availability_rules').select('*').eq('organization_id',org);
+    if(error)setNotice(error.message||'Não foi possível carregar as regras da agenda.');
+    setRules(Object.fromEntries((data||[]).map(row=>[row.user_id,normalizeAvailabilityRule(row)])));
+  }
+
+  async function searchPublishers(term=''){
+    if(!org)return;
+    setPublisherSearchLoading(true);
+    let query=supabase.from('publishers')
+      .select('id,name,city,state')
+      .eq('organization_id',org)
+      .eq('archived',false)
+      .order('name');
+    const needle=term.trim();
+    if(needle)query=query.ilike('name',`%${needle}%`);
+    const {data,error}=await query.limit(100);
+    if(error){
+      setNotice(error.message||'Não foi possível buscar editoras.');
+      setPublisherChoices([]);
+    }else{
+      setPublisherChoices(data||[]);
+    }
+    setPublisherSearchLoading(false);
   }
 
   async function loadRange(start=range.start,end=range.end,silent=false){
@@ -178,6 +195,11 @@ export default function CommercialAgendaFullCalendar(){
     },60000);
     return()=>clearInterval(timer);
   },[org,range.start,range.end,presenterFilter,team,activityVersion]);
+  useEffect(()=>{
+    if(!quick)return;
+    const timer=setTimeout(()=>searchPublishers(publisherQuery),250);
+    return()=>clearTimeout(timer);
+  },[quick,publisherQuery,org]);
 
   const participantMap=useMemo(()=>{const out={};for(const person of participants)(out[person.meeting_id]||(out[person.meeting_id]=[])).push(person);return out},[participants]);
   const presenterOptions=useMemo(()=>{
@@ -272,7 +294,7 @@ export default function CommercialAgendaFullCalendar(){
     const rule=normalizeAvailabilityRule(rules[presenterId]);const duration=normalizedDuration(durationValue||rule.default_duration_minutes||30);
     const check=slotValidation(presenterId,startValue,duration);
     if(!check.allowed){setNotice(check.reason);return}
-    setPublisherQuery('');setQuick({publisher_id:'',presenter_user_id:presenterId,scheduled_start:localInput(startValue),duration_minutes:duration});
+    setPublisherQuery('');setPublisherChoices([]);setQuick({publisher_id:'',presenter_user_id:presenterId,scheduled_start:localInput(startValue),duration_minutes:duration});
   }
 
   function handleDateClick(info){
@@ -307,7 +329,6 @@ export default function CommercialAgendaFullCalendar(){
     router.push(`/app/editoras/${quick.publisher_id}?${params.toString()}`);
   }
 
-  const publisherChoices=useMemo(()=>{const needle=publisherQuery.trim().toLowerCase();return (needle?publishers.filter(item=>String(item.name||'').toLowerCase().includes(needle)):publishers).slice(0,80)},[publishers,publisherQuery]);
   const period=periodLabel(periodAnchor||range.start,range.end,viewMode);
   const scrollHour=Math.max(0,new Date().getHours()-1);
   const scrollTime=`${String(scrollHour).padStart(2,'0')}:00:00`;
@@ -393,7 +414,7 @@ export default function CommercialAgendaFullCalendar(){
     </section>
 
     {quick&&<div className="modal-backdrop"><div className="modal quick-agenda-modal"><div className="modal-head"><div><h3>Agendar reunião</h3><p>Defina o contexto e continue para a ficha da editora.</p></div><button type="button" onClick={()=>setQuick(null)}><X/></button></div><div className="form-grid">
-      <label className="span-2">Editora<div className="search-box quick-publisher-search"><Search size={14}/><input value={publisherQuery} onChange={e=>setPublisherQuery(e.target.value)} placeholder="Buscar editora"/></div><select size={Math.min(6,Math.max(3,publisherChoices.length))} value={quick.publisher_id} onChange={e=>setQuick(x=>({...x,publisher_id:e.target.value}))}>{publisherChoices.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      <label className="span-2">Editora<div className="search-box quick-publisher-search"><Search size={14}/><input className="input" value={publisherQuery} onChange={e=>setPublisherQuery(e.target.value)} placeholder="Buscar editora em toda a base"/></div><small className="muted" style={{fontSize:10}}>A busca consulta toda a base de editoras. Digite parte do nome para localizar qualquer cadastro.</small><select size={Math.min(6,Math.max(3,publisherChoices.length||3))} value={quick.publisher_id} onChange={e=>setQuick(x=>({...x,publisher_id:e.target.value}))}><option value="">{publisherSearchLoading?'Buscando editoras…':publisherChoices.length?'Selecione uma editora':'Nenhuma editora encontrada'}</option>{publisherChoices.map(item=><option key={item.id} value={item.id}>{item.name}{[item.city,item.state].filter(Boolean).length?` — ${[item.city,item.state].filter(Boolean).join(' / ')}`:''}</option>)}</select></label>
       <label>Apresentador<select value={quick.presenter_user_id} onChange={e=>changeQuickPresenter(e.target.value)}>{presenterOptions.map(member=><option key={member.user_id} value={member.user_id}>{member.full_name||member.email||'Equipe'}</option>)}</select></label>
       <label>Duração<select value={quick.duration_minutes} onChange={e=>setQuick(x=>({...x,duration_minutes:Number(e.target.value)}))}>{ALLOWED_DURATIONS.map(value=><option value={value} key={value}>{value===60?'1 hora':value===90?'1h30':`${value} min`}</option>)}</select></label>
       <label className="span-2">Data e horário<input className="input" type="datetime-local" value={quick.scheduled_start} onChange={e=>setQuick(x=>({...x,scheduled_start:e.target.value}))}/></label>
