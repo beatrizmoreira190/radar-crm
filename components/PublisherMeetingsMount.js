@@ -77,11 +77,35 @@ export default function PublisherMeetingsMount(){
   function openNew(){if(!presenters.length){setNotice('Nenhum usuário está configurado com a função Apresentação comercial. Defina essa função na área Equipe antes de agendar.');return}setPrefill(null);setEditing(null);setShowModal(true)}
   function openEdit(meeting){setPrefill(null);setEditing(meeting);setShowModal(true)}
   function close(){setShowModal(false);setEditing(null);setPrefill(null)}
+  async function syncMeetingCalendar(meetingId){
+    const {data:{session}}=await supabase.auth.getSession();
+    if(!session?.access_token)return {synced:false,code:'SESSION_EXPIRED'};
+    const response=await fetch('/api/google-calendar',{
+      method:'POST',
+      headers:{Authorization:`Bearer ${session.access_token}`,'content-type':'application/json'},
+      body:JSON.stringify({action:'sync_meeting',meetingId}),
+      cache:'no-store'
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||'Não foi possível sincronizar a reunião com o Google Agenda.');
+    return data;
+  }
+
   async function quickStatus(meeting,status,message){
     const payload={status};
     if(status==='cancelled'&&meeting.google_event_id){payload.calendar_sync_status='pending';payload.google_sync_error=null}
     const {error}=await supabase.from('meetings').update(payload).eq('organization_id',org).eq('id',meeting.id);
-    if(error)setNotice(error.message);else{setNotice(message);await load()}
+    if(error)setNotice(error.message);else{
+      let finalMessage=message;
+      if(status==='cancelled'){
+        try{
+          const sync=await syncMeetingCalendar(meeting.id);
+          if(sync.synced)finalMessage+=' O compromisso também foi removido do Google Agenda.';
+          else if(sync.code==='CALENDAR_NOT_CONNECTED')finalMessage+=' A agenda externa não está conectada.';
+        }catch(syncError){finalMessage+=` A reunião foi cancelada no CRM, mas a sincronização com o Google Agenda falhou: ${syncError.message}`;}
+      }
+      setNotice(finalMessage);await load()
+    }
   }
   async function cancelMeeting(meeting){if(!window.confirm('Cancelar esta reunião? Os lembretes automáticos ligados a ela também serão cancelados.'))return;await quickStatus(meeting,'cancelled','Reunião cancelada.')}
   async function markNoShow(meeting){if(!window.confirm('Marcar que a editora não compareceu?'))return;await quickStatus(meeting,'no_show','Reunião marcada como não comparecimento.')}
@@ -160,7 +184,18 @@ function MeetingModal({supabase,org,publisherId,publisherName,user,team,presente
     if(editing){const payload=canEditScheduling?{title:form.title.trim()||'Reunião comercial',meeting_type:form.meeting_type,scheduled_start:new Date(form.scheduled_start).toISOString(),duration_minutes:Number(form.duration_minutes),presenter_user_id:form.presenter_user_id,status:form.status,notes:form.notes.trim()||null,outcome_notes:form.outcome_notes.trim()||null,calendar_sync_status:meeting?.google_event_id?'pending':'not_synced',google_sync_error:null}:{status:form.status,notes:form.notes.trim()||null,outcome_notes:form.outcome_notes.trim()||null};result=await supabase.from('meetings').update(payload).eq('organization_id',org).eq('id',meeting.id)}else{result=await supabase.from('meetings').insert({organization_id:org,publisher_id:publisherId,title:form.title.trim()||'Apresentação comercial',meeting_type:form.meeting_type,scheduled_start:new Date(form.scheduled_start).toISOString(),duration_minutes:Number(form.duration_minutes),status:'scheduled',scheduled_by:user.id,presenter_user_id:form.presenter_user_id,notes:form.notes.trim()||null,created_by:user.id,calendar_sync_status:'not_synced'}).select('id').single();meetingId=result.data?.id}
     if(result.error||!meetingId){setBusy(false);setError(result.error?.message||'Não foi possível salvar a reunião.');return}
     if(canEditScheduling){if(editing){const del=await supabase.from('meeting_participants').delete().eq('organization_id',org).eq('meeting_id',meetingId);if(del.error){setBusy(false);setError(del.error.message);return}}const contactRows=selectedContacts.map(contactId=>contacts.find(c=>c.id===contactId)).filter(Boolean).map(c=>({organization_id:org,meeting_id:meetingId,contact_id:c.id,source:'crm_contact',full_name:c.full_name,email:c.email||null,job_title:c.job_title||c.department||null,created_by:user.id}));const manualRows=manual.filter(row=>row.full_name.trim()).map(row=>({organization_id:org,meeting_id:meetingId,contact_id:null,source:'manual',full_name:row.full_name.trim(),email:row.email.trim()||null,job_title:row.job_title.trim()||null,created_by:user.id}));const rows=[...contactRows,...manualRows];if(rows.length){const ins=await supabase.from('meeting_participants').insert(rows);if(ins.error){setBusy(false);setError(`A reunião foi salva, mas houve erro ao salvar participantes: ${ins.error.message}`);return}}}
-    setBusy(false);onSaved(editing?'Reunião atualizada.':'Reunião agendada no CRM. Os lembretes internos foram criados automaticamente.');
+    let syncMessage='';
+    try{
+      const sync=await calendarRequest({action:'sync_meeting',meetingId});
+      if(sync.synced){
+        syncMessage=sync.invited>0?` Google Agenda sincronizado e ${sync.invited} convite${sync.invited===1?'':'s'} enviado${sync.invited===1?'':'s'}.`:' Google Agenda sincronizado.';
+      }else if(sync.code==='CALENDAR_NOT_CONNECTED'){
+        syncMessage=' A agenda do apresentador ainda não está conectada.';
+      }
+    }catch(syncError){
+      syncMessage=` A reunião foi salva no CRM, mas a sincronização com o Google Agenda falhou: ${syncError.message}`;
+    }
+    setBusy(false);onSaved((editing?'Reunião atualizada.':'Reunião agendada no CRM. Os lembretes internos foram criados automaticamente.')+syncMessage);
   }
 
   return <div className="modal-backdrop"><form className="modal" onSubmit={save}><div className="modal-head"><div><h3>{editing?'Editar reunião':'Agendar reunião'}</h3><p>{canEditScheduling?'O CRM aplica as regras do apresentador, verifica conflitos e prepara automaticamente a fila de tarefas.':`Você está atualizando a reunião como apresentador(a): ${presenterName}.`}</p></div><button type="button" onClick={onClose}><X/></button></div>{error&&<div className="notice error">{error}</div>}<div className="form-grid">

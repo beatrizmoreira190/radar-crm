@@ -88,6 +88,105 @@ export async function POST(request){
       return NextResponse.json({ok:true});
     }
 
+    if(action==='sync_meeting'){
+      const meetingId=String(body.meetingId||'').trim();
+      if(!meetingId){const error=new Error('Reunião não informada.');error.code='MEETING_REQUIRED';throw error}
+
+      const {data:meeting,error:meetingError}=await supabase.from('meetings')
+        .select('id,publisher_id,title,meeting_type,scheduled_start,duration_minutes,status,scheduled_by,presenter_user_id,notes,google_event_id,calendar_sync_status,publishers(name)')
+        .eq('organization_id',membership.organization_id).eq('id',meetingId).maybeSingle();
+      if(meetingError)throw meetingError;
+      if(!meeting){const error=new Error('Reunião não encontrada.');error.status=404;throw error}
+
+      const isManager=['owner','admin','supervisor'].includes(membership.role);
+      const canSync=isManager||meeting.scheduled_by===user.id||meeting.presenter_user_id===user.id;
+      if(!canSync){const error=new Error('Seu perfil não permite sincronizar esta reunião.');error.status=403;throw error}
+
+      const {data:connection,error:connectionError}=await supabase.from('google_calendar_connections')
+        .select('bridge_url,bridge_key,bridge_status,google_account_email')
+        .eq('organization_id',membership.organization_id).eq('user_id',meeting.presenter_user_id).maybeSingle();
+      if(connectionError)throw connectionError;
+
+      if(!connection||connection.bridge_status!=='connected'||!connection.bridge_url||!connection.bridge_key){
+        await supabase.from('meetings').update({
+          calendar_sync_status:'not_synced',
+          google_sync_error:'Agenda do apresentador não conectada.'
+        }).eq('organization_id',membership.organization_id).eq('id',meeting.id);
+        return NextResponse.json({ok:true,synced:false,code:'CALENDAR_NOT_CONNECTED'});
+      }
+
+      try{
+        if(meeting.status==='cancelled'){
+          if(meeting.google_event_id){
+            await callCalendarBridge({
+              url:connection.bridge_url,key:connection.bridge_key,action:'delete_event',
+              payload:{eventId:meeting.google_event_id}
+            });
+          }
+          await supabase.from('meetings').update({
+            calendar_sync_status:'synced',
+            google_event_id:null,
+            google_event_url:null,
+            google_meet_url:null,
+            google_last_synced_at:new Date().toISOString(),
+            google_sync_error:null
+          }).eq('organization_id',membership.organization_id).eq('id',meeting.id);
+          return NextResponse.json({ok:true,synced:true,deleted:true});
+        }
+
+        const {data:participants,error:participantsError}=await supabase.from('meeting_participants')
+          .select('full_name,email').eq('organization_id',membership.organization_id).eq('meeting_id',meeting.id).order('created_at');
+        if(participantsError)throw participantsError;
+
+        const start=new Date(meeting.scheduled_start);
+        const end=new Date(start.getTime()+Number(meeting.duration_minutes||30)*60000);
+        const guests=[...new Set((participants||[]).map(item=>String(item.email||'').trim()).filter(email=>email&&email.includes('@')))];
+        const people=(participants||[]).map(item=>item.email?`${item.full_name} <${item.email}>`:item.full_name).filter(Boolean);
+        const description=[
+          'Reunião agendada pelo Radar CRM.',
+          `Editora: ${meeting.publishers?.name||'—'}`,
+          `Tipo: ${meeting.meeting_type||'presentation'}`,
+          meeting.notes?`Observações: ${meeting.notes}`:null,
+          people.length?`Participantes: ${people.join(', ')}`:null,
+          `CRM: ${new URL(request.url).origin}/app/editoras/${meeting.publisher_id}`
+        ].filter(Boolean).join('\n\n');
+        const eventTitle=`Radar | ${meeting.publishers?.name||'Editora'} — ${meeting.title||'Reunião comercial'}`;
+        const bridgeAction=meeting.google_event_id?'update_event':'create_event';
+
+        const result=await callCalendarBridge({
+          url:connection.bridge_url,key:connection.bridge_key,action:bridgeAction,
+          payload:{
+            eventId:meeting.google_event_id||undefined,
+            meetingId:meeting.id,
+            title:eventTitle,
+            start:start.toISOString(),
+            end:end.toISOString(),
+            description,
+            guests
+          }
+        });
+
+        const {error:updateError}=await supabase.from('meetings').update({
+          calendar_sync_status:'synced',
+          google_event_id:result.eventId||meeting.google_event_id||null,
+          google_last_synced_at:new Date().toISOString(),
+          google_sync_error:null
+        }).eq('organization_id',membership.organization_id).eq('id',meeting.id);
+        if(updateError)throw updateError;
+
+        return NextResponse.json({
+          ok:true,synced:true,eventId:result.eventId||meeting.google_event_id||null,
+          invited:guests.length,calendarEmail:result.account||connection.google_account_email||null
+        });
+      }catch(error){
+        await supabase.from('meetings').update({
+          calendar_sync_status:'error',
+          google_sync_error:String(error.message||'Falha ao sincronizar com Google Agenda.').slice(0,500)
+        }).eq('organization_id',membership.organization_id).eq('id',meeting.id);
+        throw error;
+      }
+    }
+
     if(action==='availability'){
       const presenterUserId=body.presenterUserId||user.id;
       if(!canReadPresenterAvailability(membership,presenterUserId)){const error=new Error('Seu perfil não permite consultar a disponibilidade deste apresentador.');error.status=403;throw error}
