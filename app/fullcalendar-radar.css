@@ -58,3 +58,38 @@
 .radar-fc-month-event .radar-fc-month-time{font-size:9px!important;font-weight:900!important;color:#344054!important}
 .radar-fc-month-event strong{font-size:9.5px!important;font-weight:800!important;color:#1f2937!important}
 .radar-fc-month-event small{font-size:8px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+
+/* Agenda v2.2 — distinção Google/Radar e responsável legível */
+.radar-fullcalendar-card .fc .radar-calendar-external,
+.radar-fullcalendar-card .fc .fc-event.radar-calendar-external,
+.radar-fullcalendar-card .fc .fc-daygrid-event.radar-calendar-external{
+  background:#e7eaee!important;
+  border-color:#667085!important;
+  color:#1f2937!important;
+}
+.radar-fullcalendar-card .fc .radar-calendar-event,
+.radar-fullcalendar-card .fc .fc-event.radar-calendar-event,
+.radar-fullcalendar-card .fc .fc-daygrid-event.radar-calendar-event{
+  background:#dceaff!important;
+  border-color:#3b73c5!important;
+  color:#172b4d!important;
+}
+.radar-fc-presenter{
+  display:block;
+  width:max-content;
+  max-width:100%;
+  margin-top:2px;
+  padding:2px 5px;
+  border-radius:999px;
+  background:rgba(255,255,255,.62);
+  color:#344054;
+  font-size:9.5px;
+  line-height:1.15;
+  font-weight:800;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.radar-fc-external-content .radar-fc-presenter{background:#f8f9fb;color:#344054}
+.radar-fc-month-event .radar-fc-presenter{font-size:8px;padding:1px 4px;margin-top:1px}

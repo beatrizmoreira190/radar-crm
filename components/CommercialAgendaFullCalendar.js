@@ -214,12 +214,18 @@ export default function CommercialAgendaFullCalendar(){
       title:meeting.publishers?.name||meeting.title||'Reunião Radar',
       start:meeting.scheduled_start,
       end:addMinutes(meeting.scheduled_start,meeting.duration_minutes).toISOString(),
+      backgroundColor:'#dceaff',
+      borderColor:'#3b73c5',
+      textColor:'#172b4d',
       classNames:['radar-calendar-event',meetingStatusClass(meeting.status)],
       extendedProps:{kind:'radar',meeting,publisherId:meeting.publisher_id,presenter:teamMap[meeting.presenter_user_id],participants:participantMap[meeting.id]||[]},
     }));
     const external=visibleExternal.map((block,index)=>({
       id:`external-${block.presenterUserId||'presenter'}-${index}-${block.start}`,
       title:block.title||'Compromisso no Google Agenda',start:block.start,end:block.end,
+      backgroundColor:'#e7eaee',
+      borderColor:'#667085',
+      textColor:'#1f2937',
       editable:false,overlap:false,classNames:['radar-calendar-external'],
       extendedProps:{kind:'external',presenterName:block.presenterName||'',presenterUserId:block.presenterUserId||''},
     }));
@@ -310,11 +316,11 @@ export default function CommercialAgendaFullCalendar(){
     const month=info.view?.type==='dayGridMonth';
     if(info.event.extendedProps.kind==='external'){
       const presenter=info.event.extendedProps.presenterName;
-      if(month)return <div className="radar-fc-month-event external"><span className="radar-fc-month-time">{info.timeText}</span><strong>{info.event.title}</strong>{presenterFilter==='all'&&presenter&&<small>{presenter}</small>}</div>;
-      return <div className="radar-fc-external-content"><span className="radar-fc-event-time">{info.timeText}</span><strong>{info.event.title}</strong>{presenterFilter==='all'&&presenter&&<small>{presenter}</small>}</div>;
+      if(month)return <div className="radar-fc-month-event external"><span className="radar-fc-month-time">{info.timeText}</span><strong>{info.event.title}</strong>{presenterFilter==='all'&&presenter&&<span className="radar-fc-presenter">{presenter}</span>}</div>;
+      return <div className="radar-fc-external-content"><span className="radar-fc-event-time">{info.timeText}</span><strong>{info.event.title}</strong>{presenterFilter==='all'&&presenter&&<span className="radar-fc-presenter">{presenter}</span>}</div>;
     }
     const meeting=info.event.extendedProps.meeting;const presenter=info.event.extendedProps.presenter;
-    if(month)return <div className="radar-fc-month-event radar"><span className="radar-fc-month-time">{info.timeText}</span><strong>{info.event.title}</strong>{presenterFilter==='all'&&presenter&&<small>{presenter.full_name||presenter.email||'Equipe'}</small>}</div>;
+    if(month)return <div className="radar-fc-month-event radar"><span className="radar-fc-month-time">{info.timeText}</span><strong>{info.event.title}</strong>{presenterFilter==='all'&&presenter&&<span className="radar-fc-presenter">{presenter.full_name||presenter.email||'Equipe'}</span>}</div>;
     return <div className="radar-fc-event-content"><div><strong>{info.timeText}</strong><span>{MEETING_STATUS_LABELS[meeting?.status]||meeting?.status}</span></div><b>{info.event.title}</b><small>{MEETING_TYPE_LABELS[meeting?.meeting_type]||meeting?.meeting_type}{presenterFilter==='all'&&presenter?` · ${presenter.full_name||presenter.email||'Equipe'}`:''}</small></div>;
   }
 
