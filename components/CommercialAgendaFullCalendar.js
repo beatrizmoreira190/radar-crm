@@ -48,6 +48,7 @@ export default function CommercialAgendaFullCalendar(){
   const canSchedule=isManager||hasCommercialFunction('meeting_scheduling');
 
   const [range,setRange]=useState(DEFAULT_RANGE);
+  const [periodAnchor,setPeriodAnchor]=useState(null);
   const [viewMode,setViewMode]=useState('week');
   const [viewDays,setViewDays]=useState(5);
   const [meetings,setMeetings]=useState([]);
@@ -108,10 +109,23 @@ export default function CommercialAgendaFullCalendar(){
   async function fetchExternalBusy(presenterId,start,end){
     if(!presenterId||presenterId==='all'||!start||!end)return {busy:[],notConnected:true};
     const token=await accessToken();if(!token)throw new Error('Sua sessão expirou.');
-    const response=await fetch('/api/google-calendar',{method:'POST',headers:{Authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({action:'availability',presenterUserId:presenterId,timeMin:start,timeMax:end}),cache:'no-store'});
-    const data=await response.json().catch(()=>({}));
-    if(!response.ok){const error=new Error(data.error||'Não foi possível consultar a agenda externa.');error.code=data.code;throw error}
-    return data;
+    const startDate=new Date(start),endDate=new Date(end);
+    if(Number.isNaN(startDate.getTime())||Number.isNaN(endDate.getTime())||endDate<=startDate)throw new Error('Intervalo de agenda inválido.');
+    const chunks=[];let cursor=new Date(startDate);
+    const MAX_CHUNK_MS=28*24*60*60*1000;
+    while(cursor<endDate){
+      const chunkEnd=new Date(Math.min(endDate.getTime(),cursor.getTime()+MAX_CHUNK_MS));
+      chunks.push([cursor.toISOString(),chunkEnd.toISOString()]);
+      cursor=chunkEnd;
+    }
+    const responses=await Promise.all(chunks.map(async ([timeMin,timeMax])=>{
+      const response=await fetch('/api/google-calendar',{method:'POST',headers:{Authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({action:'availability',presenterUserId:presenterId,timeMin,timeMax}),cache:'no-store'});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok){const error=new Error(data.error||'Não foi possível consultar a agenda externa.');error.code=data.code;throw error}
+      return data;
+    }));
+    const first=responses[0]||{};
+    return {...first,busy:responses.flatMap(item=>item.busy||[])};
   }
 
   async function loadExternal(presenterId=presenterFilter,start=range.start,end=range.end,silent=false){
@@ -266,7 +280,7 @@ export default function CommercialAgendaFullCalendar(){
   }
   function handleSelect(info){const duration=normalizedDuration(Math.round((info.end.getTime()-info.start.getTime())/60000));openQuick(info.start,duration);api()?.unselect()}
   function handleEventClick(info){if(info.event.extendedProps.kind==='radar')router.push(`/app/editoras/${info.event.extendedProps.publisherId}`)}
-  function handleDatesSet(info){setRange({start:info.start.toISOString(),end:info.end.toISOString()})}
+  function handleDatesSet(info){setRange({start:info.start.toISOString(),end:info.end.toISOString()});setPeriodAnchor((info.view?.currentStart||info.start).toISOString())}
 
   function changeQuickPresenter(presenterId){
     const rule=normalizeAvailabilityRule(rules[presenterId]);setQuick(value=>({...value,presenter_user_id:presenterId,duration_minutes:rule.default_duration_minutes||30}));
@@ -288,7 +302,7 @@ export default function CommercialAgendaFullCalendar(){
   }
 
   const publisherChoices=useMemo(()=>{const needle=publisherQuery.trim().toLowerCase();return (needle?publishers.filter(item=>String(item.name||'').toLowerCase().includes(needle)):publishers).slice(0,80)},[publishers,publisherQuery]);
-  const period=periodLabel(range.start,range.end,viewMode);
+  const period=periodLabel(periodAnchor||range.start,range.end,viewMode);
   const scrollHour=Math.max(0,new Date().getHours()-1);
   const scrollTime=`${String(scrollHour).padStart(2,'0')}:00:00`;
 
@@ -296,13 +310,11 @@ export default function CommercialAgendaFullCalendar(){
     const month=info.view?.type==='dayGridMonth';
     if(info.event.extendedProps.kind==='external'){
       const presenter=info.event.extendedProps.presenterName;
-      return <div className={month?'radar-fc-month-event external':'radar-fc-external-content'}>
-        <strong>{info.event.title}</strong>
-        <span>{info.timeText}{presenterFilter==='all'&&presenter?` · ${presenter}`:''}</span>
-      </div>;
+      if(month)return <div className="radar-fc-month-event external"><span className="radar-fc-month-time">{info.timeText}</span><strong>{info.event.title}</strong>{presenterFilter==='all'&&presenter&&<small>{presenter}</small>}</div>;
+      return <div className="radar-fc-external-content"><span className="radar-fc-event-time">{info.timeText}</span><strong>{info.event.title}</strong>{presenterFilter==='all'&&presenter&&<small>{presenter}</small>}</div>;
     }
     const meeting=info.event.extendedProps.meeting;const presenter=info.event.extendedProps.presenter;
-    if(month)return <div className="radar-fc-month-event radar"><strong>{info.event.title}</strong><span>{info.timeText}{presenterFilter==='all'&&presenter?` · ${presenter.full_name||presenter.email||'Equipe'}`:''}</span></div>;
+    if(month)return <div className="radar-fc-month-event radar"><span className="radar-fc-month-time">{info.timeText}</span><strong>{info.event.title}</strong>{presenterFilter==='all'&&presenter&&<small>{presenter.full_name||presenter.email||'Equipe'}</small>}</div>;
     return <div className="radar-fc-event-content"><div><strong>{info.timeText}</strong><span>{MEETING_STATUS_LABELS[meeting?.status]||meeting?.status}</span></div><b>{info.event.title}</b><small>{MEETING_TYPE_LABELS[meeting?.meeting_type]||meeting?.meeting_type}{presenterFilter==='all'&&presenter?` · ${presenter.full_name||presenter.email||'Equipe'}`:''}</small></div>;
   }
 
@@ -331,7 +343,7 @@ export default function CommercialAgendaFullCalendar(){
       </div>
     </section>
 
-    <div className="radar-agenda-meta"><span><strong>{scheduledCount}</strong> agendada{scheduledCount===1?'':'s'} · <strong>{todayCount}</strong> hoje · <strong>{completedCount}</strong> realizada{completedCount===1?'':'s'}</span><span>{externalLoading?'Consultando agenda externa…':calendarMessage} · atualização automática a cada 1 min</span></div>
+    <div className="radar-agenda-meta"><span><strong>{scheduledCount}</strong> agendada{scheduledCount===1?'':'s'} · <strong>{todayCount}</strong> hoje · <strong>{completedCount}</strong> realizada{completedCount===1?'':'s'}</span><span className="agenda-legend"><i className="radar"/>Radar <i className="google"/>Google Agenda</span><span>{externalLoading?'Consultando agenda externa…':calendarMessage} · atualização automática a cada 1 min</span></div>
     {selectedRule&&<div className="radar-agenda-rule"><Clock3 size={12}/>{ruleSummary(selectedRule)}</div>}
 
     <section className="radar-fullcalendar-card card" aria-busy={loading}>
@@ -364,6 +376,7 @@ export default function CommercialAgendaFullCalendar(){
         eventClick={handleEventClick}
         datesSet={handleDatesSet}
         events={calendarEvents}
+        eventClassNames={arg=>arg.event.extendedProps.kind==='external'?['radar-calendar-external']:arg.event.extendedProps.kind==='break'?['radar-calendar-break']:['radar-calendar-event',meetingStatusClass(arg.event.extendedProps.meeting?.status)]}
         eventContent={renderEventContent}
         eventMinHeight={26}
         eventShortHeight={34}
