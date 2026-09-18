@@ -54,7 +54,7 @@ export default function PublisherMaterialsMount(){
       const stack=document.querySelector('.detail-grid > .detail-stack');
       if(!stack){if(attempts++<30)timer=setTimeout(attach,50);return;}
       const meetingMount=stack.querySelector('[data-publisher-meetings="commercial-meetings"]');
-      const contactSection=Array.from(stack.children).find(child=>child.querySelector?.('h2')?.textContent?.trim()==='Contatos');
+      const contactSection=Array.from(stack.children).find(child=>child.querySelector?.('h2')?.textContent?.replace(/\?/g,'').trim()==='Contatos');
       if(!contactSection){if(attempts++<30)timer=setTimeout(attach,50);return;}
       node=document.createElement('div');
       node.dataset.publisherMaterials='commercial-materials';

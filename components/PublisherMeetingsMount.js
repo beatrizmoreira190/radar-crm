@@ -63,7 +63,7 @@ export default function PublisherMeetingsMount(){
   useEffect(()=>{load()},[org,id,activityVersion]);
   useEffect(()=>{
     let node=null;let timer=null;let attempts=0;
-    function attach(){const stack=document.querySelector('.detail-grid > .detail-stack');if(!stack){if(attempts++<30)timer=setTimeout(attach,50);return}const contactSection=Array.from(stack.children).find(child=>child.querySelector?.('h2')?.textContent?.trim()==='Contatos');if(!contactSection){if(attempts++<30)timer=setTimeout(attach,50);return}node=document.createElement('div');node.dataset.publisherMeetings='commercial-meetings';contactSection.insertAdjacentElement('afterend',node);setMount(node)}
+    function attach(){const stack=document.querySelector('.detail-grid > .detail-stack');if(!stack){if(attempts++<30)timer=setTimeout(attach,50);return}const contactSection=Array.from(stack.children).find(child=>child.querySelector?.('h2')?.textContent?.replace(/\?/g,'').trim()==='Contatos');if(!contactSection){if(attempts++<30)timer=setTimeout(attach,50);return}node=document.createElement('div');node.dataset.publisherMeetings='commercial-meetings';contactSection.insertAdjacentElement('afterend',node);setMount(node)}
     attach();return()=>{if(timer)clearTimeout(timer);if(node?.parentNode)node.parentNode.removeChild(node)};
   },[id]);
   useEffect(()=>{

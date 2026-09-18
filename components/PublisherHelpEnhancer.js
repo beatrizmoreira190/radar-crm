@@ -59,6 +59,7 @@ function helpFor(text){
 function addHelp(target,text){
   if(!(target instanceof HTMLElement))return;
   if(target.querySelector(':scope > .help-tip, :scope > .publisher-help-dot'))return;
+  if(target.matches('h2,h3')&&target.parentElement?.classList.contains('help-heading')&&target.parentElement.querySelector(':scope > .help-tip, :scope > .publisher-help-dot'))return;
   const help=helpFor(text||target.textContent);
   if(!help)return;
   const button=document.createElement('button');
