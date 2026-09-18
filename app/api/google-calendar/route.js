@@ -10,12 +10,36 @@ function errorResponse(error){
   return NextResponse.json({error:error.message,code:error.code||'GOOGLE_CALENDAR_ERROR'},{status});
 }
 
+function canAdminCalendar(membership){
+  return ['owner','admin'].includes(membership?.role);
+}
+
+async function calendarTarget(supabase,membership,user,targetUserId){
+  const targetId=String(targetUserId||user.id);
+  const managingOther=targetId!==user.id;
+  if(managingOther&&!canAdminCalendar(membership)){
+    const error=new Error('Somente administradores podem gerenciar a integração de outro usuário.');
+    error.status=403;
+    throw error;
+  }
+  const {data:member,error}=await supabase.from('org_members')
+    .select('user_id,role,active,commercial_functions,full_name,email')
+    .eq('organization_id',membership.organization_id).eq('user_id',targetId).eq('active',true).maybeSingle();
+  if(error)throw error;
+  if(!member){const targetError=new Error('Usuário da equipe não encontrado.');targetError.status=404;throw targetError}
+  const eligible=['owner','admin','supervisor'].includes(member.role)||(member.commercial_functions||[]).includes('commercial_presentation');
+  return {targetId,member,managingOther,eligible};
+}
+
 export async function GET(request){
   try{
     const {supabase,membership,user}=await authenticateRequest(request);
+    const url=new URL(request.url);
+    const targetUserId=url.searchParams.get('userId')||user.id;
+    const {targetId,eligible}=await calendarTarget(supabase,membership,user,targetUserId);
     const {data,error}=await supabase.from('google_calendar_connections')
       .select('user_id,google_account_email,connection_method,bridge_url,bridge_key,bridge_status,last_verified_at,connected_at,updated_at')
-      .eq('organization_id',membership.organization_id).eq('user_id',user.id).maybeSingle();
+      .eq('organization_id',membership.organization_id).eq('user_id',targetId).maybeSingle();
     if(error)throw error;
     const connection=data?{
       user_id:data.user_id,
@@ -29,7 +53,8 @@ export async function GET(request){
     }:null;
     return NextResponse.json({
       configured:true,
-      canConnect:canConnectCalendar(membership),
+      canConnect:eligible,
+      canManage:targetId===user.id?canConnectCalendar(membership):canAdminCalendar(membership),
       connection,
       scriptCode:data?.bridge_key?buildBridgeScript(data.bridge_key):null
     });
@@ -41,13 +66,15 @@ export async function POST(request){
     const {supabase,membership,user}=await authenticateRequest(request);
     const body=await request.json().catch(()=>({}));
     const action=body.action;
+    const requestedUserId=body.presenterUserId||user.id;
 
     if(action==='prepare'){
-      if(!canConnectCalendar(membership)){const error=new Error('Somente apresentadores e gestores podem conectar uma agenda.');error.status=403;throw error}
+      const {targetId,eligible}=await calendarTarget(supabase,membership,user,requestedUserId);
+      if(!eligible){const error=new Error('Este usuário precisa estar habilitado para apresentações comerciais antes de conectar uma agenda.');error.status=400;throw error}
       const key=newBridgeKey();
       const {error}=await supabase.from('google_calendar_connections').upsert({
         organization_id:membership.organization_id,
-        user_id:user.id,
+        user_id:targetId,
         connection_method:'apps_script',
         bridge_key:key,
         bridge_url:null,
@@ -58,15 +85,16 @@ export async function POST(request){
         granted_scopes:[]
       },{onConflict:'organization_id,user_id'});
       if(error)throw error;
-      return NextResponse.json({ok:true,scriptCode:buildBridgeScript(key)});
+      return NextResponse.json({ok:true,userId:targetId,scriptCode:buildBridgeScript(key)});
     }
 
     if(action==='save_bridge'){
-      if(!canConnectCalendar(membership)){const error=new Error('Seu perfil não permite conectar uma agenda.');error.status=403;throw error}
+      const {targetId,eligible}=await calendarTarget(supabase,membership,user,requestedUserId);
+      if(!eligible){const error=new Error('Este usuário não está habilitado para conectar uma agenda.');error.status=400;throw error}
       const bridgeUrl=validateBridgeUrl(body.bridgeUrl);
       if(!bridgeUrl){const error=new Error('Cole a URL de implantação do Apps Script terminada em /exec.');error.code='CALENDAR_BRIDGE_URL_INVALID';throw error}
       const {data:connection,error:connectionError}=await supabase.from('google_calendar_connections')
-        .select('bridge_key').eq('organization_id',membership.organization_id).eq('user_id',user.id).maybeSingle();
+        .select('bridge_key').eq('organization_id',membership.organization_id).eq('user_id',targetId).maybeSingle();
       if(connectionError)throw connectionError;
       if(!connection?.bridge_key){const error=new Error('Prepare a conexão antes de salvar a URL do Apps Script.');error.code='CALENDAR_SETUP_REQUIRED';throw error}
       const now=new Date();const end=new Date(now.getTime()+24*60*60*1000);
@@ -76,16 +104,17 @@ export async function POST(request){
         bridge_status:'connected',
         google_account_email:result.account||null,
         last_verified_at:new Date().toISOString()
-      }).eq('organization_id',membership.organization_id).eq('user_id',user.id);
+      }).eq('organization_id',membership.organization_id).eq('user_id',targetId);
       if(updateError)throw updateError;
-      return NextResponse.json({ok:true,email:result.account||null,busy:result.busy||[]});
+      return NextResponse.json({ok:true,userId:targetId,email:result.account||null,busy:result.busy||[]});
     }
 
     if(action==='disconnect'){
+      const {targetId}=await calendarTarget(supabase,membership,user,requestedUserId);
       const {error}=await supabase.from('google_calendar_connections')
-        .delete().eq('organization_id',membership.organization_id).eq('user_id',user.id);
+        .delete().eq('organization_id',membership.organization_id).eq('user_id',targetId);
       if(error)throw error;
-      return NextResponse.json({ok:true});
+      return NextResponse.json({ok:true,userId:targetId});
     }
 
     if(action==='sync_meeting'){

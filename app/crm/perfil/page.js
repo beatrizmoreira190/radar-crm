@@ -8,7 +8,7 @@ import { COMMERCIAL_FUNCTION_LABELS, ROLE_LABELS } from '@/lib/constants';
 function formatBusy(value){return new Date(value).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}
 
 export default function ProfilePage(){
-  const {supabase,user,membership,refreshTeam,refresh,isManager}=useCrm();
+  const {supabase,user,membership,refreshTeam,refresh,isManager,isAdmin}=useCrm();
   const [name,setName]=useState(membership?.full_name||'');
   const [job,setJob]=useState(membership?.job_title||'');
   const [avatar,setAvatar]=useState(membership?.avatar_url||'');
@@ -113,15 +113,16 @@ export default function ProfilePage(){
     </section>
 
     {showCalendar&&<section className="card panel" style={{marginTop:16}}>
-      <div className="section-title"><div><div className="eyebrow">Integrações</div><h2 style={{margin:'4px 0'}}>Google Agenda</h2><p className="muted">A conexão usa um Apps Script da própria conta Google. O CRM recebe somente horários ocupados — nunca título, descrição ou local dos compromissos.</p></div><CalendarDays size={24}/></div>
+      <div className="section-title"><div><div className="eyebrow">Integrações</div><h2 style={{margin:'4px 0'}}>Google Agenda</h2><p className="muted">A conexão usa um Apps Script da própria conta Google. O CRM recebe título, início e fim dos compromissos; não importa descrição, convidados nem local.</p></div><CalendarDays size={24}/></div>
       {calendar.loading?<div className="table-empty">Verificando integração…</div>:connected?<div style={{display:'grid',gap:12}}>
         <div className="info-grid"><div className="info-item"><small>Status</small><span><CheckCircle2 size={14} style={{verticalAlign:'middle',marginRight:5}}/>Conectado</span></div><div className="info-item"><small>Conta Google</small><span>{calendar.connection.google_account_email||'Conta autorizada'}</span></div><div className="info-item"><small>Método</small><span>Apps Script</span></div><div className="info-item"><small>Último teste</small><span>{calendar.connection.last_verified_at?new Date(calendar.connection.last_verified_at).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'—'}</span></div></div>
-        <div className="chips"><span className="badge green">Somente livre/ocupado</span><span className="badge">Sem Google Cloud</span><span className="badge">Sem detalhes pessoais</span></div>
+        <div className="chips"><span className="badge green">Título e horário</span><span className="badge">Sem Google Cloud</span><span className="badge">Sem descrição, convidados ou local</span></div>
         {calendarNotice&&<div className="notice">{calendarNotice}</div>}
         {availability&&<AvailabilityPreview availability={availability}/>} 
-        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn secondary" type="button" disabled={calendarBusy} onClick={testAvailability}><RefreshCw size={15}/>{calendarBusy?'Consultando…':'Testar disponibilidade'}</button><button className="btn secondary" type="button" disabled={calendarBusy} onClick={prepareBridge}>Refazer configuração</button><button className="btn secondary" type="button" disabled={calendarBusy} onClick={disconnectCalendar}><Unlink size={15}/> Desconectar</button></div>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn secondary" type="button" disabled={calendarBusy} onClick={testAvailability}><RefreshCw size={15}/>{calendarBusy?'Consultando…':'Testar disponibilidade'}</button>{isAdmin&&<><button className="btn secondary" type="button" disabled={calendarBusy} onClick={prepareBridge}>Refazer configuração</button><button className="btn secondary" type="button" disabled={calendarBusy} onClick={disconnectCalendar}><Unlink size={15}/> Desconectar</button></>}</div>
       </div>:<div style={{display:'grid',gap:13}}>
-        <div className="notice"><span><b>Configuração única.</b> Depois disso você continua usando o Google Agenda normalmente; o CRM consulta os bloqueios automaticamente.</span></div>
+        {!isAdmin?<div className="notice"><span><b>Integração gerenciada pela administração.</b> Quando a conexão estiver configurada, o status e os testes de disponibilidade aparecerão aqui.</span></div>:<>
+        <div className="notice"><span><b>Configuração administrativa.</b> Depois disso o Google Agenda continua funcionando normalmente e o CRM sincroniza os compromissos automaticamente.</span></div>
         {!setupStarted?<button className="btn" type="button" disabled={calendarBusy||!calendar.canConnect} onClick={prepareBridge}>{calendarBusy?'Preparando…':'Preparar conexão com Google Agenda'}</button>:<>
           <div className="card" style={{padding:14,boxShadow:'none'}}><strong style={{fontSize:12}}>1. Crie o Apps Script</strong><p className="muted" style={{fontSize:11}}>Abra o editor na conta Google que possui a agenda, apague o conteúdo inicial e cole o código pronto abaixo.</p><a className="btn secondary small" href="https://script.google.com/create" target="_blank" rel="noreferrer"><ExternalLink size={14}/> Abrir Apps Script</a></div>
           <div className="card" style={{padding:14,boxShadow:'none'}}><div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center'}}><strong style={{fontSize:12}}>2. Copie o código pronto</strong><button className="btn secondary small" type="button" onClick={copyScript}><Copy size={13}/>{copied?'Copiado':'Copiar código'}</button></div><textarea className="input" readOnly value={calendar.scriptCode||''} rows={11} style={{marginTop:9,fontFamily:'monospace',fontSize:10,resize:'vertical'}}/></div>
@@ -129,6 +130,7 @@ export default function ProfilePage(){
           <div className="card" style={{padding:14,boxShadow:'none'}}><strong style={{fontSize:12}}>4. Cole a URL aqui</strong><p className="muted" style={{fontSize:11}}>O CRM testa a conexão antes de salvá-la.</p><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><input className="input" style={{flex:'1 1 320px'}} value={bridgeUrl} onChange={e=>setBridgeUrl(e.target.value)} placeholder="https://script.google.com/macros/s/.../exec"/><button className="btn" type="button" disabled={calendarBusy||!bridgeUrl.trim()} onClick={saveBridge}>{calendarBusy?'Testando…':'Salvar e testar'}</button></div></div>
         </>}
         {calendarNotice&&<div className="notice">{calendarNotice}</div>}
+        </>}
       </div>}
     </section>}
   </div>;
