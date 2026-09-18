@@ -197,7 +197,7 @@ export default function ReportsPage(){
         RESULT_LABELS[t.result_code]||t.result_code||'',wrap(t.result_note),t.cadence_enrollment_id?'Cadência':t.automation_key?'Automação de reunião':'Manual',dt(t.created_at),wrap(t.description)
       ]));
 
-      downloadXlsx(`radar-relatorio-${new Date().toISOString().slice(0,10)}.xlsx`,[
+      await downloadXlsx(`radar-relatorio-${new Date().toISOString().slice(0,10)}.xlsx`,[
         {name:'Resumo',rows:summaryRows,widths:[34,20,52,20],merges:summaryMerges},
         {name:'Pipeline',rows:pipelineRows,widths:[30,18,14],merges:['A1:C1','A2:C2'],freezeRows:4,autoFilter:`A4:C${pipelineRows.length}`},
         {name:'Prioridades',rows:priorityRows,widths:[24,14],merges:['A1:B1','A2:B2'],freezeRows:4,autoFilter:`A4:B${priorityRows.length}`},

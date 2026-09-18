@@ -18,6 +18,7 @@
     "next": "16.3.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "temporal-polyfill": "1.0.1"
+    "temporal-polyfill": "1.0.1",
+    "write-excel-file": "4.1.1"
   }
 }
