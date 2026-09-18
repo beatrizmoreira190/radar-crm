@@ -110,18 +110,47 @@ export default function CommercialAgendaFullCalendar(){
   }
 
   async function loadExternal(presenterId=presenterFilter,start=range.start,end=range.end){
-    if(presenterId==='all'||!start||!end){setExternalBusy([]);setCalendarMessage('Selecione um apresentador para ver os bloqueios externos.');return}
+    if(!start||!end){setExternalBusy([]);return}
     setExternalLoading(true);
     try{
-      const data=await fetchExternalBusy(presenterId,start,end);
-      setExternalBusy(data.busy||[]);setCalendarMessage(data.calendarEmail?`Google Agenda: ${data.calendarEmail}`:'Google Agenda sincronizado.');
-    }catch(error){setExternalBusy([]);setCalendarMessage(error.code==='CALENDAR_NOT_CONNECTED'?'Google Agenda ainda não conectado.':'Agenda externa indisponível no momento.');}
-    finally{setExternalLoading(false)}
+      if(presenterId==='all'){
+        const presenters=team.filter(member=>member.active&&(member.commercial_functions||[]).includes('commercial_presentation'));
+        const results=await Promise.all(presenters.map(async presenter=>{
+          try{
+            const data=await fetchExternalBusy(presenter.user_id,start,end);
+            return {presenter,data};
+          }catch(error){
+            if(error.code==='CALENDAR_NOT_CONNECTED')return null;
+            throw error;
+          }
+        }));
+        const connected=results.filter(Boolean);
+        const rows=connected.flatMap(({presenter,data})=>(data.busy||[]).map(block=>({
+          ...block,
+          presenterUserId:presenter.user_id,
+          presenterName:presenter.full_name||presenter.email||'Equipe'
+        })));
+        setExternalBusy(rows);
+        setCalendarMessage(connected.length?`${connected.length} agenda${connected.length===1?'':'s'} externa${connected.length===1?'':'s'} sincronizada${connected.length===1?'':'s'}.`:'Nenhuma agenda externa conectada para os apresentadores.');
+      }else{
+        const data=await fetchExternalBusy(presenterId,start,end);
+        const presenter=team.find(member=>member.user_id===presenterId);
+        setExternalBusy((data.busy||[]).map(block=>({
+          ...block,
+          presenterUserId:presenterId,
+          presenterName:presenter?.full_name||presenter?.email||'Equipe'
+        })));
+        setCalendarMessage(data.calendarEmail?`Google Agenda: ${data.calendarEmail}`:'Google Agenda sincronizado.');
+      }
+    }catch(error){
+      setExternalBusy([]);
+      setCalendarMessage(error.code==='CALENDAR_NOT_CONNECTED'?'Google Agenda ainda não conectado.':'Agenda externa indisponível no momento.');
+    }finally{setExternalLoading(false)}
   }
 
   useEffect(()=>{loadStatic()},[org]);
   useEffect(()=>{loadRange()},[org,range.start,range.end,activityVersion]);
-  useEffect(()=>{loadExternal()},[presenterFilter,range.start,range.end]);
+  useEffect(()=>{loadExternal()},[presenterFilter,range.start,range.end,team]);
 
   const participantMap=useMemo(()=>{const out={};for(const person of participants)(out[person.meeting_id]||(out[person.meeting_id]=[])).push(person);return out},[participants]);
   const presenterOptions=useMemo(()=>{
@@ -145,9 +174,11 @@ export default function CommercialAgendaFullCalendar(){
   },[meetings,presenterFilter,statusFilter,query,participantMap]);
 
   const visibleExternal=useMemo(()=>{
-    if(presenterFilter==='all')return [];
-    const scheduledForPresenter=meetings.filter(meeting=>meeting.presenter_user_id===presenterFilter&&meeting.status==='scheduled');
-    return externalBusy.filter(block=>!scheduledForPresenter.some(meeting=>overlaps(block.start,block.end,meeting.scheduled_start,addMinutes(meeting.scheduled_start,meeting.duration_minutes))));
+    return externalBusy.filter(block=>{
+      const presenterId=block.presenterUserId||presenterFilter;
+      const scheduledForPresenter=meetings.filter(meeting=>meeting.presenter_user_id===presenterId&&meeting.status==='scheduled');
+      return !scheduledForPresenter.some(meeting=>overlaps(block.start,block.end,meeting.scheduled_start,addMinutes(meeting.scheduled_start,meeting.duration_minutes)));
+    });
   },[externalBusy,meetings,presenterFilter]);
 
   const calendarEvents=useMemo(()=>{
@@ -160,10 +191,10 @@ export default function CommercialAgendaFullCalendar(){
       extendedProps:{kind:'radar',meeting,publisherId:meeting.publisher_id,presenter:teamMap[meeting.presenter_user_id],participants:participantMap[meeting.id]||[]},
     }));
     const external=visibleExternal.map((block,index)=>({
-      id:`external-${index}-${block.start}`,
-      title:'Indisponível',start:block.start,end:block.end,
+      id:`external-${block.presenterUserId||'presenter'}-${index}-${block.start}`,
+      title:block.title||'Compromisso no Google Agenda',start:block.start,end:block.end,
       editable:false,overlap:false,className:'radar-calendar-external',
-      extendedProps:{kind:'external'},
+      extendedProps:{kind:'external',presenterName:block.presenterName||'',presenterUserId:block.presenterUserId||''},
     }));
     const breaks=[];
     if(selectedRule?.break_start&&selectedRule?.break_end&&range.start&&range.end){
@@ -241,7 +272,10 @@ export default function CommercialAgendaFullCalendar(){
   const scrollTime=`${String(scrollHour).padStart(2,'0')}:00:00`;
 
   function renderEventContent(info){
-    if(info.event.extendedProps.kind==='external')return <div className="radar-fc-external-content"><strong>Indisponível</strong><span>{info.timeText}</span></div>;
+    if(info.event.extendedProps.kind==='external'){
+      const presenter=info.event.extendedProps.presenterName;
+      return <div className="radar-fc-external-content"><strong>{info.event.title}</strong><span>{info.timeText}{presenterFilter==='all'&&presenter?` · ${presenter}`:''}</span></div>;
+    }
     const meeting=info.event.extendedProps.meeting;const presenter=info.event.extendedProps.presenter;
     return <div className="radar-fc-event-content"><div><strong>{info.timeText}</strong><span>{MEETING_STATUS_LABELS[meeting?.status]||meeting?.status}</span></div><b>{info.event.title}</b><small>{MEETING_TYPE_LABELS[meeting?.meeting_type]||meeting?.meeting_type}{presenterFilter==='all'&&presenter?` · ${presenter.full_name||presenter.email||'Equipe'}`:''}</small></div>;
   }
