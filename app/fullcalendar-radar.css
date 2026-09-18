@@ -5,3 +5,30 @@
 
 @media(max-width:1180px){.radar-agenda-toolbar{align-items:flex-start;flex-direction:column}.radar-agenda-filters{justify-content:flex-start;width:100%}.radar-agenda-search{flex:1;width:auto}.radar-fullcalendar-card .fc{min-width:760px}.radar-fullcalendar-card{overflow:auto}}
 @media(max-width:720px){.radar-agenda-head{flex-direction:column}.radar-agenda-toolbar{padding:9px}.radar-agenda-nav{width:100%;justify-content:space-between}.radar-agenda-nav>div{min-width:120px}.radar-agenda-filters{display:grid;grid-template-columns:1fr 1fr}.radar-agenda-filters>select,.radar-agenda-search,.radar-agenda-filters>.btn{grid-column:span 2;width:100%;max-width:none}.agenda-segmented{justify-content:center}.radar-agenda-meta{align-items:flex-start;flex-direction:column}.radar-fullcalendar-card .fc{min-width:680px}}
+
+
+/* Agenda readability + monthly view */
+.radar-fullcalendar-card .fc{font-size:11px}
+.radar-fullcalendar-card .fc .fc-timegrid-slot-label-cushion{font-size:10px;color:#667085;font-weight:600}
+.radar-fullcalendar-card .fc .fc-event{overflow:hidden}
+.radar-fullcalendar-card .fc .radar-calendar-event{background:#eaf2ff!important;border-color:#98b7f2!important;color:#183153!important}
+.radar-fullcalendar-card .fc .radar-calendar-external{background:#f4f5f7!important;border:1px solid #98a2b3!important;color:#344054!important;box-shadow:0 1px 2px rgba(16,24,40,.06)}
+.radar-fc-event-content{padding:4px 5px;gap:3px}
+.radar-fc-event-content>div strong{font-size:10px;font-weight:800}
+.radar-fc-event-content>div span{font-size:8px}
+.radar-fc-event-content>b{font-size:11px;line-height:1.18;white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.radar-fc-event-content>small{font-size:8.5px;color:#526071;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.radar-fc-external-content{padding:4px 5px;gap:3px}
+.radar-fc-external-content strong{font-size:11px;line-height:1.18;white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;color:#25344a}
+.radar-fc-external-content span{font-size:8.5px;color:#667085;font-weight:600}
+.radar-fc-day-head.month strong{font-size:10px;text-transform:capitalize;color:#475467}
+.radar-fullcalendar-card .fc .fc-daygrid-day-number{font-size:11px;font-weight:700;color:#475467;text-decoration:none;padding:6px 8px}
+.radar-fullcalendar-card .fc .fc-day-today .fc-daygrid-day-number{background:#eef4ff;color:#3538cd;border-radius:999px;margin:3px}
+.radar-fullcalendar-card .fc .fc-daygrid-day-frame{min-height:118px}
+.radar-fullcalendar-card .fc .fc-daygrid-event{margin:2px 4px;border-radius:6px}
+.radar-fc-month-event{padding:3px 5px;display:grid;gap:1px;min-width:0}
+.radar-fc-month-event strong{font-size:9px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.radar-fc-month-event span{font-size:7.5px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.radar-fc-month-event.external strong{color:#344054}
+.radar-fc-month-event.radar strong{color:#183153}
+@media(max-width:720px){.radar-fullcalendar-card .fc .fc-daygrid-day-frame{min-height:92px}.radar-fc-month-event strong{font-size:8px}}

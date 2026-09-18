@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/react/timegrid';
+import dayGridPlugin from '@fullcalendar/react/daygrid';
 import interactionPlugin from '@fullcalendar/react/interaction';
 import classicThemePlugin from '@fullcalendar/react/themes/classic';
 import { ChevronLeft, ChevronRight, Clock3, Plus, RefreshCw, Search, X } from 'lucide-react';
@@ -21,12 +22,16 @@ function dateKey(value){const d=new Date(value);return `${d.getFullYear()}-${Str
 function periodLabel(start,end,mode){
   if(!start)return '—';
   if(mode==='day')return new Intl.DateTimeFormat('pt-BR',{weekday:'long',day:'2-digit',month:'short'}).format(new Date(start));
+  if(mode==='month')return new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric'}).format(new Date(start));
   const last=new Date(end);last.setDate(last.getDate()-1);
   const fmt=new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'short'});
   return `${fmt.format(new Date(start))} — ${fmt.format(last)}`;
 }
 function dayHeader(info){
   const date=info.date;
+  if(info.view?.type==='dayGridMonth'){
+    return <div className="radar-fc-day-head month"><strong>{new Intl.DateTimeFormat('pt-BR',{weekday:'long'}).format(date)}</strong></div>;
+  }
   return <div className="radar-fc-day-head"><strong>{new Intl.DateTimeFormat('pt-BR',{weekday:'short'}).format(date).replace('.','')}</strong><span>{new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit'}).format(date)}</span>{dateKey(date)===dateKey(new Date())&&<em>Hoje</em>}</div>;
 }
 function meetingStatusClass(status){return `meeting-${status||'scheduled'}`}
@@ -67,7 +72,7 @@ export default function CommercialAgendaFullCalendar(){
     const mode=window.localStorage.getItem('radar-agenda-mode');
     if(p)setPresenterFilter(p);
     if(days===5||days===7)setViewDays(days);
-    if(mode==='day'||mode==='week')setViewMode(mode);
+    if(mode==='day'||mode==='week'||mode==='month')setViewMode(mode);
   },[]);
   useEffect(()=>{if(typeof window!=='undefined')window.localStorage.setItem('radar-agenda-presenter',presenterFilter)},[presenterFilter]);
   useEffect(()=>{if(typeof window!=='undefined')window.localStorage.setItem('radar-agenda-days',String(viewDays))},[viewDays]);
@@ -86,18 +91,18 @@ export default function CommercialAgendaFullCalendar(){
     setPublishers(publisherResult.data||[]);
   }
 
-  async function loadRange(start=range.start,end=range.end){
+  async function loadRange(start=range.start,end=range.end,silent=false){
     if(!org||!start||!end)return;
-    setLoading(true);setNotice('');
+    if(!silent)setLoading(true);setNotice('');
     const meetingResult=await supabase.from('meetings').select('id,publisher_id,title,meeting_type,scheduled_start,duration_minutes,status,scheduled_by,presenter_user_id,notes,outcome_notes,google_meet_url,publishers(name)').eq('organization_id',org).gte('scheduled_start',start).lt('scheduled_start',end).order('scheduled_start',{ascending:true});
-    if(meetingResult.error){setNotice(meetingResult.error.message);setMeetings([]);setParticipants([]);setLoading(false);return}
+    if(meetingResult.error){setNotice(meetingResult.error.message);setMeetings([]);setParticipants([]);if(!silent)setLoading(false);return}
     const rows=meetingResult.data||[];setMeetings(rows);
     if(rows.length){
       const people=await supabase.from('meeting_participants').select('meeting_id,full_name,email,job_title').eq('organization_id',org).in('meeting_id',rows.map(row=>row.id)).order('created_at',{ascending:true});
       if(people.error)setNotice(people.error.message);
       setParticipants(people.data||[]);
     }else setParticipants([]);
-    setLoading(false);
+    if(!silent)setLoading(false);
   }
 
   async function fetchExternalBusy(presenterId,start,end){
@@ -109,9 +114,9 @@ export default function CommercialAgendaFullCalendar(){
     return data;
   }
 
-  async function loadExternal(presenterId=presenterFilter,start=range.start,end=range.end){
+  async function loadExternal(presenterId=presenterFilter,start=range.start,end=range.end,silent=false){
     if(!start||!end){setExternalBusy([]);return}
-    setExternalLoading(true);
+    if(!silent)setExternalLoading(true);
     try{
       if(presenterId==='all'){
         const presenters=team.filter(member=>member.active&&(member.commercial_functions||[]).includes('commercial_presentation'));
@@ -145,12 +150,20 @@ export default function CommercialAgendaFullCalendar(){
     }catch(error){
       setExternalBusy([]);
       setCalendarMessage(error.code==='CALENDAR_NOT_CONNECTED'?'Google Agenda ainda não conectado.':'Agenda externa indisponível no momento.');
-    }finally{setExternalLoading(false)}
+    }finally{if(!silent)setExternalLoading(false)}
   }
 
   useEffect(()=>{loadStatic()},[org]);
   useEffect(()=>{loadRange()},[org,range.start,range.end,activityVersion]);
   useEffect(()=>{loadExternal()},[presenterFilter,range.start,range.end,team]);
+  useEffect(()=>{
+    if(!org||!range.start||!range.end)return;
+    const timer=setInterval(()=>{
+      loadRange(range.start,range.end,true);
+      loadExternal(presenterFilter,range.start,range.end,true);
+    },60000);
+    return()=>clearInterval(timer);
+  },[org,range.start,range.end,presenterFilter,team,activityVersion]);
 
   const participantMap=useMemo(()=>{const out={};for(const person of participants)(out[person.meeting_id]||(out[person.meeting_id]=[])).push(person);return out},[participants]);
   const presenterOptions=useMemo(()=>{
@@ -187,13 +200,13 @@ export default function CommercialAgendaFullCalendar(){
       title:meeting.publishers?.name||meeting.title||'Reunião Radar',
       start:meeting.scheduled_start,
       end:addMinutes(meeting.scheduled_start,meeting.duration_minutes).toISOString(),
-      className:`radar-calendar-event ${meetingStatusClass(meeting.status)}`,
+      classNames:['radar-calendar-event',meetingStatusClass(meeting.status)],
       extendedProps:{kind:'radar',meeting,publisherId:meeting.publisher_id,presenter:teamMap[meeting.presenter_user_id],participants:participantMap[meeting.id]||[]},
     }));
     const external=visibleExternal.map((block,index)=>({
       id:`external-${block.presenterUserId||'presenter'}-${index}-${block.start}`,
       title:block.title||'Compromisso no Google Agenda',start:block.start,end:block.end,
-      editable:false,overlap:false,className:'radar-calendar-external',
+      editable:false,overlap:false,classNames:['radar-calendar-external'],
       extendedProps:{kind:'external',presenterName:block.presenterName||'',presenterUserId:block.presenterUserId||''},
     }));
     const breaks=[];
@@ -203,7 +216,7 @@ export default function CommercialAgendaFullCalendar(){
         if(selectedRule.active_days.includes(cursor.getDay())){
           const y=cursor.getFullYear(),m=cursor.getMonth(),d=cursor.getDate();
           const [sh,sm]=selectedRule.break_start.split(':').map(Number);const [eh,em]=selectedRule.break_end.split(':').map(Number);
-          breaks.push({id:`break-${dateKey(cursor)}`,start:new Date(y,m,d,sh,sm).toISOString(),end:new Date(y,m,d,eh,em).toISOString(),display:'background',className:'radar-calendar-break',extendedProps:{kind:'break'}});
+          breaks.push({id:`break-${dateKey(cursor)}`,start:new Date(y,m,d,sh,sm).toISOString(),end:new Date(y,m,d,eh,em).toISOString(),display:'background',classNames:['radar-calendar-break'],extendedProps:{kind:'break'}});
         }
         cursor.setDate(cursor.getDate()+1);
       }
@@ -219,7 +232,7 @@ export default function CommercialAgendaFullCalendar(){
   function previous(){api()?.prev()}
   function next(){api()?.next()}
   function today(){api()?.today()}
-  function setMode(mode){setViewMode(mode);api()?.changeView(mode==='day'?'timeGridDay':'timeGridWeek')}
+  function setMode(mode){setViewMode(mode);api()?.changeView(mode==='day'?'timeGridDay':mode==='month'?'dayGridMonth':'timeGridWeek')}
 
   function slotValidation(presenterId,start,duration,busyOverride=null){
     const rule=normalizeAvailabilityRule(rules[presenterId]);
@@ -242,7 +255,15 @@ export default function CommercialAgendaFullCalendar(){
     setPublisherQuery('');setQuick({publisher_id:'',presenter_user_id:presenterId,scheduled_start:localInput(startValue),duration_minutes:duration});
   }
 
-  function handleDateClick(info){openQuick(info.date)}
+  function handleDateClick(info){
+    if(viewMode!=='month'){openQuick(info.date);return}
+    const presenterId=presenterFilter!=='all'?presenterFilter:presenterOptions[0]?.user_id;
+    const rule=normalizeAvailabilityRule(rules[presenterId]);
+    const start=new Date(info.date);
+    const [hour,minute]=String(rule.work_start||'09:00').split(':').map(Number);
+    start.setHours(Number.isFinite(hour)?hour:9,Number.isFinite(minute)?minute:0,0,0);
+    openQuick(start);
+  }
   function handleSelect(info){const duration=normalizedDuration(Math.round((info.end.getTime()-info.start.getTime())/60000));openQuick(info.start,duration);api()?.unselect()}
   function handleEventClick(info){if(info.event.extendedProps.kind==='radar')router.push(`/app/editoras/${info.event.extendedProps.publisherId}`)}
   function handleDatesSet(info){setRange({start:info.start.toISOString(),end:info.end.toISOString()})}
@@ -272,11 +293,16 @@ export default function CommercialAgendaFullCalendar(){
   const scrollTime=`${String(scrollHour).padStart(2,'0')}:00:00`;
 
   function renderEventContent(info){
+    const month=info.view?.type==='dayGridMonth';
     if(info.event.extendedProps.kind==='external'){
       const presenter=info.event.extendedProps.presenterName;
-      return <div className="radar-fc-external-content"><strong>{info.event.title}</strong><span>{info.timeText}{presenterFilter==='all'&&presenter?` · ${presenter}`:''}</span></div>;
+      return <div className={month?'radar-fc-month-event external':'radar-fc-external-content'}>
+        <strong>{info.event.title}</strong>
+        <span>{info.timeText}{presenterFilter==='all'&&presenter?` · ${presenter}`:''}</span>
+      </div>;
     }
     const meeting=info.event.extendedProps.meeting;const presenter=info.event.extendedProps.presenter;
+    if(month)return <div className="radar-fc-month-event radar"><strong>{info.event.title}</strong><span>{info.timeText}{presenterFilter==='all'&&presenter?` · ${presenter.full_name||presenter.email||'Equipe'}`:''}</span></div>;
     return <div className="radar-fc-event-content"><div><strong>{info.timeText}</strong><span>{MEETING_STATUS_LABELS[meeting?.status]||meeting?.status}</span></div><b>{info.event.title}</b><small>{MEETING_TYPE_LABELS[meeting?.meeting_type]||meeting?.meeting_type}{presenterFilter==='all'&&presenter?` · ${presenter.full_name||presenter.email||'Equipe'}`:''}</small></div>;
   }
 
@@ -291,12 +317,12 @@ export default function CommercialAgendaFullCalendar(){
     <section className="radar-agenda-toolbar card">
       <div className="radar-agenda-nav">
         <button className="icon-btn" type="button" onClick={previous} aria-label="Período anterior"><ChevronLeft size={17}/></button>
-        <div><small>{viewMode==='day'?'Dia':'Semana'}</small><strong>{period}</strong></div>
+        <div><small>{viewMode==='day'?'Dia':viewMode==='month'?'Mês':'Semana'}</small><strong>{period}</strong></div>
         <button className="icon-btn" type="button" onClick={next} aria-label="Próximo período"><ChevronRight size={17}/></button>
         <button className="btn secondary small" type="button" onClick={today}>Hoje</button>
       </div>
       <div className="radar-agenda-filters">
-        <div className="agenda-segmented"><button type="button" className={viewMode==='day'?'active':''} onClick={()=>setMode('day')}>Dia</button><button type="button" className={viewMode==='week'?'active':''} onClick={()=>setMode('week')}>Semana</button></div>
+        <div className="agenda-segmented"><button type="button" className={viewMode==='day'?'active':''} onClick={()=>setMode('day')}>Dia</button><button type="button" className={viewMode==='week'?'active':''} onClick={()=>setMode('week')}>Semana</button><button type="button" className={viewMode==='month'?'active':''} onClick={()=>setMode('month')}>Mês</button></div>
         <select value={presenterFilter} onChange={e=>setPresenterFilter(e.target.value)}><option value="all">Toda a equipe</option>{presenterOptions.map(member=><option key={member.user_id} value={member.user_id}>{member.full_name||member.email||'Equipe'}</option>)}</select>
         {viewMode==='week'&&<div className="agenda-segmented"><button type="button" className={viewDays===5?'active':''} onClick={()=>setViewDays(5)}>5 dias</button><button type="button" className={viewDays===7?'active':''} onClick={()=>setViewDays(7)}>7 dias</button></div>}
         <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="scheduled">Agendadas</option><option value="all">Todos os status</option>{Object.entries(MEETING_STATUS_LABELS).filter(([key])=>key!=='scheduled').map(([key,label])=><option value={key} key={key}>{label}</option>)}</select>
@@ -305,20 +331,20 @@ export default function CommercialAgendaFullCalendar(){
       </div>
     </section>
 
-    <div className="radar-agenda-meta"><span><strong>{scheduledCount}</strong> agendada{scheduledCount===1?'':'s'} · <strong>{todayCount}</strong> hoje · <strong>{completedCount}</strong> realizada{completedCount===1?'':'s'}</span><span>{externalLoading?'Consultando agenda externa…':calendarMessage}</span></div>
+    <div className="radar-agenda-meta"><span><strong>{scheduledCount}</strong> agendada{scheduledCount===1?'':'s'} · <strong>{todayCount}</strong> hoje · <strong>{completedCount}</strong> realizada{completedCount===1?'':'s'}</span><span>{externalLoading?'Consultando agenda externa…':calendarMessage} · atualização automática a cada 1 min</span></div>
     {selectedRule&&<div className="radar-agenda-rule"><Clock3 size={12}/>{ruleSummary(selectedRule)}</div>}
 
     <section className="radar-fullcalendar-card card" aria-busy={loading}>
       {loading&&<div className="radar-calendar-loading">Atualizando reuniões…</div>}
       <FullCalendar
         ref={calendarRef}
-        plugins={[classicThemePlugin,timeGridPlugin,interactionPlugin]}
+        plugins={[classicThemePlugin,timeGridPlugin,dayGridPlugin,interactionPlugin]}
         themeSystem="classic"
-        initialView={viewMode==='day'?'timeGridDay':'timeGridWeek'}
+        initialView={viewMode==='day'?'timeGridDay':viewMode==='month'?'dayGridMonth':'timeGridWeek'}
         headerToolbar={false}
         firstDay={1}
-        weekends={viewMode==='day'?true:viewDays===7}
-        allDaySlot={false}
+        weekends={viewMode==='week'?viewDays===7:true}
+        allDaySlot={viewMode==='month'?true:false}
         slotMinTime="08:00:00"
         slotMaxTime="19:00:00"
         slotDuration="00:30:00"
@@ -330,7 +356,7 @@ export default function CommercialAgendaFullCalendar(){
         businessHours={businessHours}
         scrollTime={scrollTime}
         scrollTimeReset={false}
-        selectable={canSchedule}
+        selectable={canSchedule&&viewMode!=='month'}
         selectMirror={true}
         selectOverlap={false}
         dateClick={handleDateClick}
@@ -342,7 +368,7 @@ export default function CommercialAgendaFullCalendar(){
         eventMinHeight={26}
         eventShortHeight={34}
         slotEventOverlap={false}
-        height="calc(100vh - 245px)"
+        height={viewMode==='month'?'auto':'calc(100vh - 245px)'}
         expandRows={true}
       />
     </section>
