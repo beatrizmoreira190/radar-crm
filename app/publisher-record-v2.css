@@ -87,3 +87,195 @@
   .publisher-record-overview-head{padding:14px}
   .publisher-record-main .card.panel{padding:15px}
 }
+
+
+/* Publisher record v3 — unified visual system
+   One commercial record, one card language. Color is reserved for status and actions. */
+.publisher-record-overview,
+.publisher-quick-contact,
+.publisher-record-main .card.panel,
+.publisher-record-aside .card.panel,
+.radar-intelligence-collapsible,
+.publisher-meetings-card,
+.publisher-materials-card{
+  border:1px solid #e2e6ec!important;
+  border-top:1px solid #e2e6ec!important;
+  border-radius:14px!important;
+  background:#fff!important;
+  box-shadow:0 1px 2px rgba(16,24,40,.025),0 5px 16px rgba(16,24,40,.025)!important;
+}
+
+/* Remove the old module-by-module accent bars. */
+.radar-intelligence-collapsible,
+.publisher-meetings-card,
+.publisher-materials-card,
+.publisher-sidebar-tracking,
+.publisher-sidebar-tasks,
+.publisher-sidebar-summary{
+  border-top:1px solid #e2e6ec!important;
+}
+
+/* Main column: consistent spacing and header rhythm. */
+.publisher-record-main{gap:14px!important}
+.publisher-record-main .card.panel{padding:18px!important}
+.publisher-record-main .section-title{
+  min-height:38px;
+  margin-bottom:14px!important;
+  padding-bottom:11px;
+  border-bottom:1px solid #eef1f4;
+  align-items:flex-start!important;
+}
+.publisher-record-main .section-title>div:first-child{min-width:0}
+.publisher-record-main .section-title h2,
+.publisher-record-main .section-title .help-heading h2{
+  margin:0!important;
+  font-size:16px!important;
+  line-height:1.25!important;
+  letter-spacing:-.015em!important;
+  color:#101828!important;
+}
+.publisher-record-main .section-title p{
+  margin:3px 0 0!important;
+  font-size:10.5px!important;
+  line-height:1.4!important;
+  color:#667085!important;
+}
+
+/* Data card reads like the rest of the record, not a separate form. */
+.publisher-data-card .info-grid{gap:0 24px!important}
+.publisher-data-card .info-item{
+  padding:9px 0!important;
+  border:0!important;
+  border-bottom:1px solid #f1f3f5!important;
+  border-radius:0!important;
+  background:transparent!important;
+}
+.publisher-data-card .info-item:nth-last-child(-n+2){border-bottom:0!important}
+.publisher-data-card .info-item small{
+  margin-bottom:3px!important;
+  font-size:8.5px!important;
+  color:#98a2b3!important;
+}
+.publisher-data-card .info-item span{font-size:11.5px!important;color:#344054!important}
+
+/* Radar Score: same card shell, with intelligence communicated by content rather than a dark stripe. */
+.radar-intelligence-collapsible{overflow:hidden!important}
+.radar-intelligence-summary{
+  padding:17px 18px!important;
+  min-height:78px;
+}
+.radar-intelligence-summary h2{
+  margin:4px 0 6px!important;
+  font-size:18px!important;
+  color:#101828!important;
+}
+.radar-intelligence-summary-line{font-size:10.5px!important}
+.radar-intelligence-content{border-top:1px solid #eef1f4!important}
+
+/* Relationship/activity rows share one visual language. */
+.publisher-contacts-card .contact-row,
+.publisher-history-card .timeline-body,
+.publisher-opportunities-card .opportunity-row,
+.publisher-meetings-card .meeting-row,
+.publisher-materials-card .publisher-material-row{
+  border-color:#eef1f4!important;
+}
+.publisher-contacts-card .contact-row,
+.publisher-opportunities-card .opportunity-row{
+  padding:12px 2px!important;
+}
+
+/* Empty states should inform, not dominate the record. */
+.publisher-meetings-card .empty-state,
+.publisher-materials-card .empty-state{
+  min-height:112px;
+  padding:20px 12px!important;
+  display:grid;
+  place-items:center;
+  align-content:center;
+  gap:3px;
+}
+.publisher-meetings-card .empty-state svg,
+.publisher-materials-card .empty-state svg{
+  width:25px!important;
+  height:25px!important;
+  color:#98a2b3!important;
+}
+.publisher-meetings-card .empty-state strong,
+.publisher-materials-card .empty-state strong{
+  margin-top:4px!important;
+  font-size:12px!important;
+  color:#344054!important;
+}
+.publisher-meetings-card .empty-state p,
+.publisher-materials-card .empty-state p{
+  margin:1px 0 0!important;
+  font-size:10.5px!important;
+  color:#98a2b3!important;
+}
+
+/* Sidebar: compact record controls, never stretched to match the main column. */
+.publisher-record-aside{
+  display:flex!important;
+  flex-direction:column!important;
+  gap:12px!important;
+  align-items:stretch!important;
+  height:auto!important;
+  min-height:0!important;
+}
+.publisher-record-aside>.card,
+.publisher-record-aside>.panel,
+.publisher-sidebar-tracking,
+.publisher-sidebar-tasks,
+.publisher-sidebar-summary{
+  width:100%!important;
+  height:auto!important;
+  min-height:0!important;
+  align-self:flex-start!important;
+}
+.publisher-record-aside .card.panel{padding:16px!important}
+.publisher-record-aside .section-title{
+  margin-bottom:10px!important;
+  padding-bottom:9px;
+  border-bottom:1px solid #eef1f4;
+}
+.publisher-record-aside .section-title h2,
+.publisher-record-aside .section-title h3,
+.publisher-record-aside .help-heading h2,
+.publisher-record-aside .help-heading h3{
+  font-size:14px!important;
+  line-height:1.25!important;
+  color:#101828!important;
+}
+.publisher-record-aside .stat-list{display:grid}
+.publisher-record-aside .stat-row{
+  min-height:36px;
+  padding:9px 0!important;
+  border-top:1px solid #f1f3f5!important;
+  align-items:center!important;
+}
+.publisher-record-aside .stat-row:first-child{border-top:0!important;padding-top:3px!important}
+.publisher-record-aside .stat-row span,
+.publisher-record-aside .stat-row strong{font-size:10.5px!important}
+.publisher-record-aside .stat-row strong{color:#344054!important}
+
+/* Overview + essential contact use the same shell as the record below. */
+.publisher-record-overview{margin-bottom:12px!important}
+.publisher-quick-contact{margin-bottom:14px!important;box-shadow:0 1px 2px rgba(16,24,40,.02)!important}
+.publisher-record-overview-head{border-bottom-color:#eef1f4!important}
+.quick-contact-items>a,
+.quick-contact-empty,
+.quick-contact-location{
+  border-color:#eef1f4!important;
+  background:#fcfcfd!important;
+  box-shadow:none!important;
+}
+.quick-contact-items>a:hover{background:#fff!important;border-color:#d7dce3!important;box-shadow:0 3px 10px rgba(16,24,40,.04)!important}
+
+/* Keep buttons/status expressive; card containers stay neutral. */
+.publisher-meetings-card>.section-title .btn,
+.publisher-materials-card>.section-title .btn{box-shadow:none!important}
+
+@media(max-width:900px){
+  .publisher-record-aside{display:grid!important}
+}
