@@ -326,7 +326,7 @@ export default function CommercialAgendaFullCalendar(){
 
   return <div className="page-wrap radar-agenda-page">
     <header className="radar-agenda-head">
-      <div><div className="eyebrow">Agenda comercial</div><h1>Agenda da equipe</h1><p>Reuniões Radar e indisponibilidades externas em um calendário estável e integrado.</p></div>
+      <div><div className="eyebrow">Agenda comercial</div><h1>Agenda da equipe</h1><p>Organize reuniões, acompanhe compromissos da equipe e consulte disponibilidades em um só lugar.</p></div>
       <button className="btn secondary" type="button" onClick={()=>{loadRange();loadExternal()}}><RefreshCw size={15}/> Atualizar</button>
     </header>
 
@@ -349,7 +349,7 @@ export default function CommercialAgendaFullCalendar(){
       </div>
     </section>
 
-    <div className="radar-agenda-meta"><span><strong>{scheduledCount}</strong> agendada{scheduledCount===1?'':'s'} · <strong>{todayCount}</strong> hoje · <strong>{completedCount}</strong> realizada{completedCount===1?'':'s'}</span><span className="agenda-legend"><i className="radar"/>Radar <i className="google"/>Google Agenda</span><span>{externalLoading?'Consultando agenda externa…':calendarMessage} · atualização automática a cada 1 min</span></div>
+    <div className="radar-agenda-meta"><span><strong>{scheduledCount}</strong> agendada{scheduledCount===1?'':'s'} · <strong>{todayCount}</strong> hoje · <strong>{completedCount}</strong> realizada{completedCount===1?'':'s'}</span><span>{externalLoading?'Consultando agenda externa…':calendarMessage} · atualização automática a cada 1 min</span></div>
     {selectedRule&&<div className="radar-agenda-rule"><Clock3 size={12}/>{ruleSummary(selectedRule)}</div>}
 
     <section className="radar-fullcalendar-card card" aria-busy={loading}>
