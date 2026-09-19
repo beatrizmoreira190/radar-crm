@@ -1,4 +1,4 @@
-name: Security and build
+name: Security, build and smoke test
 
 on:
   pull_request:
@@ -32,3 +32,29 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Start production server
+        run: |
+          npm run start > /tmp/radar-next.log 2>&1 &
+          echo $! > /tmp/radar-next.pid
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error http://127.0.0.1:3000/api/health > /tmp/radar-health.json; then
+              cat /tmp/radar-health.json
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/radar-next.log
+          exit 1
+
+      - name: Smoke test public routes
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:3000/ > /dev/null
+          curl --fail --silent --show-error http://127.0.0.1:3000/login > /dev/null
+
+      - name: Stop production server
+        if: always()
+        run: |
+          if [ -f /tmp/radar-next.pid ]; then
+            kill "$(cat /tmp/radar-next.pid)" || true
+          fi
