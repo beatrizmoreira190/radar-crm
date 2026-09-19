@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { CalendarClock, ExternalLink, FileText, Pencil, Plus, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 import { MATERIAL_STATUS_LABELS, MATERIAL_TYPE_LABELS, formatDate } from '@/lib/constants';
+import PublisherHelp from '@/components/PublisherHelp';
 
 function linkHost(value=''){
   try{return new URL(value).hostname.replace(/^www\./,'')}catch{return 'Link externo'}
@@ -54,7 +55,7 @@ export default function PublisherMaterialsMount(){
     <section className="card panel publisher-materials-card">
       <div className="section-title">
         <div>
-          <h2>Materiais comerciais</h2>
+          <div className="help-heading"><h2>Materiais comerciais</h2><PublisherHelp text="Apresentações, projetos, propostas, curadorias e outros materiais preparados para esta editora."/></div>
           <p className="muted">Links de apresentações, projetos, propostas e curadorias preparados para esta editora.</p>
         </div>
         {canManage&&<button className="btn secondary small" type="button" onClick={openNew}><Plus size={14}/> Material</button>}
