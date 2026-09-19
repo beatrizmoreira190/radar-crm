@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, CheckCircle2, CircleHelp, Clock3, Globe2, Mail, Phone, Plus, Save, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 import { CHANNEL_LABELS, EDITORIAL_PROFILE_CONFIDENCE_LABELS, EDITORIAL_PROFILE_STATUS_LABELS, INTEREST_LABELS, OPPORTUNITY_STAGE_LABELS, PRIORITY_LABELS, RESULT_LABELS, TASK_TYPE_LABELS, currency, formatDate } from '@/lib/constants';
@@ -70,15 +70,15 @@ function localInput(value){if(!value)return'';const d=new Date(value);if(Number.
 export default function PublisherDetailPage(){
   const {id}=useParams(); const {supabase,membership,user,teamMap,team,isManager,activityVersion}=useCrm(); const org=membership?.organization_id;
   const [publisher,setPublisher]=useState(null); const [contacts,setContacts]=useState([]); const [interactions,setInteractions]=useState([]); const [tasks,setTasks]=useState([]); const [opps,setOpps]=useState([]); const [stages,setStages]=useState([]);
-  const [loading,setLoading]=useState(true); const [notice,setNotice]=useState(''); const [modal,setModal]=useState(''); const [editingOpportunity,setEditingOpportunity]=useState(null); const [edit,setEdit]=useState({priority:'medium',stage_id:'',owner_user_id:'',next_action_at:'',notes:''});
+  const [loading,setLoading]=useState(true); const [notice,setNotice]=useState(''); const [modal,setModal]=useState(''); const [editingOpportunity,setEditingOpportunity]=useState(null); const [edit,setEdit]=useState({priority:'medium',stage_id:'',owner_user_id:'',next_action_at:'',notes:''}); const editHydratedFor=useRef(null);
   async function load(){if(!org||!id)return;setLoading(true);const [p,c,i,t,o,s]=await Promise.all([
     supabase.from('publishers').select('*').eq('organization_id',org).eq('id',id).maybeSingle(),
     supabase.from('contacts').select('*').eq('organization_id',org).eq('publisher_id',id).eq('active',true).order('is_decision_maker',{ascending:false}).order('full_name'),
     supabase.from('interactions').select('*').eq('organization_id',org).eq('publisher_id',id).order('occurred_at',{ascending:false}).limit(30),
-    supabase.from('tasks').select('*').eq('organization_id',org).eq('publisher_id',id).order('due_at',{ascending:true,nullsFirst:false}).limit(30),
+    supabase.from('tasks').select('*').eq('organization_id',org).eq('publisher_id',id).in('status',['open','in_progress']).order('due_at',{ascending:true,nullsFirst:false}).limit(30),
     supabase.from('opportunities').select('*').eq('organization_id',org).eq('publisher_id',id).order('created_at',{ascending:false}),
     supabase.from('pipeline_stages').select('id,name,position,stage_type').eq('organization_id',org).eq('active',true).order('position')
-  ]);if(p.error)setNotice(p.error.message);setPublisher(p.data||null);setContacts(c.data||[]);setInteractions(i.data||[]);setTasks(t.data||[]);setOpps(o.data||[]);setStages(s.data||[]);if(p.data)setEdit({priority:p.data.priority||'medium',stage_id:p.data.stage_id||'',owner_user_id:p.data.owner_user_id||'',next_action_at:localInput(p.data.next_action_at),notes:p.data.notes||''});setLoading(false)}
+  ]);if(p.error)setNotice(p.error.message);setPublisher(p.data||null);setContacts(c.data||[]);setInteractions(i.data||[]);setTasks(t.data||[]);setOpps(o.data||[]);setStages(s.data||[]);if(p.data&&editHydratedFor.current!==p.data.id){setEdit({priority:p.data.priority||'medium',stage_id:p.data.stage_id||'',owner_user_id:p.data.owner_user_id||'',next_action_at:localInput(p.data.next_action_at),notes:p.data.notes||''});editHydratedFor.current=p.data.id}setLoading(false)}
   useEffect(()=>{load()},[org,id,activityVersion]);
   const stageMap=useMemo(()=>Object.fromEntries(stages.map(s=>[s.id,s])),[stages]);
   const canWork=Boolean(publisher&&(isManager||publisher.owner_user_id===user?.id));
@@ -91,7 +91,7 @@ export default function PublisherDetailPage(){
   function newOpportunity(){setEditingOpportunity(null);setModal('opportunity')}
   function editOpportunity(opportunity){setEditingOpportunity(opportunity);setModal('opportunity')}
   function closeOpportunity(){setModal('');setEditingOpportunity(null)}
-  if(loading)return <div className="page-wrap"><div className="table-empty">Carregando editora…</div></div>;
+  if(loading&&!publisher)return <div className="page-wrap"><div className="table-empty">Carregando editora…</div></div>;
   if(!publisher)return <div className="page-wrap"><Link href="/app/editoras" className="text-link"><ArrowLeft size={15}/> Voltar</Link><div className="card panel" style={{marginTop:16}}><h2>Editora não encontrada</h2><p className="muted">Ela pode ter sido arquivada ou você não tem acesso a esse registro.</p></div></div>;
   return <div className="page-wrap">
     <div className="page-head"><div><Link href="/app/editoras" className="text-link"><ArrowLeft size={15}/> Editoras</Link><div className="eyebrow" style={{marginTop:12}}>Ficha comercial</div><h1>{publisher.name}</h1><p>{[publisher.trade_name,publisher.city,publisher.state].filter(Boolean).join(' · ')||'Dados cadastrais e histórico comercial.'}</p></div><div className="chips"><span className="badge dark">Score {publisher.score??0}</span><HelpTip text={HELP.score}/><span className="badge">{stageMap[publisher.stage_id]?.name||'Sem etapa'}</span><HelpTip text={HELP.stageBadge}/></div></div>
