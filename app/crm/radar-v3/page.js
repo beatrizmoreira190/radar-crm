@@ -1,12 +1,32 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowDownRight, ArrowUpRight, Beaker, ChevronLeft, ChevronRight, Equal, RefreshCw, Search, ShieldCheck, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertCircle, ArrowDownRight, ArrowUpRight, Beaker, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Equal, RefreshCw, Search, ShieldCheck, SlidersHorizontal, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 import { RADAR_PRODUCT_LABELS, formatDate } from '@/lib/constants';
 
 const PAGE_SIZE=50;
+
+const REVIEW_LABELS={
+  pending:'Pendente',
+  validated:'Faz sentido',
+  needs_adjustment:'Precisa ajuste',
+  later:'Revisar depois'
+};
+
+const FLAG_META={
+  large_up:{label:'Alta forte',tone:'green'},
+  large_down:{label:'Queda forte',tone:'red'},
+  v2_cap_removed:{label:'Teto do v2 removido',tone:'amber'},
+  product_changed:{label:'Produto mudou',tone:'blue'},
+  multi_product_tie:{label:'Empate de produtos',tone:''},
+  unknown_taxonomy:{label:'Perfil sem mapa',tone:'red'},
+  specialized_catalog:{label:'Catálogo especializado',tone:''},
+  opportunities_recalibrated:{label:'Oportunidades recalibrado',tone:'amber'},
+  v2_fit_saturation_reduced:{label:'Saturação do v2 reduzida',tone:'blue'},
+  taxonomy_normalized:{label:'Taxonomia normalizada',tone:'green'}
+};
 
 function scoreTone(delta){
   if(delta>=10)return'green';
@@ -21,9 +41,22 @@ function Delta({value}){
   </span>;
 }
 function productLabel(value){return RADAR_PRODUCT_LABELS[value]||value||'—'}
+function ReviewBadge({status}){
+  const value=status||'pending';
+  const tone=value==='validated'?'green':value==='needs_adjustment'?'red':value==='later'?'amber':'';
+  return <span className={`badge ${tone}`}>{REVIEW_LABELS[value]||value}</span>;
+}
+function FlagBadges({flags=[]}){
+  const rows=Array.isArray(flags)?flags:[];
+  if(!rows.length)return <span className="muted" style={{fontSize:10}}>Sem alerta especial</span>;
+  return <div className="chips">{rows.slice(0,4).map(flag=>{
+    const meta=FLAG_META[flag]||{label:flag,tone:''};
+    return <span className={`badge ${meta.tone}`} key={flag}>{meta.label}</span>;
+  })}{rows.length>4&&<span className="badge">+{rows.length-4}</span>}</div>;
+}
 
 export default function RadarV3LabPage(){
-  const {supabase,membership,isManager}=useCrm();
+  const {supabase,membership,isManager,user}=useCrm();
   const org=membership?.organization_id;
   const [summary,setSummary]=useState(null);
   const [rows,setRows]=useState([]);
@@ -32,22 +65,28 @@ export default function RadarV3LabPage(){
   const [notice,setNotice]=useState('');
   const [sort,setSort]=useState('abs');
   const [status,setStatus]=useState('confirmed');
+  const [reviewFilter,setReviewFilter]=useState('pending');
   const [search,setSearch]=useState('');
   const [draftSearch,setDraftSearch]=useState('');
   const [page,setPage]=useState(1);
+  const [reviewRow,setReviewRow]=useState(null);
+  const [reviewStatus,setReviewStatus]=useState('pending');
+  const [reviewNote,setReviewNote]=useState('');
+  const [savingReview,setSavingReview]=useState(false);
 
   async function load(){
     if(!org||!isManager)return;
     setLoading(true);
     const [{data:summaryData,error:summaryError},{data:rowData,error:rowsError}]=await Promise.all([
       supabase.rpc('crm_radar_v3_lab_summary',{p_organization_id:org}),
-      supabase.rpc('crm_radar_v3_lab_rows',{
+      supabase.rpc('crm_radar_v3_lab_rows_review',{
         p_organization_id:org,
         p_limit:PAGE_SIZE,
         p_offset:(page-1)*PAGE_SIZE,
         p_sort:sort,
         p_search:search||null,
-        p_status:status||null
+        p_status:status||null,
+        p_review_status:reviewFilter||null
       })
     ]);
     if(summaryError||rowsError)setNotice(summaryError?.message||rowsError?.message);
@@ -56,14 +95,14 @@ export default function RadarV3LabPage(){
     setLoading(false);
   }
 
-  useEffect(()=>{load()},[org,isManager,page,sort,status,search]);
+  useEffect(()=>{load()},[org,isManager,page,sort,status,reviewFilter,search]);
 
   async function refreshLab(){
     if(!org)return;
     setRefreshing(true);setNotice('');
     const {data,error}=await supabase.rpc('crm_radar_v3_lab_refresh',{p_organization_id:org});
     if(error)setNotice(error.message);
-    else setNotice(`Laboratório recalculado para ${Number(data||0).toLocaleString('pt-BR')} editoras com perfil editorial.`);
+    else setNotice(`Laboratório recalculado para ${Number(data||0).toLocaleString('pt-BR')} editoras com perfil editorial. As revisões humanas foram preservadas.`);
     setRefreshing(false);
     if(!error){setPage(1);await load()}
   }
@@ -72,6 +111,34 @@ export default function RadarV3LabPage(){
     e.preventDefault();
     setPage(1);
     setSearch(draftSearch.trim());
+  }
+
+  function openReview(row){
+    setReviewRow(row);
+    setReviewStatus(row.review_status||'pending');
+    setReviewNote(row.review_note||'');
+  }
+
+  async function saveReview(e){
+    e.preventDefault();
+    if(!org||!reviewRow||!user?.id)return;
+    setSavingReview(true);
+    const now=new Date().toISOString();
+    const {error}=await supabase.from('radar_v3_reviews').upsert({
+      organization_id:org,
+      publisher_id:reviewRow.publisher_id,
+      review_status:reviewStatus,
+      review_note:reviewNote.trim()||null,
+      reviewed_by:user.id,
+      reviewed_at:now,
+      updated_at:now
+    },{onConflict:'organization_id,publisher_id'});
+    setSavingReview(false);
+    if(error){setNotice(error.message);return}
+    setReviewRow(null);
+    setNotice(`${reviewRow.publisher_name}: revisão registrada como “${REVIEW_LABELS[reviewStatus]}”.`);
+    if(reviewFilter==='pending'&&reviewStatus!=='pending')setPage(1);
+    await load();
   }
 
   const bestProducts=Array.isArray(summary?.best_products)?summary.best_products:[];
@@ -87,7 +154,7 @@ export default function RadarV3LabPage(){
       <div>
         <div className="eyebrow">Laboratório comercial</div>
         <h1>Radar Score v3</h1>
-        <p>Compare o score atual com o candidato v3 sem alterar Prioridades, Pipeline ou o score oficial das editoras.</p>
+        <p>Compare, audite e valide o candidato v3 sem alterar Prioridades, Pipeline ou o score oficial das editoras.</p>
       </div>
       <button className="btn secondary" onClick={refreshLab} disabled={refreshing}>
         <RefreshCw size={16}/>{refreshing?'Recalculando…':'Recalcular laboratório'}
@@ -97,11 +164,11 @@ export default function RadarV3LabPage(){
     {notice&&<div className="notice-bar"><span>{notice}</span><button onClick={()=>setNotice('')}><X size={15}/></button></div>}
 
     <section className="card panel" style={{borderColor:'#b2ddff',background:'#f5fbff'}}>
-      <div className="panel-head"><div><h2>O v3 ainda não está valendo</h2><p>O Radar Score oficial continua sendo o <strong>radar_v2</strong>. Esta tela é somente comparativa.</p></div><ShieldCheck size={22}/></div>
+      <div className="panel-head"><div><h2>O v3 ainda não está valendo</h2><p>O Radar Score oficial continua sendo o <strong>radar_v2</strong>. Revisar uma editora aqui não altera a operação comercial.</p></div><ShieldCheck size={22}/></div>
       <div className="info-grid">
         <div className="info-item"><small>Fórmula final</small><span>70% aderência + 20% potencial + 10% prospectabilidade</span></div>
-        <div className="info-item"><small>Aderência do produto</small><span>85% maior sinal + 10% segundo + 5% terceiro, ajustados pela cobertura do catálogo</span></div>
-        <div className="info-item"><small>Perfis confessionais</small><span>Sem teto global; cada linha é avaliada pelo próprio fit e pela cobertura do catálogo</span></div>
+        <div className="info-item"><small>Aderência do produto</small><span>Os sinais disponíveis são normalizados: 1 perfil usa 100%; 2 perfis reescalam 85/10; 3+ usam 85/10/5 com cobertura do catálogo</span></div>
+        <div className="info-item"><small>Perfis confessionais</small><span>Sem teto global; o laboratório sinaliza grandes correções do teto v2 para revisão humana</span></div>
         <div className="info-item"><small>Radar de Oportunidades</small><span>Pesos experimentais 15 pontos abaixo do v2 antes da combinação</span></div>
       </div>
     </section>
@@ -113,6 +180,8 @@ export default function RadarV3LabPage(){
       <div className="metric-card"><span>Score 90+</span><strong>{Number(summary?.v2_90_plus||0).toLocaleString('pt-BR')} → {Number(summary?.v3_90_plus||0).toLocaleString('pt-BR')}</strong><small>Faixa de prioridade máxima</small></div>
       <div className="metric-card"><span>Mudança ≥10 pontos</span><strong>{changed.toLocaleString('pt-BR')}</strong><small>{summary?.up_10_plus||0} sobem · {summary?.down_10_plus||0} descem</small></div>
       <div className="metric-card"><span>Praticamente estáveis</span><strong>{stable.toLocaleString('pt-BR')}</strong><small>Diferença de até 5 pontos</small></div>
+      <div className="metric-card"><span>Auditoria humana</span><strong>{Number(summary?.review_validated||0).toLocaleString('pt-BR')} validadas</strong><small>{Number(summary?.review_pending||0).toLocaleString('pt-BR')} pendentes · {Number(summary?.review_later||0).toLocaleString('pt-BR')} depois</small></div>
+      <div className="metric-card"><span>Regra precisa ajuste</span><strong>{Number(summary?.review_needs_adjustment||0).toLocaleString('pt-BR')}</strong><small>Casos que indicam mudança no algoritmo</small></div>
     </div>
 
     <section className="card panel">
@@ -127,8 +196,15 @@ export default function RadarV3LabPage(){
 
     <section className="card panel">
       <div className="panel-head" style={{alignItems:'flex-end'}}>
-        <div><h2>Comparação editora por editora</h2><p>Abra os maiores desvios primeiro e valide se a mudança faz sentido comercialmente.</p></div>
+        <div><h2>Fila de auditoria</h2><p>Comece pelos maiores desvios e registre se a mudança faz sentido comercialmente.</p></div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
+          <select value={reviewFilter} onChange={e=>{setPage(1);setReviewFilter(e.target.value)}}>
+            <option value="pending">Revisão: pendentes</option>
+            <option value="validated">Revisão: faz sentido</option>
+            <option value="needs_adjustment">Revisão: precisa ajuste</option>
+            <option value="later">Revisão: depois</option>
+            <option value="">Todas as revisões</option>
+          </select>
           <select value={status} onChange={e=>{setPage(1);setStatus(e.target.value)}}>
             <option value="confirmed">Perfil confirmado</option>
             <option value="partial">Perfil parcial</option>
@@ -146,22 +222,24 @@ export default function RadarV3LabPage(){
         </div>
       </div>
 
-      {loading?<div className="table-empty">Carregando comparação…</div>:rows.length?<div className="table-wrap"><table className="data-table">
-        <thead><tr><th>Editora</th><th>Score</th><th>Δ</th><th>Aderência</th><th>Abordagem v3</th><th>Perfis</th></tr></thead>
+      {loading?<div className="table-empty">Carregando auditoria…</div>:rows.length?<div className="table-wrap"><table className="data-table">
+        <thead><tr><th>Editora</th><th>Score</th><th>Δ</th><th>Aderência</th><th>Abordagem v3</th><th>Sinais</th><th>Revisão</th></tr></thead>
         <tbody>{rows.map(row=>{
           const profiles=Array.isArray(row.editorial_profile)?row.editorial_profile:[];
           const top=Array.isArray(row.top_products)?row.top_products:[];
           const unknown=Array.isArray(row.unknown_profiles)?row.unknown_profiles:[];
+          const flags=Array.isArray(row.audit_flags)?row.audit_flags:[];
           return <tr key={row.publisher_id}>
-            <td><Link className="table-title" href={`/app/editoras/${row.publisher_id}`}>{row.publisher_name}</Link><small>{row.editorial_profile_status||'—'} · confiança {row.editorial_profile_confidence||'—'}</small></td>
+            <td><Link className="table-title" href={`/app/editoras/${row.publisher_id}`}>{row.publisher_name}</Link><small>{row.editorial_profile_status||'—'} · confiança {row.editorial_profile_confidence||'—'}</small><div className="chips" style={{marginTop:5}}>{profiles.slice(0,3).map(p=><span className="badge" key={p}>{p}</span>)}{profiles.length>3&&<span className="badge">+{profiles.length-3}</span>}{unknown.length>0&&<span className="badge red">Sem mapa: {unknown.join(', ')}</span>}</div></td>
             <td><strong>{row.v2_score??0} → {row.v3_score??0}</strong></td>
             <td><Delta value={row.delta}/></td>
             <td><strong>{row.v2_fit??0} → {row.v3_fit??0}</strong></td>
             <td><strong>{productLabel(row.v3_best_product)}</strong>{top.length>1&&<small>Empate: {top.map(productLabel).join(' · ')}</small>}</td>
-            <td><div className="chips">{profiles.slice(0,4).map(p=><span className="badge" key={p}>{p}</span>)}{profiles.length>4&&<span className="badge">+{profiles.length-4}</span>}{unknown.length>0&&<span className="badge red">Sem mapa: {unknown.join(', ')}</span>}</div></td>
+            <td><FlagBadges flags={flags}/></td>
+            <td><div style={{display:'grid',gap:6,justifyItems:'start'}}><ReviewBadge status={row.review_status}/><button className="link-btn compact" onClick={()=>openReview(row)}><SlidersHorizontal size={13}/> Revisar</button></div></td>
           </tr>
         })}</tbody>
-      </table></div>:<div className="empty-state"><Beaker/><strong>Nenhuma editora encontrada.</strong><p>Ajuste os filtros ou recalcule o laboratório.</p></div>}
+      </table></div>:<div className="empty-state"><CheckCircle2/><strong>Nenhum caso neste filtro.</strong><p>Altere o filtro de revisão ou passe para a próxima etapa da auditoria.</p></div>}
 
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:14}}>
         <button className="btn secondary small" disabled={page<=1} onClick={()=>setPage(p=>Math.max(1,p-1))}><ChevronLeft size={14}/> Anterior</button>
@@ -169,5 +247,27 @@ export default function RadarV3LabPage(){
         <button className="btn secondary small" disabled={!canNext} onClick={()=>setPage(p=>p+1)}>Próxima <ChevronRight size={14}/></button>
       </div>
     </section>
+
+    {reviewRow&&<div className="modal-backdrop"><form className="modal" onSubmit={saveReview}>
+      <div className="modal-head"><div><h3>Auditar · {reviewRow.publisher_name}</h3><p>Registre se a mudança do v3 representa melhor a oportunidade comercial.</p></div><button type="button" onClick={()=>setReviewRow(null)}><X/></button></div>
+      <div className="info-grid" style={{marginBottom:14}}>
+        <div className="info-item"><small>Radar Score</small><span>{reviewRow.v2_score??0} → <strong>{reviewRow.v3_score??0}</strong> · Δ {reviewRow.delta>0?'+':''}{reviewRow.delta}</span></div>
+        <div className="info-item"><small>Aderência</small><span>{reviewRow.v2_fit??0} → <strong>{reviewRow.v3_fit??0}</strong></span></div>
+        <div className="info-item"><small>Produto v2</small><span>{productLabel(reviewRow.v2_best_product)}</span></div>
+        <div className="info-item"><small>Produto v3</small><span>{productLabel(reviewRow.v3_best_product)}</span></div>
+      </div>
+      <div style={{marginBottom:14}}><small className="muted">Sinais da auditoria</small><div style={{marginTop:6}}><FlagBadges flags={reviewRow.audit_flags}/></div></div>
+      <div style={{marginBottom:14}}><small className="muted">Perfis editoriais</small><div className="chips" style={{marginTop:6}}>{(reviewRow.editorial_profile||[]).map(profile=><span className="badge" key={profile}>{profile}</span>)}</div></div>
+      <div className="form-grid">
+        <label className="span-2">Conclusão<select value={reviewStatus} onChange={e=>setReviewStatus(e.target.value)}>
+          <option value="pending">Pendente</option>
+          <option value="validated">Faz sentido</option>
+          <option value="needs_adjustment">Precisa ajuste na regra</option>
+          <option value="later">Revisar depois</option>
+        </select></label>
+        <label className="span-2">Nota da auditoria<textarea rows={5} value={reviewNote} onChange={e=>setReviewNote(e.target.value)} placeholder="Ex.: a queda parece correta porque o v2 supervalorizava Radar de Oportunidades; ou a alta ainda parece excessiva porque a linha aderente é secundária."/></label>
+      </div>
+      <div className="modal-actions"><button type="button" className="btn secondary" onClick={()=>setReviewRow(null)}>Cancelar</button><button className="btn" disabled={savingReview}>{savingReview?'Salvando…':'Salvar revisão'}</button></div>
+    </form></div>}
   </div>;
 }
