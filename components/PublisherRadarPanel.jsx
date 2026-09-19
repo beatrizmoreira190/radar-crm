@@ -5,6 +5,7 @@ import { ChevronDown } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 import { RADAR_PRODUCT_LABELS } from '@/lib/constants';
 import PublisherRadarIntelligence from '@/components/PublisherRadarIntelligence';
+import PublisherHelp from '@/components/PublisherHelp';
 
 export default function PublisherRadarPanel({publisher,contacts=[],interactions=[]}){
   const {supabase,membership,activityVersion}=useCrm();
@@ -32,7 +33,7 @@ export default function PublisherRadarPanel({publisher,contacts=[],interactions=
     <summary className="radar-intelligence-summary">
       <div className="radar-intelligence-summary-main">
         <div className="eyebrow">Inteligência comercial</div>
-        <h2>Radar Score detalhado</h2>
+        <div className="help-heading"><h2>Radar Score detalhado</h2><PublisherHelp text="Explica a pontuação comercial da editora, os fatores que formam o score e a leitura prática para prospecção."/></div>
         <div className="radar-intelligence-summary-line">
           <span><strong>Score {score}</strong></span>
           <span>Melhor oportunidade: <strong>{bestLabel}</strong></span>
