@@ -68,6 +68,7 @@ export default function RadarV3LabPage(){
   const [status,setStatus]=useState('confirmed');
   const [reviewFilter,setReviewFilter]=useState('pending');
   const [flagFilter,setFlagFilter]=useState('');
+  const [suggestionFilter,setSuggestionFilter]=useState('__any__');
   const [search,setSearch]=useState('');
   const [draftSearch,setDraftSearch]=useState('');
   const [page,setPage]=useState(1);
@@ -89,7 +90,8 @@ export default function RadarV3LabPage(){
         p_search:search||null,
         p_status:status||null,
         p_review_status:reviewFilter||null,
-        p_audit_flag:flagFilter||null
+        p_audit_flag:flagFilter||null,
+        p_suggestion_status:suggestionFilter||null
       })
     ]);
     if(summaryError||rowsError)setNotice(summaryError?.message||rowsError?.message);
@@ -98,7 +100,7 @@ export default function RadarV3LabPage(){
     setLoading(false);
   }
 
-  useEffect(()=>{load()},[org,isManager,page,sort,status,reviewFilter,flagFilter,search]);
+  useEffect(()=>{load()},[org,isManager,page,sort,status,reviewFilter,flagFilter,suggestionFilter,search]);
 
   async function refreshLab(){
     if(!org)return;
@@ -208,6 +210,14 @@ export default function RadarV3LabPage(){
             <option value="needs_adjustment">Revisão: precisa ajuste</option>
             <option value="later">Revisão: depois</option>
             <option value="">Todas as revisões</option>
+          </select>
+          <select value={suggestionFilter} onChange={e=>{setPage(1);setSuggestionFilter(e.target.value)}}>
+            <option value="__any__">Com sugestão do assistente</option>
+            <option value="validated">Sugestão: faz sentido</option>
+            <option value="needs_adjustment">Sugestão: precisa ajuste</option>
+            <option value="later">Sugestão: revisar depois</option>
+            <option value="__none__">Sem sugestão</option>
+            <option value="">Todas as editoras</option>
           </select>
           <select value={flagFilter} onChange={e=>{setPage(1);setFlagFilter(e.target.value)}}>
             <option value="">Todos os sinais</option>
