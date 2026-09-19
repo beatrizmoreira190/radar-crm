@@ -255,6 +255,7 @@ export default function RadarV3LabPage(){
           const top=Array.isArray(row.top_products)?row.top_products:[];
           const unknown=Array.isArray(row.unknown_profiles)?row.unknown_profiles:[];
           const flags=Array.isArray(row.audit_flags)?row.audit_flags:[];
+          const suggestionStale=Boolean(row.suggestion_generated_at&&row.calculated_at&&new Date(row.suggestion_generated_at)<new Date(row.calculated_at));
           return <tr key={row.publisher_id}>
             <td><Link className="table-title" href={`/app/editoras/${row.publisher_id}`}>{row.publisher_name}</Link><small>{row.editorial_profile_status||'—'} · confiança {row.editorial_profile_confidence||'—'}</small><div className="chips" style={{marginTop:5}}>{profiles.slice(0,3).map(p=><span className="badge" key={p}>{p}</span>)}{profiles.length>3&&<span className="badge">+{profiles.length-3}</span>}{unknown.length>0&&<span className="badge red">Sem mapa: {unknown.join(', ')}</span>}</div></td>
             <td><strong>{row.v2_score??0} → {row.v3_score??0}</strong></td>
@@ -262,7 +263,7 @@ export default function RadarV3LabPage(){
             <td><strong>{row.v2_fit??0} → {row.v3_fit??0}</strong></td>
             <td><strong>{productLabel(row.v3_best_product)}</strong>{top.length>1&&<small>Empate: {top.map(productLabel).join(' · ')}</small>}</td>
             <td><FlagBadges flags={flags}/></td>
-            <td><div style={{display:'grid',gap:6,justifyItems:'start'}}><ReviewBadge status={row.review_status}/>{row.suggestion_status&&<span className="muted" style={{fontSize:9}}>Sugestão: {REVIEW_LABELS[row.suggestion_status]||row.suggestion_status}</span>}<button className="link-btn compact" onClick={()=>openReview(row)}><SlidersHorizontal size={13}/> Revisar</button></div></td>
+            <td><div style={{display:'grid',gap:6,justifyItems:'start'}}><ReviewBadge status={row.review_status}/>{row.suggestion_status&&<span className="muted" style={{fontSize:9}}>Sugestão: {REVIEW_LABELS[row.suggestion_status]||row.suggestion_status}{suggestionStale?' · anterior ao último recálculo':''}</span>}<button className="link-btn compact" onClick={()=>openReview(row)}><SlidersHorizontal size={13}/> Revisar</button></div></td>
           </tr>
         })}</tbody>
       </table></div>:<div className="empty-state"><CheckCircle2/><strong>Nenhum caso neste filtro.</strong><p>Altere o filtro de revisão ou passe para a próxima etapa da auditoria.</p></div>}
@@ -295,6 +296,7 @@ export default function RadarV3LabPage(){
           <div><small className="muted">Sugestão do assistente · não conta como revisão humana</small><div style={{marginTop:5}}><ReviewBadge status={reviewRow.suggestion_status}/></div></div>
           <button type="button" className="btn secondary small" onClick={()=>{setReviewStatus(reviewRow.suggestion_status);setReviewNote(reviewRow.suggestion_note||'')}}>Usar como rascunho</button>
         </div>
+        {reviewRow.suggestion_generated_at&&reviewRow.calculated_at&&new Date(reviewRow.suggestion_generated_at)<new Date(reviewRow.calculated_at)&&<div className="notice" style={{marginTop:10}}><Clock3 size={14}/><span>Esta sugestão foi produzida antes do último recálculo do laboratório. Use-a como contexto, mas confira os números atuais antes de salvar a revisão.</span></div>}
         <p style={{fontSize:11,lineHeight:1.55,color:'#475467',margin:'10px 0 0'}}>{reviewRow.suggestion_note}</p>
       </div>}
       <div style={{marginBottom:14}}><small className="muted">Perfis editoriais</small><div className="chips" style={{marginTop:6}}>{(reviewRow.editorial_profile||[]).map(profile=><span className="badge" key={profile}>{profile}</span>)}</div></div>
