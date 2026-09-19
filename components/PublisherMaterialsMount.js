@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useParams } from 'next/navigation';
 import { CalendarClock, ExternalLink, FileText, Pencil, Plus, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
@@ -18,11 +17,10 @@ function statusClass(status){
   return '';
 }
 
-export default function PublisherMaterialsMount({inline=false}){
+export default function PublisherMaterialsMount(){
   const {id}=useParams();
   const {supabase,membership,user,team,teamMap,isManager,hasCommercialFunction,activityVersion}=useCrm();
   const org=membership?.organization_id;
-  const [mount,setMount]=useState(null);
   const [materials,setMaterials]=useState([]);
   const [meetings,setMeetings]=useState([]);
   const [loading,setLoading]=useState(true);
@@ -48,31 +46,11 @@ export default function PublisherMaterialsMount({inline=false}){
 
   useEffect(()=>{load()},[org,id,activityVersion]);
 
-  useEffect(()=>{
-    if(inline)return;
-    let node=null;let timer=null;let attempts=0;
-    function attach(){
-      const stack=document.querySelector('.detail-grid > .detail-stack');
-      if(!stack){if(attempts++<30)timer=setTimeout(attach,50);return;}
-      const meetingMount=stack.querySelector('[data-publisher-meetings="commercial-meetings"]');
-      const contactSection=Array.from(stack.children).find(child=>child.querySelector?.('h2')?.textContent?.replace(/\?/g,'').trim()==='Contatos');
-      if(!contactSection){if(attempts++<30)timer=setTimeout(attach,50);return;}
-      node=document.createElement('div');
-      node.dataset.publisherMaterials='commercial-materials';
-      (meetingMount||contactSection).insertAdjacentElement('afterend',node);
-      setMount(node);
-    }
-    attach();
-    return()=>{if(timer)clearTimeout(timer);if(node?.parentNode)node.parentNode.removeChild(node)};
-  },[id,inline]);
-
   function openNew(){setEditing(null);setShowModal(true)}
   function openEdit(material){setEditing(material);setShowModal(true)}
   function close(){setShowModal(false);setEditing(null)}
 
-  if(!inline&&!mount)return null;
-
-  const content=<>
+  return <>
     <section className="card panel publisher-materials-card">
       <div className="section-title">
         <div>
@@ -110,7 +88,6 @@ export default function PublisherMaterialsMount({inline=false}){
       @media(max-width:700px){.publisher-material-row{grid-template-columns:34px minmax(0,1fr)}.publisher-material-row>.btn{grid-column:2;justify-self:start}.publisher-material-card :global(.section-title){align-items:flex-start}}
     `}</style>
   </>;
-  return inline?content:createPortal(content,mount);
 }
 
 function MaterialModal({supabase,org,publisherId,user,team,meetings,material,onClose,onSaved}){
