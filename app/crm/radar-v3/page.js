@@ -67,6 +67,7 @@ export default function RadarV3LabPage(){
   const [sort,setSort]=useState('abs');
   const [status,setStatus]=useState('confirmed');
   const [reviewFilter,setReviewFilter]=useState('pending');
+  const [flagFilter,setFlagFilter]=useState('');
   const [search,setSearch]=useState('');
   const [draftSearch,setDraftSearch]=useState('');
   const [page,setPage]=useState(1);
@@ -87,7 +88,8 @@ export default function RadarV3LabPage(){
         p_sort:sort,
         p_search:search||null,
         p_status:status||null,
-        p_review_status:reviewFilter||null
+        p_review_status:reviewFilter||null,
+        p_audit_flag:flagFilter||null
       })
     ]);
     if(summaryError||rowsError)setNotice(summaryError?.message||rowsError?.message);
@@ -96,7 +98,7 @@ export default function RadarV3LabPage(){
     setLoading(false);
   }
 
-  useEffect(()=>{load()},[org,isManager,page,sort,status,reviewFilter,search]);
+  useEffect(()=>{load()},[org,isManager,page,sort,status,reviewFilter,flagFilter,search]);
 
   async function refreshLab(){
     if(!org)return;
@@ -205,6 +207,18 @@ export default function RadarV3LabPage(){
             <option value="needs_adjustment">Revisão: precisa ajuste</option>
             <option value="later">Revisão: depois</option>
             <option value="">Todas as revisões</option>
+          </select>
+          <select value={flagFilter} onChange={e=>{setPage(1);setFlagFilter(e.target.value)}}>
+            <option value="">Todos os sinais</option>
+            <option value="secondary_line_drives_score">Linha secundária puxa o score</option>
+            <option value="v2_cap_removed">Teto v2 removido</option>
+            <option value="opportunities_recalibrated">Radar de Oportunidades recalibrado</option>
+            <option value="product_changed">Produto recomendado mudou</option>
+            <option value="large_up">Alta forte</option>
+            <option value="large_down">Queda forte</option>
+            <option value="v2_fit_saturation_reduced">Saturação do v2 reduzida</option>
+            <option value="taxonomy_normalized">Taxonomia normalizada</option>
+            <option value="unknown_taxonomy">Perfil sem mapa</option>
           </select>
           <select value={status} onChange={e=>{setPage(1);setStatus(e.target.value)}}>
             <option value="confirmed">Perfil confirmado</option>
