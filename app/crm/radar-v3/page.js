@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { AlertCircle, ArrowDownRight, ArrowUpRight, Beaker, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Equal, RefreshCw, Search, ShieldCheck, SlidersHorizontal, X } from 'lucide-react';
+import { AlertCircle, ArrowDownRight, ArrowUpRight, Beaker, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Equal, Search, ShieldCheck, SlidersHorizontal, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 import { RADAR_PRODUCT_LABELS, formatDate } from '@/lib/constants';
 
@@ -62,7 +62,6 @@ export default function RadarV3LabPage(){
   const [summary,setSummary]=useState(null);
   const [rows,setRows]=useState([]);
   const [loading,setLoading]=useState(true);
-  const [refreshing,setRefreshing]=useState(false);
   const [notice,setNotice]=useState('');
   const [sort,setSort]=useState('abs');
   const [status,setStatus]=useState('confirmed');
@@ -101,16 +100,6 @@ export default function RadarV3LabPage(){
   }
 
   useEffect(()=>{load()},[org,isManager,page,sort,status,reviewFilter,flagFilter,suggestionFilter,search]);
-
-  async function refreshLab(){
-    if(!org)return;
-    setRefreshing(true);setNotice('');
-    const {data,error}=await supabase.rpc('crm_radar_v3_lab_refresh',{p_organization_id:org});
-    if(error)setNotice(error.message);
-    else setNotice(`Laboratório recalculado para ${Number(data||0).toLocaleString('pt-BR')} editoras com perfil editorial. As revisões humanas foram preservadas.`);
-    setRefreshing(false);
-    if(!error){setPage(1);await load()}
-  }
 
   function submitSearch(e){
     e.preventDefault();
@@ -152,29 +141,26 @@ export default function RadarV3LabPage(){
   const stable=Number(summary?.within_5||0);
   const canNext=rows.length===PAGE_SIZE;
 
-  if(!isManager)return <div className="page-wrap"><div className="card panel"><h1>Radar v3</h1><p className="muted">Este laboratório é restrito à gestão da Radar.</p></div></div>;
+  if(!isManager)return <div className="page-wrap"><div className="card panel"><h1>Auditoria Radar</h1><p className="muted">Esta área é restrita à gestão da Radar.</p></div></div>;
 
   return <div className="page-wrap">
     <div className="page-head">
       <div>
-        <div className="eyebrow">Laboratório comercial</div>
-        <h1>Radar Score v3</h1>
-        <p>Compare, audite e valide o candidato v3 sem alterar Prioridades, Pipeline ou o score oficial das editoras.</p>
+        <div className="eyebrow">Gestão do modelo</div>
+        <h1>Auditoria Radar Score</h1>
+        <p>O Radar Score v3 já é o modelo oficial. Esta área preserva a comparação histórica com o v2 e os casos que merecem acompanhamento.</p>
       </div>
-      <button className="btn secondary" onClick={refreshLab} disabled={refreshing}>
-        <RefreshCw size={16}/>{refreshing?'Recalculando…':'Recalcular laboratório'}
-      </button>
     </div>
 
     {notice&&<div className="notice-bar"><span>{notice}</span><button onClick={()=>setNotice('')}><X size={15}/></button></div>}
 
     <section className="card panel" style={{borderColor:'#b2ddff',background:'#f5fbff'}}>
-      <div className="panel-head"><div><h2>O v3 ainda não está valendo</h2><p>O Radar Score oficial continua sendo o <strong>radar_v2</strong>. Revisar uma editora aqui não altera a operação comercial.</p></div><ShieldCheck size={22}/></div>
+      <div className="panel-head"><div><h2>Radar v3 em produção</h2><p>Ficha da editora, Prioridades e demais leituras comerciais já usam <strong>radar_v3</strong>. A comparação abaixo mantém o antigo v2 apenas como referência histórica.</p></div><ShieldCheck size={22}/></div>
       <div className="info-grid">
-        <div className="info-item"><small>Fórmula final</small><span>70% aderência + 20% potencial + 10% prospectabilidade</span></div>
-        <div className="info-item"><small>Aderência do produto</small><span>Os sinais disponíveis são normalizados: 1 perfil usa 100%; 2 perfis reescalam 85/10; 3+ usam 85/10/5 com cobertura do catálogo</span></div>
-        <div className="info-item"><small>Perfis confessionais</small><span>Sem teto global; o laboratório sinaliza grandes correções do teto v2 para revisão humana</span></div>
-        <div className="info-item"><small>Radar de Oportunidades</small><span>Pesos experimentais 15 pontos abaixo do v2 antes da combinação</span></div>
+        <div className="info-item"><small>Fórmula oficial</small><span>70% aderência + 20% potencial + 10% prospectabilidade</span></div>
+        <div className="info-item"><small>Aderência do produto</small><span>1 perfil usa 100% do sinal; 2 perfis reescalam 85/10; 3+ usam 85/10/5 com cobertura do catálogo</span></div>
+        <div className="info-item"><small>Perfis confessionais</small><span>Não existe teto global. Cada perfil contribui conforme sua aderência real aos produtos da Radar.</span></div>
+        <div className="info-item"><small>Radar de Oportunidades</small><span>Pesos recalibrados em 15 pontos antes da combinação para reduzir a inflação do antigo v2.</span></div>
       </div>
     </section>
 
@@ -191,7 +177,7 @@ export default function RadarV3LabPage(){
     </div>
 
     <section className="card panel">
-      <div className="panel-head"><div><h2>Distribuição da melhor abordagem no v3</h2><p>O produto exibido é a recomendação de abertura; empates continuam registrados separadamente.</p></div><Beaker size={21}/></div>
+      <div className="panel-head"><div><h2>Distribuição da melhor abordagem no Radar v3</h2><p>O produto exibido é a recomendação de abertura; empates continuam registrados separadamente.</p></div><Beaker size={21}/></div>
       <div className="chips">{bestProducts.map(item=><span className="badge blue" key={item.product}>{productLabel(item.product)} · {Number(item.n||0).toLocaleString('pt-BR')}</span>)}</div>
       <div className="publisher-meta" style={{marginTop:12}}>
         <span>Empates em 2+ produtos: {Number(summary?.ties||0).toLocaleString('pt-BR')}</span>
