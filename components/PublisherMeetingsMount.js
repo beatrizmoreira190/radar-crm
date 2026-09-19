@@ -6,6 +6,7 @@ import { AlertCircle, Ban, CalendarClock, CheckCircle2, Clock3, Copy, FileCheck2
 import { useCrm } from '@/components/CrmProvider';
 import { INTEREST_LABELS, MEETING_STATUS_LABELS, MEETING_TYPE_LABELS, formatDate } from '@/lib/constants';
 import { availabilityRuleCheck, normalizeAvailabilityRule, overlapsWithBuffer, ruleSummary } from '@/lib/meetingAvailability';
+import PublisherHelp from '@/components/PublisherHelp';
 
 function localInput(value){
   if(!value)return'';
@@ -114,7 +115,7 @@ export default function PublisherMeetingsMount(){
 
   return <>
     <section className="card panel publisher-meetings-card">
-      <div className="section-title"><div><h2>Reuniões</h2><p className="muted">Apresentações, preparação, resultado e próximos passos desta editora.</p></div>{canSchedule&&<button className="btn small" type="button" onClick={openNew}><Plus size={14}/> Agendar reunião</button>}</div>
+      <div className="section-title"><div><div className="help-heading"><h2>Reuniões</h2><PublisherHelp text="Reuniões comerciais vinculadas à editora, incluindo preparação, participantes, resultado e próximos passos."/></div><p className="muted">Apresentações, preparação, resultado e próximos passos desta editora.</p></div>{canSchedule&&<button className="btn small" type="button" onClick={openNew}><Plus size={14}/> Agendar reunião</button>}</div>
       {notice&&<div className="notice-bar" style={{marginBottom:12}}><span>{notice}</span><button type="button" onClick={()=>setNotice('')}><X size={14}/></button></div>}
       {loading?<div className="table-empty">Carregando reuniões…</div>:ordered.length?<div className="meeting-list">{ordered.map(meeting=>{
         const external=participantMap[meeting.id]||[];const presenter=personLabel(teamMap[meeting.presenter_user_id]);const scheduler=personLabel(teamMap[meeting.scheduled_by]);
@@ -125,7 +126,7 @@ export default function PublisherMeetingsMount(){
           <div className="meeting-main">
             <div className="meeting-title"><strong>{meeting.title}</strong><span className={`badge ${statusClass(meeting.status)}`}>{MEETING_STATUS_LABELS[meeting.status]||meeting.status}</span>{meeting.status==='scheduled'&&(materialReady?<span className="meeting-material ready"><FileCheck2 size={12}/> Material pronto</span>:<span className="meeting-material warning"><FileWarning size={12}/> Sem material pronto</span>)}</div>
             <div className="meeting-meta"><span><Clock3 size={12}/>{formatDate(meeting.scheduled_start,true)} · {meeting.duration_minutes} min</span><span>{MEETING_TYPE_LABELS[meeting.meeting_type]||meeting.meeting_type}</span></div>
-            <div className="meeting-people"><span><b>Apresentação:</b> {presenter}</span><span><b>Agendada por:</b> {scheduler}</span></div>
+            <div className="meeting-people"><span><b>Apresentação:</b> {presenter}<PublisherHelp text="Pessoa responsável por conduzir a apresentação ou reunião comercial."/></span><span><b>Agendada por:</b> {scheduler}<PublisherHelp text="Pessoa da equipe que criou o agendamento no CRM."/></span></div>
             {external.length>0&&<div className="participant-chips">{external.map(p=><span className="badge" key={p.id}>{p.full_name}{p.email?` · ${p.email}`:''}</span>)}</div>}
             {meeting.notes&&<p>{meeting.notes}</p>}
             {meeting.outcome_notes&&<p className="meeting-outcome"><b>Resultado:</b> {meeting.outcome_notes}</p>}
