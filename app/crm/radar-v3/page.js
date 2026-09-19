@@ -185,6 +185,7 @@ export default function RadarV3LabPage(){
       <div className="metric-card"><span>Praticamente estáveis</span><strong>{stable.toLocaleString('pt-BR')}</strong><small>Diferença de até 5 pontos</small></div>
       <div className="metric-card"><span>Auditoria humana</span><strong>{Number(summary?.review_validated||0).toLocaleString('pt-BR')} validadas</strong><small>{Number(summary?.review_pending||0).toLocaleString('pt-BR')} pendentes · {Number(summary?.review_later||0).toLocaleString('pt-BR')} depois</small></div>
       <div className="metric-card"><span>Regra precisa ajuste</span><strong>{Number(summary?.review_needs_adjustment||0).toLocaleString('pt-BR')}</strong><small>Casos que indicam mudança no algoritmo</small></div>
+      <div className="metric-card"><span>Sugestões do assistente</span><strong>{Number(summary?.suggestions_total||0).toLocaleString('pt-BR')}</strong><small>{Number(summary?.suggestions_validated||0).toLocaleString('pt-BR')} fazem sentido · {Number(summary?.suggestions_needs_adjustment||0).toLocaleString('pt-BR')} pedem ajuste · {Number(summary?.suggestions_later||0).toLocaleString('pt-BR')} depois</small></div>
     </div>
 
     <section className="card panel">
@@ -251,7 +252,7 @@ export default function RadarV3LabPage(){
             <td><strong>{row.v2_fit??0} → {row.v3_fit??0}</strong></td>
             <td><strong>{productLabel(row.v3_best_product)}</strong>{top.length>1&&<small>Empate: {top.map(productLabel).join(' · ')}</small>}</td>
             <td><FlagBadges flags={flags}/></td>
-            <td><div style={{display:'grid',gap:6,justifyItems:'start'}}><ReviewBadge status={row.review_status}/><button className="link-btn compact" onClick={()=>openReview(row)}><SlidersHorizontal size={13}/> Revisar</button></div></td>
+            <td><div style={{display:'grid',gap:6,justifyItems:'start'}}><ReviewBadge status={row.review_status}/>{row.suggestion_status&&<span className="muted" style={{fontSize:9}}>Sugestão: {REVIEW_LABELS[row.suggestion_status]||row.suggestion_status}</span>}<button className="link-btn compact" onClick={()=>openReview(row)}><SlidersHorizontal size={13}/> Revisar</button></div></td>
           </tr>
         })}</tbody>
       </table></div>:<div className="empty-state"><CheckCircle2/><strong>Nenhum caso neste filtro.</strong><p>Altere o filtro de revisão ou passe para a próxima etapa da auditoria.</p></div>}
@@ -278,6 +279,13 @@ export default function RadarV3LabPage(){
           <strong>Linha secundária está sustentando a recomendação.</strong>
           <p style={{margin:'4px 0 0'}}>Nos três primeiros perfis editoriais, o maior peso bruto para {productLabel(reviewRow.v3_best_product)} é <strong>{reviewRow.audit_meta?.primary_product_support?.primary_raw_max??0}</strong>. Considerando todo o catálogo, existe um perfil com peso <strong>{reviewRow.audit_meta?.primary_product_support?.all_raw_max??0}</strong>. Isso não reduz automaticamente a nota; é um sinal para validar se essa linha realmente tem presença comercial relevante.</p>
         </div>
+      </div>}
+      {reviewRow.suggestion_status&&<div style={{marginBottom:14,padding:12,border:'1px solid #d0d5dd',borderRadius:10,background:'#f9fafb'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+          <div><small className="muted">Sugestão do assistente · não conta como revisão humana</small><div style={{marginTop:5}}><ReviewBadge status={reviewRow.suggestion_status}/></div></div>
+          <button type="button" className="btn secondary small" onClick={()=>{setReviewStatus(reviewRow.suggestion_status);setReviewNote(reviewRow.suggestion_note||'')}}>Usar como rascunho</button>
+        </div>
+        <p style={{fontSize:11,lineHeight:1.55,color:'#475467',margin:'10px 0 0'}}>{reviewRow.suggestion_note}</p>
       </div>}
       <div style={{marginBottom:14}}><small className="muted">Perfis editoriais</small><div className="chips" style={{marginTop:6}}>{(reviewRow.editorial_profile||[]).map(profile=><span className="badge" key={profile}>{profile}</span>)}</div></div>
       <div className="form-grid">
