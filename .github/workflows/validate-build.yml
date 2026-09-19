@@ -31,7 +31,24 @@ jobs:
         run: npm ci --no-fund
 
       - name: Fail on high/critical dependency vulnerabilities
-        run: npm audit --audit-level=high
+        run: |
+          set +e
+          for attempt in 1 2 3 4 5; do
+            echo "Security audit attempt $attempt/5"
+            output="$(npm audit --audit-level=high --json 2>&1)"
+            code=$?
+            echo "$output"
+            if [ "$code" -eq 0 ]; then
+              exit 0
+            fi
+            if printf '%s' "$output" | grep -q '"auditReportVersion"'; then
+              exit "$code"
+            fi
+            if [ "$attempt" -lt 5 ]; then
+              sleep 10
+            fi
+          done
+          exit "$code"
 
       - name: Build
         run: npm run build
