@@ -1,17 +1,19 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Bell, BellRing, CheckCheck, CheckCircle2, Clock3, Copy, MessageSquareText, Plus, Search, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 import { PRIORITY_LABELS, RESULT_LABELS, TASK_TYPE_LABELS, formatDate } from '@/lib/constants';
+import Pagination from '@/components/Pagination';
 
 const AUTOMATION_LABELS={meeting_preparation:'Preparação automática',meeting_outcome:'Resultado automático',meeting_follow_up:'Follow-up automático'};
 const CADENCE_RESULTS=['no_answer','left_message','connected','replied','asked_email','meeting_scheduled','callback_scheduled','busy','follow_up','proposal_requested','qualified','not_interested','wrong_contact','contact_updated','other'];
 const PAUSE_RESULTS=new Set(['callback_scheduled','busy','follow_up']);
+const PAGE_SIZE=50;
 
 export default function TasksPage(){
   const {supabase,membership,user,activityVersion,isManager,teamMap}=useCrm();const org=membership?.organization_id;
-  const [rows,setRows]=useState([]);const [reminders,setReminders]=useState([]);const [status,setStatus]=useState('open');const [scope,setScope]=useState('mine');const [q,setQ]=useState('');const [show,setShow]=useState(false);const [notice,setNotice]=useState('');const [loading,setLoading]=useState(true);const [resultTask,setResultTask]=useState(null);const [copiedTemplate,setCopiedTemplate]=useState('');
+  const [rows,setRows]=useState([]);const [total,setTotal]=useState(0);const [page,setPage]=useState(1);const [reminders,setReminders]=useState([]);const [status,setStatus]=useState('open');const [scope,setScope]=useState('mine');const [q,setQ]=useState('');const [search,setSearch]=useState('');const [show,setShow]=useState(false);const [notice,setNotice]=useState('');const [loading,setLoading]=useState(true);const [resultTask,setResultTask]=useState(null);const [copiedTemplate,setCopiedTemplate]=useState('');
 
   async function loadReminders(){
     if(!org||!user?.id)return;
@@ -22,17 +24,44 @@ export default function TasksPage(){
   }
   async function load(){
     if(!org||!user)return;setLoading(true);
-    const {error:cadenceRefreshError}=await supabase.rpc('crm_refresh_cadences',{p_organization_id:org});
-    if(cadenceRefreshError)setNotice(cadenceRefreshError.message);
-    let query=supabase.from('tasks').select('id,title,description,task_type,due_at,status,priority,publisher_id,assigned_to,created_at,meeting_id,automation_key,cadence_enrollment_id,cadence_step_id,result_code,result_note,outreach_template_id,outreach_templates(name,body,channel,purpose),publishers(name)').eq('organization_id',org);
-    if(!isManager||scope==='mine')query=query.eq('assigned_to',user.id);
-    if(status==='open')query=query.in('status',['open','in_progress']);else if(status!=='all')query=query.eq('status',status);
-    const {data,error}=await query.order('due_at',{ascending:true,nullsFirst:false}).limit(250);
-    if(error)setNotice(error.message);setRows(data||[]);await loadReminders();setLoading(false);
+    const {data,error}=await supabase.rpc('crm_task_queue',{
+      p_organization_id:org,
+      p_scope:isManager&&scope==='team'?'team':'mine',
+      p_status:status,
+      p_search:search||null,
+      p_limit:PAGE_SIZE,
+      p_offset:(page-1)*PAGE_SIZE
+    });
+    if(error){setNotice(error.message);setRows([]);setTotal(0)}
+    else{
+      const nextTotal=Number(data?.total||0);
+      const maxPage=Math.max(1,Math.ceil(nextTotal/PAGE_SIZE));
+      if(page>maxPage){setPage(maxPage);setLoading(false);return}
+      setRows(Array.isArray(data?.items)?data.items:[]);
+      setTotal(nextTotal);
+    }
+    setLoading(false);
   }
-  useEffect(()=>{load()},[org,user?.id,status,scope,isManager,activityVersion]);
 
-  const filtered=useMemo(()=>{const needle=q.trim().toLowerCase();return needle?rows.filter(t=>`${t.title} ${t.publishers?.name||''} ${teamMap[t.assigned_to]?.full_name||teamMap[t.assigned_to]?.email||''}`.toLowerCase().includes(needle)):rows},[rows,q,teamMap]);
+  useEffect(()=>{
+    const timer=setTimeout(()=>{setPage(1);setSearch(q.trim())},300);
+    return()=>clearTimeout(timer);
+  },[q]);
+
+  useEffect(()=>{load()},[org,user?.id,status,scope,isManager,activityVersion,page,search]);
+
+  useEffect(()=>{
+    if(!org||!user?.id)return;
+    let cancelled=false;
+    (async()=>{
+      const {error}=await supabase.rpc('crm_refresh_cadences',{p_organization_id:org});
+      if(!cancelled&&error)setNotice(error.message);
+      if(!cancelled){await loadReminders();await load()}
+    })();
+    return()=>{cancelled=true};
+  },[org,user?.id,activityVersion]);
+
+  const totalPages=Math.max(1,Math.ceil(total/PAGE_SIZE));
   async function done(id){const {error}=await supabase.from('tasks').update({status:'done',completed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('organization_id',org).eq('id',id);if(error)setNotice(error.message);else load()}
   function personalizedTemplate(task){
     const body=task?.outreach_templates?.body||'';
@@ -53,11 +82,11 @@ export default function TasksPage(){
 
     {!teamView&&reminders.length>0&&<section className="card attention-inbox"><div className="attention-head"><div><span className="attention-icon"><BellRing size={17}/></span><div><strong>Atenção agora</strong><p>{reminders.length} lembrete{reminders.length===1?'':'s'} ainda não revisado{reminders.length===1?'':'s'}.</p></div></div><button className="btn secondary small" type="button" onClick={markAllReminders}><CheckCheck size={14}/> Marcar todos como lidos</button></div><div className="attention-list">{reminders.slice(0,4).map(item=><article key={item.id} className={`attention-row ${item.severity||'info'}`}><span className="attention-bell">{item.severity==='urgent'?<BellRing size={15}/>:<Bell size={15}/>}</span><div><strong>{item.title}</strong><p>{item.body||'Há uma ação esperando por você.'}</p><small>{formatDate(item.created_at,true)}</small></div><div className="attention-actions">{item.href&&<Link href={item.href} className="btn secondary small" onClick={()=>markReminder(item.id)}>Abrir</Link>}<button type="button" className="link-btn" onClick={()=>markReminder(item.id)}>Lido</button></div></article>)}</div>{reminders.length>4&&<div className="attention-more">+{reminders.length-4} lembrete{reminders.length-4===1?'':'s'} — marque os itens revisados para avançar a fila.</div>}</section>}
 
-    <div className="toolbar"><div className="search-box"><Search size={17}/><input className="input" value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar tarefa, editora ou pessoa"/></div>{isManager&&<div className="chips"><button className={`chip ${scope==='mine'?'active':''}`} onClick={()=>setScope('mine')}>Minhas</button><button className={`chip ${scope==='team'?'active':''}`} onClick={()=>setScope('team')}>Equipe</button></div>}<div className="chips"><button className={`chip ${status==='open'?'active':''}`} onClick={()=>setStatus('open')}>Em aberto</button><button className={`chip ${status==='done'?'active':''}`} onClick={()=>setStatus('done')}>Concluídas</button><button className={`chip ${status==='all'?'active':''}`} onClick={()=>setStatus('all')}>Todas</button></div></div>
-    <section className="card panel">{loading?<div className="table-empty">Carregando fila…</div>:filtered.length?<div className="task-list">{filtered.map(t=>{const late=t.status!=='done'&&t.due_at&&new Date(t.due_at)<new Date();const mine=t.assigned_to===user.id;const assignee=teamMap[t.assigned_to]?.full_name||teamMap[t.assigned_to]?.email||'Equipe';const cadenceTask=Boolean(t.cadence_enrollment_id);return <div className="task-row smart-task-row" key={t.id}>{t.status!=='done'&&mine?<button className="task-check" onClick={()=>cadenceTask?setResultTask(t):done(t.id)} title={cadenceTask?'Registrar resultado':'Concluir'}><CheckCircle2 size={19}/></button>:<CheckCircle2 size={19} style={{color:t.status==='done'?'#15803d':'#98a2b3'}}/>}<div className="task-main"><div className="task-title-line"><strong>{t.title}</strong>{cadenceTask&&<span className="badge cadence-badge">Cadência</span>}{t.automation_key&&<span className="badge blue auto-badge">{AUTOMATION_LABELS[t.automation_key]||'Automático'}</span>}{t.result_code&&<span className="badge green">{RESULT_LABELS[t.result_code]||t.result_code}</span>}</div><span>{t.publisher_id?<Link href={`/app/editoras/${t.publisher_id}`}>{t.publishers?.name||'Abrir editora'}</Link>:'Sem editora'} · {TASK_TYPE_LABELS[t.task_type]||t.task_type} · {PRIORITY_LABELS[t.priority]||t.priority}{teamView?` · ${assignee}`:''}</span>{t.description&&<span>{t.description}</span>}{t.outreach_templates?.body&&t.status!=='done'&&<div className="task-template"><div><MessageSquareText size={14}/><span><b>Modelo sugerido:</b> {t.outreach_templates.name}</span></div><button className="btn secondary small" type="button" onClick={()=>copyTemplate(t)}><Copy size={13}/>{copiedTemplate===t.id?'Copiado':'Copiar texto'}</button></div>}</div><div className={`task-due ${late?'late':''}`}><Clock3 size={14}/>{t.due_at?formatDate(t.due_at,true):'Sem prazo'}</div></div>})}</div>:<div className="empty-state"><CheckCircle2/><strong>Nenhuma tarefa nesta visão.</strong><p>{teamView?'A equipe não tem tarefas que correspondam aos filtros atuais.':'Sua fila está limpa. Novos próximos passos e lembretes de reunião aparecerão aqui.'}</p></div>}</section>
+    <div className="toolbar"><div className="search-box"><Search size={17}/><input className="input" value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar em toda a fila por tarefa, editora ou pessoa"/></div>{isManager&&<div className="chips"><button className={`chip ${scope==='mine'?'active':''}`} onClick={()=>{setPage(1);setScope('mine')}}>Minhas</button><button className={`chip ${scope==='team'?'active':''}`} onClick={()=>{setPage(1);setScope('team')}}>Equipe</button></div>}<div className="chips"><button className={`chip ${status==='open'?'active':''}`} onClick={()=>{setPage(1);setStatus('open')}}>Em aberto</button><button className={`chip ${status==='done'?'active':''}`} onClick={()=>{setPage(1);setStatus('done')}}>Concluídas</button><button className={`chip ${status==='all'?'active':''}`} onClick={()=>{setPage(1);setStatus('all')}}>Todas</button></div></div>
+    <section className="card panel"><div className="task-list-head"><span><strong>{total.toLocaleString('pt-BR')}</strong> tarefa{total===1?'':'s'}{search?` para “${search}”`:''}</span>{total>0&&<small>Página {page} de {totalPages}</small>}</div>{loading?<div className="table-empty">Carregando fila…</div>:rows.length?<><div className="task-list">{rows.map(t=>{const late=t.status!=='done'&&t.due_at&&new Date(t.due_at)<new Date();const mine=t.assigned_to===user.id;const assignee=t.assignee?.full_name||t.assignee?.email||teamMap[t.assigned_to]?.full_name||teamMap[t.assigned_to]?.email||'Equipe';const cadenceTask=Boolean(t.cadence_enrollment_id);return <div className="task-row smart-task-row" key={t.id}>{t.status!=='done'&&mine?<button className="task-check" onClick={()=>cadenceTask?setResultTask(t):done(t.id)} title={cadenceTask?'Registrar resultado':'Concluir'}><CheckCircle2 size={19}/></button>:<CheckCircle2 size={19} style={{color:t.status==='done'?'#15803d':'#98a2b3'}}/>}<div className="task-main"><div className="task-title-line"><strong>{t.title}</strong>{cadenceTask&&<span className="badge cadence-badge">Cadência</span>}{t.automation_key&&<span className="badge blue auto-badge">{AUTOMATION_LABELS[t.automation_key]||'Automático'}</span>}{t.result_code&&<span className="badge green">{RESULT_LABELS[t.result_code]||t.result_code}</span>}</div><span>{t.publisher_id?<Link href={`/app/editoras/${t.publisher_id}`}>{t.publishers?.name||'Abrir editora'}</Link>:'Sem editora'} · {TASK_TYPE_LABELS[t.task_type]||t.task_type} · {PRIORITY_LABELS[t.priority]||t.priority}{teamView?` · ${assignee}`:''}</span>{t.description&&<span>{t.description}</span>}{t.outreach_templates?.body&&t.status!=='done'&&<div className="task-template"><div><MessageSquareText size={14}/><span><b>Modelo sugerido:</b> {t.outreach_templates.name}</span></div><button className="btn secondary small" type="button" onClick={()=>copyTemplate(t)}><Copy size={13}/>{copiedTemplate===t.id?'Copiado':'Copiar texto'}</button></div>}</div><div className={`task-due ${late?'late':''}`}><Clock3 size={14}/>{t.due_at?formatDate(t.due_at,true):'Sem prazo'}</div></div>})}</div><Pagination page={page} totalPages={totalPages} onChange={setPage}/></>:<div className="empty-state"><CheckCircle2/><strong>Nenhuma tarefa nesta visão.</strong><p>{search?'Nenhuma tarefa corresponde à busca em toda a fila.':teamView?'A equipe não tem tarefas que correspondam aos filtros atuais.':'Sua fila está limpa. Novos próximos passos e lembretes de reunião aparecerão aqui.'}</p></div>}</section>
     {show&&<NewTask supabase={supabase} org={org} user={user} onClose={()=>setShow(false)} onSaved={()=>{setShow(false);setNotice('Tarefa criada.');load()}}/>}
     {resultTask&&<CadenceResultModal supabase={supabase} org={org} task={resultTask} onClose={()=>setResultTask(null)} onSaved={async action=>{setResultTask(null);setNotice(action||'Resultado registrado e cadência atualizada.');await load()}}/>}
-    <style jsx>{`.attention-inbox{padding:0;margin-bottom:14px;overflow:hidden;border-color:#f0d7a6}.attention-head{padding:12px 14px;background:#fffcf5;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #f6e6c5}.attention-head>div{display:flex;align-items:center;gap:9px}.attention-head strong{font-size:12px}.attention-head p{margin:1px 0 0;font-size:10px;color:#667085}.attention-icon{width:30px;height:30px;border-radius:8px;background:#fff4d9;color:#b54708;display:grid;place-items:center}.attention-list{display:grid}.attention-row{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:9px;padding:10px 14px;border-top:1px solid #f0f1f3;align-items:center}.attention-row:first-child{border-top:0}.attention-bell{color:#667085}.attention-row.urgent .attention-bell{color:#b42318}.attention-row.warning .attention-bell{color:#b54708}.attention-row strong{display:block;font-size:11px}.attention-row p{margin:2px 0;font-size:10px;color:#475467}.attention-row small{font-size:9px;color:#98a2b3}.attention-actions{display:flex;align-items:center;gap:4px}.attention-more{padding:8px 14px;background:#fcfcfd;border-top:1px solid #f0f1f3;font-size:9px;color:#667085}.task-title-line{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.auto-badge{font-size:8px!important}.cadence-badge{font-size:8px!important;background:#f2f4f7;color:#475467}.smart-task-row{align-items:start}.task-template{margin-top:7px;padding:8px 9px;border:1px solid #e4e7ec;border-radius:8px;background:#fcfcfd;display:flex;align-items:center;justify-content:space-between;gap:10px}.task-template>div{display:flex;align-items:center;gap:6px;min-width:0}.task-template>div span{font-size:10px!important;color:#475467!important}.task-template .btn{flex:0 0 auto;min-height:30px}@media(max-width:700px){.attention-head{align-items:flex-start;flex-direction:column}.attention-row{grid-template-columns:24px 1fr}.attention-actions{grid-column:2;justify-content:flex-start}}`}</style>
+    <style jsx>{`.attention-inbox{padding:0;margin-bottom:14px;overflow:hidden;border-color:#f0d7a6}.attention-head{padding:12px 14px;background:#fffcf5;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #f6e6c5}.attention-head>div{display:flex;align-items:center;gap:9px}.attention-head strong{font-size:12px}.attention-head p{margin:1px 0 0;font-size:10px;color:#667085}.attention-icon{width:30px;height:30px;border-radius:8px;background:#fff4d9;color:#b54708;display:grid;place-items:center}.attention-list{display:grid}.attention-row{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:9px;padding:10px 14px;border-top:1px solid #f0f1f3;align-items:center}.attention-row:first-child{border-top:0}.attention-bell{color:#667085}.attention-row.urgent .attention-bell{color:#b42318}.attention-row.warning .attention-bell{color:#b54708}.attention-row strong{display:block;font-size:11px}.attention-row p{margin:2px 0;font-size:10px;color:#475467}.attention-row small{font-size:9px;color:#98a2b3}.attention-actions{display:flex;align-items:center;gap:4px}.attention-more{padding:8px 14px;background:#fcfcfd;border-top:1px solid #f0f1f3;font-size:9px;color:#667085}.task-title-line{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.auto-badge{font-size:8px!important}.cadence-badge{font-size:8px!important;background:#f2f4f7;color:#475467}.task-list-head{display:flex;justify-content:space-between;align-items:center;padding:0 0 10px;border-bottom:1px solid #eef0f3;margin-bottom:2px;font-size:11px;color:#667085}.task-list-head strong{color:#344054}.smart-task-row{align-items:start}.task-template{margin-top:7px;padding:8px 9px;border:1px solid #e4e7ec;border-radius:8px;background:#fcfcfd;display:flex;align-items:center;justify-content:space-between;gap:10px}.task-template>div{display:flex;align-items:center;gap:6px;min-width:0}.task-template>div span{font-size:10px!important;color:#475467!important}.task-template .btn{flex:0 0 auto;min-height:30px}@media(max-width:700px){.attention-head{align-items:flex-start;flex-direction:column}.attention-row{grid-template-columns:24px 1fr}.attention-actions{grid-column:2;justify-content:flex-start}}`}</style>
   </div>
 }
 function NewTask({supabase,org,user,onClose,onSaved}){
