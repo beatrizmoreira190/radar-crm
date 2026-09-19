@@ -25,7 +25,8 @@ const FLAG_META={
   specialized_catalog:{label:'Catálogo especializado',tone:''},
   opportunities_recalibrated:{label:'Oportunidades recalibrado',tone:'amber'},
   v2_fit_saturation_reduced:{label:'Saturação do v2 reduzida',tone:'blue'},
-  taxonomy_normalized:{label:'Taxonomia normalizada',tone:'green'}
+  taxonomy_normalized:{label:'Taxonomia normalizada',tone:'green'},
+  secondary_line_drives_score:{label:'Linha secundária puxa o score',tone:'amber'}
 };
 
 function scoreTone(delta){
@@ -257,6 +258,13 @@ export default function RadarV3LabPage(){
         <div className="info-item"><small>Produto v3</small><span>{productLabel(reviewRow.v3_best_product)}</span></div>
       </div>
       <div style={{marginBottom:14}}><small className="muted">Sinais da auditoria</small><div style={{marginTop:6}}><FlagBadges flags={reviewRow.audit_flags}/></div></div>
+      {(reviewRow.audit_flags||[]).includes('secondary_line_drives_score')&&<div className="notice" style={{marginBottom:14}}>
+        <AlertCircle size={16}/>
+        <div>
+          <strong>Linha secundária está sustentando a recomendação.</strong>
+          <p style={{margin:'4px 0 0'}}>Nos três primeiros perfis editoriais, o maior peso bruto para {productLabel(reviewRow.v3_best_product)} é <strong>{reviewRow.audit_meta?.primary_product_support?.primary_raw_max??0}</strong>. Considerando todo o catálogo, existe um perfil com peso <strong>{reviewRow.audit_meta?.primary_product_support?.all_raw_max??0}</strong>. Isso não reduz automaticamente a nota; é um sinal para validar se essa linha realmente tem presença comercial relevante.</p>
+        </div>
+      </div>}
       <div style={{marginBottom:14}}><small className="muted">Perfis editoriais</small><div className="chips" style={{marginTop:6}}>{(reviewRow.editorial_profile||[]).map(profile=><span className="badge" key={profile}>{profile}</span>)}</div></div>
       <div className="form-grid">
         <label className="span-2">Conclusão<select value={reviewStatus} onChange={e=>setReviewStatus(e.target.value)}>
