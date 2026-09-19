@@ -24,6 +24,9 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Use current npm audit client
+        run: npm install --global npm@11.19.1
+
       - name: Install locked dependencies
         run: npm ci --no-fund
 
