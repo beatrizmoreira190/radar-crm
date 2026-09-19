@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Activity, BarChart3, BookOpenCheck, Building2, CalendarDays, ClipboardList, FileUp, Gauge, HeartPulse, LayoutDashboard, ListChecks, LogOut, MessageSquareText, Target, UserCircle2, Users, Workflow } from 'lucide-react';
+import { Activity, BarChart3, Beaker, BookOpenCheck, Building2, CalendarDays, ClipboardList, FileUp, Gauge, HeartPulse, LayoutDashboard, ListChecks, LogOut, MessageSquareText, Target, UserCircle2, Users, Workflow } from 'lucide-react';
 import { useCrm } from './CrmProvider';
 import Avatar from './Avatar';
 
@@ -26,6 +26,7 @@ const NAV_GROUPS = [
   ]},
   { label:'Gestão', managerOnly:true, items:[
     ['/app/qualidade', 'Qualidade da base', HeartPulse],
+    ['/app/radar-v3', 'Radar v3 (lab)', Beaker],
     ['/app/equipe', 'Equipe', Users],
   ]},
   { label:'Administração', adminOnly:true, items:[
