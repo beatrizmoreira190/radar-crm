@@ -2,7 +2,7 @@ export async function GET() {
   return Response.json({
     ok: true,
     service: 'radar-crm-editoras',
-    version: '3.2.0',
+    version: '3.2.1',
     commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || null,
   });
 }
