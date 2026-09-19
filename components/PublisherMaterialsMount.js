@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useParams } from 'next/navigation';
 import { CalendarClock, ExternalLink, FileText, Pencil, Plus, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 import { MATERIAL_STATUS_LABELS, MATERIAL_TYPE_LABELS, formatDate } from '@/lib/constants';
+import PublisherHelp from '@/components/PublisherHelp';
 
 function linkHost(value=''){
   try{return new URL(value).hostname.replace(/^www\./,'')}catch{return 'Link externo'}
@@ -22,7 +22,6 @@ export default function PublisherMaterialsMount(){
   const {id}=useParams();
   const {supabase,membership,user,team,teamMap,isManager,hasCommercialFunction,activityVersion}=useCrm();
   const org=membership?.organization_id;
-  const [mount,setMount]=useState(null);
   const [materials,setMaterials]=useState([]);
   const [meetings,setMeetings]=useState([]);
   const [loading,setLoading]=useState(true);
@@ -48,34 +47,15 @@ export default function PublisherMaterialsMount(){
 
   useEffect(()=>{load()},[org,id,activityVersion]);
 
-  useEffect(()=>{
-    let node=null;let timer=null;let attempts=0;
-    function attach(){
-      const stack=document.querySelector('.detail-grid > .detail-stack');
-      if(!stack){if(attempts++<30)timer=setTimeout(attach,50);return;}
-      const meetingMount=stack.querySelector('[data-publisher-meetings="commercial-meetings"]');
-      const contactSection=Array.from(stack.children).find(child=>child.querySelector?.('h2')?.textContent?.replace(/\?/g,'').trim()==='Contatos');
-      if(!contactSection){if(attempts++<30)timer=setTimeout(attach,50);return;}
-      node=document.createElement('div');
-      node.dataset.publisherMaterials='commercial-materials';
-      (meetingMount||contactSection).insertAdjacentElement('afterend',node);
-      setMount(node);
-    }
-    attach();
-    return()=>{if(timer)clearTimeout(timer);if(node?.parentNode)node.parentNode.removeChild(node)};
-  },[id]);
-
   function openNew(){setEditing(null);setShowModal(true)}
   function openEdit(material){setEditing(material);setShowModal(true)}
   function close(){setShowModal(false);setEditing(null)}
 
-  if(!mount)return null;
-
-  return createPortal(<>
+  return <>
     <section className="card panel publisher-materials-card">
       <div className="section-title">
         <div>
-          <h2>Materiais comerciais</h2>
+          <div className="help-heading"><h2>Materiais comerciais</h2><PublisherHelp text="Apresentações, projetos, propostas, curadorias e outros materiais preparados para esta editora."/></div>
           <p className="muted">Links de apresentações, projetos, propostas e curadorias preparados para esta editora.</p>
         </div>
         {canManage&&<button className="btn secondary small" type="button" onClick={openNew}><Plus size={14}/> Material</button>}
@@ -108,7 +88,7 @@ export default function PublisherMaterialsMount(){
       .publisher-material-main p{font-size:12px;line-height:1.45;color:#475467;margin:7px 0}.material-meeting span{display:flex;align-items:center;gap:4px}
       @media(max-width:700px){.publisher-material-row{grid-template-columns:34px minmax(0,1fr)}.publisher-material-row>.btn{grid-column:2;justify-self:start}.publisher-material-card :global(.section-title){align-items:flex-start}}
     `}</style>
-  </>,mount);
+  </>;
 }
 
 function MaterialModal({supabase,org,publisherId,user,team,meetings,material,onClose,onSaved}){

@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useParams } from 'next/navigation';
 import { AlertCircle, Ban, CalendarClock, CheckCircle2, Clock3, Copy, FileCheck2, FileWarning, Pencil, Plus, RefreshCw, RotateCcw, UserRound, UserRoundPlus, UserX, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 import { INTEREST_LABELS, MEETING_STATUS_LABELS, MEETING_TYPE_LABELS, formatDate } from '@/lib/constants';
 import { availabilityRuleCheck, normalizeAvailabilityRule, overlapsWithBuffer, ruleSummary } from '@/lib/meetingAvailability';
+import PublisherHelp from '@/components/PublisherHelp';
 
 function localInput(value){
   if(!value)return'';
@@ -25,7 +25,6 @@ export default function PublisherMeetingsMount(){
   const {id}=useParams();
   const {supabase,membership,user,team,teamMap,isManager,hasCommercialFunction,activityVersion}=useCrm();
   const org=membership?.organization_id;
-  const [mount,setMount]=useState(null);
   const [meetings,setMeetings]=useState([]);
   const [participants,setParticipants]=useState([]);
   const [contacts,setContacts]=useState([]);
@@ -61,11 +60,6 @@ export default function PublisherMeetingsMount(){
   }
 
   useEffect(()=>{load()},[org,id,activityVersion]);
-  useEffect(()=>{
-    let node=null;let timer=null;let attempts=0;
-    function attach(){const stack=document.querySelector('.detail-grid > .detail-stack');if(!stack){if(attempts++<30)timer=setTimeout(attach,50);return}const contactSection=Array.from(stack.children).find(child=>child.querySelector?.('h2')?.textContent?.replace(/\?/g,'').trim()==='Contatos');if(!contactSection){if(attempts++<30)timer=setTimeout(attach,50);return}node=document.createElement('div');node.dataset.publisherMeetings='commercial-meetings';contactSection.insertAdjacentElement('afterend',node);setMount(node)}
-    attach();return()=>{if(timer)clearTimeout(timer);if(node?.parentNode)node.parentNode.removeChild(node)};
-  },[id]);
   useEffect(()=>{
     if(!canSchedule||!presenters.length||agendaPrefillConsumed.current||typeof window==='undefined')return;
     const params=new URLSearchParams(window.location.search);if(params.get('schedule')!=='1')return;
@@ -119,10 +113,9 @@ export default function PublisherMeetingsMount(){
     return [`${publisherName} — ${meeting.title}`,`Data: ${formatDate(meeting.scheduled_start,true)}`,`Apresentação: ${presenter}`,people.length?`Participantes: ${people.map(p=>p.full_name).join(', ')}`:null,meeting.outcome_interest?`Interesse: ${INTEREST_LABELS[meeting.outcome_interest]||meeting.outcome_interest}`:null,meeting.outcome_notes?`Resultado: ${meeting.outcome_notes}`:null,meeting.next_step?`Próximo passo: ${meeting.next_step}`:null,meeting.follow_up_at?`Retorno: ${formatDate(meeting.follow_up_at,true)}`:null].filter(Boolean).join('\n');
   }
 
-  if(!mount)return null;
-  return createPortal(<>
+  return <>
     <section className="card panel publisher-meetings-card">
-      <div className="section-title"><div><h2>Reuniões</h2><p className="muted">Apresentações, preparação, resultado e próximos passos desta editora.</p></div>{canSchedule&&<button className="btn small" type="button" onClick={openNew}><Plus size={14}/> Agendar reunião</button>}</div>
+      <div className="section-title"><div><div className="help-heading"><h2>Reuniões</h2><PublisherHelp text="Reuniões comerciais vinculadas à editora, incluindo preparação, participantes, resultado e próximos passos."/></div><p className="muted">Apresentações, preparação, resultado e próximos passos desta editora.</p></div>{canSchedule&&<button className="btn small" type="button" onClick={openNew}><Plus size={14}/> Agendar reunião</button>}</div>
       {notice&&<div className="notice-bar" style={{marginBottom:12}}><span>{notice}</span><button type="button" onClick={()=>setNotice('')}><X size={14}/></button></div>}
       {loading?<div className="table-empty">Carregando reuniões…</div>:ordered.length?<div className="meeting-list">{ordered.map(meeting=>{
         const external=participantMap[meeting.id]||[];const presenter=personLabel(teamMap[meeting.presenter_user_id]);const scheduler=personLabel(teamMap[meeting.scheduled_by]);
@@ -133,7 +126,7 @@ export default function PublisherMeetingsMount(){
           <div className="meeting-main">
             <div className="meeting-title"><strong>{meeting.title}</strong><span className={`badge ${statusClass(meeting.status)}`}>{MEETING_STATUS_LABELS[meeting.status]||meeting.status}</span>{meeting.status==='scheduled'&&(materialReady?<span className="meeting-material ready"><FileCheck2 size={12}/> Material pronto</span>:<span className="meeting-material warning"><FileWarning size={12}/> Sem material pronto</span>)}</div>
             <div className="meeting-meta"><span><Clock3 size={12}/>{formatDate(meeting.scheduled_start,true)} · {meeting.duration_minutes} min</span><span>{MEETING_TYPE_LABELS[meeting.meeting_type]||meeting.meeting_type}</span></div>
-            <div className="meeting-people"><span><b>Apresentação:</b> {presenter}</span><span><b>Agendada por:</b> {scheduler}</span></div>
+            <div className="meeting-people"><span><b>Apresentação:</b> {presenter}<PublisherHelp text="Pessoa responsável por conduzir a apresentação ou reunião comercial."/></span><span><b>Agendada por:</b> {scheduler}<PublisherHelp text="Pessoa da equipe que criou o agendamento no CRM."/></span></div>
             {external.length>0&&<div className="participant-chips">{external.map(p=><span className="badge" key={p.id}>{p.full_name}{p.email?` · ${p.email}`:''}</span>)}</div>}
             {meeting.notes&&<p>{meeting.notes}</p>}
             {meeting.outcome_notes&&<p className="meeting-outcome"><b>Resultado:</b> {meeting.outcome_notes}</p>}
@@ -141,7 +134,7 @@ export default function PublisherMeetingsMount(){
             <div className="meeting-actions">
               {meeting.status==='scheduled'&&<button type="button" className="mini-action" onClick={()=>copyText(confirmationText(meeting),'Confirmação copiada.')}><Copy size={12}/> Copiar confirmação</button>}
               {meeting.status==='completed'&&<button type="button" className="mini-action" onClick={()=>copyText(summaryText(meeting),'Resumo da reunião copiado.')}><Copy size={12}/> Copiar resumo</button>}
-              {canEdit&&meeting.status==='scheduled'&&<><button type="button" className="mini-action" onClick={()=>openEdit(meeting)}><RotateCcw size={12}/> Reagendar/editar</button><button type="button" className="mini-action success" onClick={()=>setPostMeeting(meeting)}><CheckCircle2 size={12}/> Realizada</button><button type="button" className="mini-action" onClick={()=>markNoShow(meeting)}><UserX size={12}/> Não compareceu</button><button type="button" className="mini-action danger" onClick={()=>cancelMeeting(meeting)}><Ban size={12}/> Cancelar</button></>}
+              {canEdit&&meeting.status==='scheduled'&&<><button type="button" className="mini-action" onClick={()=>openEdit(meeting)}><RotateCcw size={12}/> Reagendar/editar</button><button type="button" className="mini-action success" onClick={()=>setPostMeeting(meeting)}><CheckCircle2 size={12}/> Realizada</button><details className="meeting-more-actions"><summary title="Mais ações" aria-label="Mais ações">•••</summary><div className="meeting-more-menu"><button type="button" onClick={()=>markNoShow(meeting)}><UserX size={12}/> Não compareceu</button><button type="button" className="danger" onClick={()=>cancelMeeting(meeting)}><Ban size={12}/> Cancelar</button></div></details></>}
               {canEdit&&meeting.status==='completed'&&<button type="button" className="mini-action" onClick={()=>setPostMeeting(meeting)}><Pencil size={12}/> Editar resultado</button>}
               {canEdit&&(meeting.status==='cancelled'||meeting.status==='no_show')&&<button type="button" className="mini-action" onClick={()=>openEdit(meeting)}><RotateCcw size={12}/> Reagendar</button>}
             </div>
@@ -155,7 +148,7 @@ export default function PublisherMeetingsMount(){
     <style jsx>{`
       .meeting-list{display:grid;gap:8px}.meeting-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:12px;align-items:start;padding:13px 0;border-top:1px solid #eaecf0}.meeting-row:first-child{border-top:0;padding-top:2px}.meeting-icon{width:36px;height:36px;border-radius:9px;background:#f2f4f7;color:#475467;display:grid;place-items:center}.meeting-main{min-width:0}.meeting-title{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.meeting-meta,.meeting-people{display:flex;gap:7px 16px;flex-wrap:wrap;color:#667085;font-size:11px;margin-top:5px}.meeting-meta span{display:flex;align-items:center;gap:4px}.participant-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}.meeting-main p{font-size:12px;line-height:1.45;color:#475467;margin:8px 0 0}.meeting-outcome,.meeting-next{padding-top:7px;border-top:1px dashed #eaecf0}.meeting-material{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;border-radius:999px;padding:3px 6px}.meeting-material.ready{background:#ecfdf3;color:#027a48}.meeting-material.warning{background:#fffaeb;color:#b54708}.meeting-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:9px}.mini-action{border:1px solid #d0d5dd;background:#fff;color:#475467;border-radius:7px;padding:5px 7px;font-size:9px;font-weight:700;display:inline-flex;align-items:center;gap:4px;cursor:pointer}.mini-action:hover{background:#f9fafb}.mini-action.success{color:#027a48;border-color:#abefc6}.mini-action.danger{color:#b42318;border-color:#fecdca}@media(max-width:700px){.meeting-row{grid-template-columns:34px minmax(0,1fr)}.meeting-row>.btn{grid-column:2;justify-self:start}.publisher-meetings-card :global(.section-title){align-items:flex-start}}
     `}</style>
-  </>,mount);
+  </>;
 }
 
 function MeetingModal({supabase,org,publisherId,publisherName,user,team,presenters,contacts,meeting,prefill,participants,materials,canEditScheduling,onClose,onSaved}){
