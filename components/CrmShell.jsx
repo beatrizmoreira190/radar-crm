@@ -26,7 +26,7 @@ const NAV_GROUPS = [
   ]},
   { label:'Gestão', managerOnly:true, items:[
     ['/app/qualidade', 'Qualidade da base', HeartPulse],
-    ['/app/radar-v3', 'Radar v3 (lab)', Beaker],
+    ['/app/radar-v3', 'Auditoria Radar', Beaker],
     ['/app/equipe', 'Equipe', Users],
   ]},
   { label:'Administração', adminOnly:true, items:[
