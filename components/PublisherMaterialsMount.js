@@ -18,7 +18,7 @@ function statusClass(status){
   return '';
 }
 
-export default function PublisherMaterialsMount(){
+export default function PublisherMaterialsMount({inline=false}){
   const {id}=useParams();
   const {supabase,membership,user,team,teamMap,isManager,hasCommercialFunction,activityVersion}=useCrm();
   const org=membership?.organization_id;
@@ -49,6 +49,7 @@ export default function PublisherMaterialsMount(){
   useEffect(()=>{load()},[org,id,activityVersion]);
 
   useEffect(()=>{
+    if(inline)return;
     let node=null;let timer=null;let attempts=0;
     function attach(){
       const stack=document.querySelector('.detail-grid > .detail-stack');
@@ -63,15 +64,15 @@ export default function PublisherMaterialsMount(){
     }
     attach();
     return()=>{if(timer)clearTimeout(timer);if(node?.parentNode)node.parentNode.removeChild(node)};
-  },[id]);
+  },[id,inline]);
 
   function openNew(){setEditing(null);setShowModal(true)}
   function openEdit(material){setEditing(material);setShowModal(true)}
   function close(){setShowModal(false);setEditing(null)}
 
-  if(!mount)return null;
+  if(!inline&&!mount)return null;
 
-  return createPortal(<>
+  const content=<>
     <section className="card panel publisher-materials-card">
       <div className="section-title">
         <div>
@@ -108,7 +109,8 @@ export default function PublisherMaterialsMount(){
       .publisher-material-main p{font-size:12px;line-height:1.45;color:#475467;margin:7px 0}.material-meeting span{display:flex;align-items:center;gap:4px}
       @media(max-width:700px){.publisher-material-row{grid-template-columns:34px minmax(0,1fr)}.publisher-material-row>.btn{grid-column:2;justify-self:start}.publisher-material-card :global(.section-title){align-items:flex-start}}
     `}</style>
-  </>,mount);
+  </>;
+  return inline?content:createPortal(content,mount);
 }
 
 function MaterialModal({supabase,org,publisherId,user,team,meetings,material,onClose,onSaved}){
