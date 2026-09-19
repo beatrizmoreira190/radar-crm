@@ -67,7 +67,7 @@ export default function PublishersPage(){
     if(error)setNotice(error.message);else{setNotice('Visão salva.');setShowSaveView(false);loadViews()}
   }
   async function deleteView(){if(!activeView)return;const {error}=await supabase.from('saved_views').delete().eq('id',activeView);if(error)setNotice(error.message);else{setNotice('Visão excluída.');setActiveView('');loadViews()}}
-  async function claim(p){const {error}=await supabase.from('publishers').update({owner_user_id:user.id,updated_by:user.id,updated_at:new Date().toISOString()}).eq('organization_id',org).eq('id',p.id);if(error)setNotice(error.message);else{setNotice(`Você agora é responsável por ${p.name}.`);load()}}
+  async function claim(p){const {data,error}=await supabase.from('publishers').update({owner_user_id:user.id,updated_by:user.id,updated_at:new Date().toISOString()}).eq('organization_id',org).eq('id',p.id).is('owner_user_id',null).select('id,owner_user_id').maybeSingle();if(error)setNotice(error.message);else if(!data){setNotice(`${p.name} acabou de ser assumida por outra pessoa. A lista foi atualizada.`);load()}else{setNotice(`Você agora é responsável por ${p.name}.`);load()}}
 
   return <div className="page-wrap">
     <div className="page-head"><div><div className="eyebrow">Base comercial</div><h1>Editoras</h1><p>Encontre contas por perfil editorial, etapa, localização e responsável para organizar sua prospecção.</p></div>{isManager&&<button className="btn" onClick={()=>setShowNew(true)}><Plus size={16}/> Nova editora</button>}</div>
