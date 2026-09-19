@@ -25,7 +25,8 @@ const FLAG_META={
   specialized_catalog:{label:'Catálogo especializado',tone:''},
   opportunities_recalibrated:{label:'Oportunidades recalibrado',tone:'amber'},
   v2_fit_saturation_reduced:{label:'Saturação do v2 reduzida',tone:'blue'},
-  taxonomy_normalized:{label:'Taxonomia normalizada',tone:'green'}
+  taxonomy_normalized:{label:'Taxonomia normalizada',tone:'green'},
+  secondary_line_drives_score:{label:'Linha secundária puxa o score',tone:'amber'}
 };
 
 function scoreTone(delta){
@@ -66,6 +67,7 @@ export default function RadarV3LabPage(){
   const [sort,setSort]=useState('abs');
   const [status,setStatus]=useState('confirmed');
   const [reviewFilter,setReviewFilter]=useState('pending');
+  const [flagFilter,setFlagFilter]=useState('');
   const [search,setSearch]=useState('');
   const [draftSearch,setDraftSearch]=useState('');
   const [page,setPage]=useState(1);
@@ -86,7 +88,8 @@ export default function RadarV3LabPage(){
         p_sort:sort,
         p_search:search||null,
         p_status:status||null,
-        p_review_status:reviewFilter||null
+        p_review_status:reviewFilter||null,
+        p_audit_flag:flagFilter||null
       })
     ]);
     if(summaryError||rowsError)setNotice(summaryError?.message||rowsError?.message);
@@ -95,7 +98,7 @@ export default function RadarV3LabPage(){
     setLoading(false);
   }
 
-  useEffect(()=>{load()},[org,isManager,page,sort,status,reviewFilter,search]);
+  useEffect(()=>{load()},[org,isManager,page,sort,status,reviewFilter,flagFilter,search]);
 
   async function refreshLab(){
     if(!org)return;
@@ -205,6 +208,18 @@ export default function RadarV3LabPage(){
             <option value="later">Revisão: depois</option>
             <option value="">Todas as revisões</option>
           </select>
+          <select value={flagFilter} onChange={e=>{setPage(1);setFlagFilter(e.target.value)}}>
+            <option value="">Todos os sinais</option>
+            <option value="secondary_line_drives_score">Linha secundária puxa o score</option>
+            <option value="v2_cap_removed">Teto v2 removido</option>
+            <option value="opportunities_recalibrated">Radar de Oportunidades recalibrado</option>
+            <option value="product_changed">Produto recomendado mudou</option>
+            <option value="large_up">Alta forte</option>
+            <option value="large_down">Queda forte</option>
+            <option value="v2_fit_saturation_reduced">Saturação do v2 reduzida</option>
+            <option value="taxonomy_normalized">Taxonomia normalizada</option>
+            <option value="unknown_taxonomy">Perfil sem mapa</option>
+          </select>
           <select value={status} onChange={e=>{setPage(1);setStatus(e.target.value)}}>
             <option value="confirmed">Perfil confirmado</option>
             <option value="partial">Perfil parcial</option>
@@ -257,6 +272,13 @@ export default function RadarV3LabPage(){
         <div className="info-item"><small>Produto v3</small><span>{productLabel(reviewRow.v3_best_product)}</span></div>
       </div>
       <div style={{marginBottom:14}}><small className="muted">Sinais da auditoria</small><div style={{marginTop:6}}><FlagBadges flags={reviewRow.audit_flags}/></div></div>
+      {(reviewRow.audit_flags||[]).includes('secondary_line_drives_score')&&<div className="notice" style={{marginBottom:14}}>
+        <AlertCircle size={16}/>
+        <div>
+          <strong>Linha secundária está sustentando a recomendação.</strong>
+          <p style={{margin:'4px 0 0'}}>Nos três primeiros perfis editoriais, o maior peso bruto para {productLabel(reviewRow.v3_best_product)} é <strong>{reviewRow.audit_meta?.primary_product_support?.primary_raw_max??0}</strong>. Considerando todo o catálogo, existe um perfil com peso <strong>{reviewRow.audit_meta?.primary_product_support?.all_raw_max??0}</strong>. Isso não reduz automaticamente a nota; é um sinal para validar se essa linha realmente tem presença comercial relevante.</p>
+        </div>
+      </div>}
       <div style={{marginBottom:14}}><small className="muted">Perfis editoriais</small><div className="chips" style={{marginTop:6}}>{(reviewRow.editorial_profile||[]).map(profile=><span className="badge" key={profile}>{profile}</span>)}</div></div>
       <div className="form-grid">
         <label className="span-2">Conclusão<select value={reviewStatus} onChange={e=>setReviewStatus(e.target.value)}>
