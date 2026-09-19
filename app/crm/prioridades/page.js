@@ -12,7 +12,7 @@ export default function PrioritiesPage(){
   async function load(){if(!org)return;setLoading(true);const {data,error}=await supabase.rpc('crm_smart_queue',{p_organization_id:org,p_limit:60});if(error)setNotice(error.message);setRows(data||[]);setLoading(false)}
   useEffect(()=>{load()},[org,activityVersion]);
   const stats=useMemo(()=>({urgent:rows.filter(r=>['overdue_task','due_followup'].includes(r.action_code)).length,claim:rows.filter(r=>r.action_code==='claim').length,first:rows.filter(r=>r.action_code==='first_contact').length,follow:rows.filter(r=>['follow_up','reengage'].includes(r.action_code)).length}),[rows]);
-  async function claim(row){const {error}=await supabase.from('publishers').update({owner_user_id:user.id,updated_by:user.id,updated_at:new Date().toISOString()}).eq('organization_id',org).eq('id',row.publisher_id).is('owner_user_id',null);if(error)setNotice(error.message);else{setNotice(`Você assumiu ${row.name}.`);load()}}
+  async function claim(row){const {data,error}=await supabase.from('publishers').update({owner_user_id:user.id,updated_by:user.id,updated_at:new Date().toISOString()}).eq('organization_id',org).eq('id',row.publisher_id).is('owner_user_id',null).select('id,owner_user_id').maybeSingle();if(error)setNotice(error.message);else if(!data){setNotice(`${row.name} acabou de ser assumida por outra pessoa. Atualizei sua fila.`);load()}else{setNotice(`Você assumiu ${row.name}.`);load()}}
   async function explain(row){setSelected(row);setGuidance(null);const {data,error}=await supabase.rpc('crm_publisher_guidance',{p_organization_id:org,p_publisher_id:row.publisher_id});if(error)setNotice(error.message);else setGuidance(data)}
   const fits=guidance?.product_fits||{};
   return <div className="page-wrap">
