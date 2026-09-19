@@ -19,8 +19,8 @@ const EXPORT_OPTIONS=[
   {key:'publishers',label:'Base de editoras'}
 ];
 const REPORT_SHEET_KEYS={
-  complete:['executive','comparison','trend','funnel','aging','cadences','channels','meetings','financial','team','score','products','geography','publishers','interactions','opportunities','tasks','meetingDetails','cadenceDetails'],
-  executive:['executive','comparison','trend','funnel','aging','meetings','financial','score','products','geography'],
+  complete:['dashboard','executive','comparison','trend','funnel','aging','cadences','channels','meetings','financial','team','score','products','geography','publishers','interactions','opportunities','tasks','meetingDetails','cadenceDetails'],
+  executive:['dashboard','executive','comparison','trend','funnel','aging','meetings','financial','score','products','geography'],
   commercial:['executive','comparison','score','products','publishers','interactions','tasks'],
   pipeline:['executive','funnel','aging','financial','opportunities','meetingDetails'],
   team:['executive','comparison','team','interactions','meetingDetails','tasks'],
@@ -322,7 +322,13 @@ export default function ReportsPage(){
         dt(e.started_at),dt(e.completed_at),dt(e.paused_until),wrap(e.pause_reason),RESULT_LABELS[e.last_result_code]||e.last_result_code||''
       ]);
 
+      const dashboardSheet=keys.includes('dashboard')?await buildExcelDashboard({
+        personal,days,current,previous,total,contacted,overdue,financial,
+        activitySeries,funnel,cadencePerformance,meetingAnalytics,scoreDistribution,productFit,geography,teamPerformance,teamMap
+      }):null;
+
       const catalog={
+        dashboard:dashboardSheet,
         executive:{name:'Resumo executivo',rows:executiveRows,widths:[38,22,42,22],merges:executiveMerges},
         comparison:makeTable('Comparativo','Período selecionado versus período imediatamente anterior de mesma duração.',['Indicador','Atual','Anterior','Variação','Variação %'],comparisonRows,[32,14,14,18,16]),
         trend:makeTable('Tendência','Atividade diária no período selecionado.',['Data','Interações','Reuniões','Oportunidades'],trendRows,[16,14,14,16]),
@@ -557,3 +563,172 @@ function GeographyTable({data}){
   if(!data?.length)return <p className="muted">Sem dados geográficos suficientes.</p>;
   return <div className="report-table-wrap"><table className="report-table"><thead><tr><th>UF</th><th>Base</th><th>Contatadas</th><th>Cobertura</th><th>Interações</th></tr></thead><tbody>{data.slice(0,15).map(row=><tr key={row.state}><td><strong>{row.state}</strong></td><td>{Number(row.base_count||0).toLocaleString('pt-BR')}</td><td>{Number(row.contacted||0).toLocaleString('pt-BR')}</td><td>{Number(row.base_count)?Math.round(Number(row.contacted||0)/Number(row.base_count)*100):0}%</td><td>{Number(row.interactions||0).toLocaleString('pt-BR')}</td></tr>)}</tbody></table></div>
 }
+
+async function buildExcelDashboard({personal,days,current,previous,total,contacted,overdue,financial,activitySeries,funnel,cadencePerformance,meetingAnalytics,scoreDistribution,productFit,geography,teamPerformance,teamMap}){
+  const S=XLSX_STYLE;
+  const cols=14;
+  const rows=Array.from({length:86},()=>Array(cols).fill(''));
+  rows[0][0]=xcell(personal?'RADAR — Dashboard pessoal':'RADAR — Dashboard gerencial',S.title);
+  rows[1][0]=xcell('Período',S.meta);rows[1][1]='Últimos '+days+' dias';
+  rows[1][3]=xcell('Gerado em',S.meta);rows[1][4]=xcell(new Date(),S.datetime,'datetime');
+  rows[3][0]=xcell('Interações',S.meta);rows[3][2]=xcell('Reuniões realizadas',S.meta);rows[3][4]=xcell('Oportunidades criadas',S.meta);rows[3][6]=xcell('Pipeline ponderado',S.meta);rows[3][9]=xcell('Cobertura comercial',S.meta);rows[3][12]=xcell('Tarefas atrasadas',S.meta);
+  rows[4][0]=xcell(Number(current?.interactions||0),S.integer,'number');
+  rows[4][2]=xcell(Number(current?.meetings_completed||0),S.integer,'number');
+  rows[4][4]=xcell(Number(current?.opportunities_created||0),S.integer,'number');
+  rows[4][6]=xcell(Number(financial?.weighted_open||0),S.currency,'number');
+  rows[4][9]=xcell(total?contacted/total:0,S.percent,'number');
+  rows[4][12]=xcell(Number(overdue||0),S.integer,'number');
+
+  const images=[];
+  const pushImage=async(chart,row,column)=>{
+    const blob=await chart.blob;
+    images.push({
+      content:blob,contentType:'image/png',width:chart.width,height:chart.height,dpi:96,
+      anchor:{row,column},title:chart.title,description:chart.description||chart.title
+    });
+  };
+
+  const activity=groupActivitySeries(activitySeries,days);
+  await pushImage({
+    title:'Evolução de interações',width:520,height:235,
+    blob:lineChartPng('Evolução de interações','Ritmo comercial ao longo do período',activity.map(r=>({label:r.label,value:Number(r.interactions||0)})))
+  },7,1);
+  await pushImage({
+    title:'Funil comercial',width:520,height:235,
+    blob:horizontalBarChartPng('Funil comercial','Editoras que alcançaram cada etapa',(funnel||[]).map(r=>({label:r.name,value:Number(r.reached||0)})).slice(0,10))
+  },7,8);
+
+  await pushImage({
+    title:'Pipeline financeiro',width:520,height:235,
+    blob:verticalBarChartPng('Pipeline financeiro','Valor bruto × ponderado',[
+      {label:'Bruto',value:Number(financial?.gross_open||0)},
+      {label:'Ponderado',value:Number(financial?.weighted_open||0)}
+    ],{currency:true})
+  },23,1);
+  await pushImage({
+    title:'Cadências',width:520,height:235,
+    blob:horizontalBarChartPng('Desempenho das cadências','Taxa de resposta das sequências',(cadencePerformance||[]).map(r=>({
+      label:r.name,value:Number(r.enrollments)?Math.round(Number(r.responses||0)/Number(r.enrollments)*100):0
+    })).slice(0,8),{suffix:'%'})
+  },23,8);
+
+  await pushImage({
+    title:'Reuniões',width:520,height:235,
+    blob:verticalBarChartPng('Reuniões','Status no período',[
+      {label:'Agendadas',value:Number(meetingAnalytics?.scheduled||0)},
+      {label:'Realizadas',value:Number(meetingAnalytics?.completed||0)},
+      {label:'Canceladas',value:Number(meetingAnalytics?.cancelled||0)},
+      {label:'No-show',value:Number(meetingAnalytics?.no_show||0)}
+    ])
+  },39,1);
+  await pushImage({
+    title:'Radar Score',width:520,height:235,
+    blob:verticalBarChartPng('Distribuição do Radar Score','Editoras por faixa',(scoreDistribution||[]).map(r=>({label:r.bucket,value:Number(r.count||0)})))
+  },39,8);
+
+  await pushImage({
+    title:'Aderência por produto',width:520,height:235,
+    blob:horizontalBarChartPng('Aderência por produto Radar','Editoras com aderência ≥ 70',(productFit||[]).map(r=>({label:r.label,value:Number(r.high_fit||0)})))
+  },55,1);
+  await pushImage({
+    title:'Distribuição geográfica',width:520,height:235,
+    blob:horizontalBarChartPng('Distribuição geográfica','Estados com maior base',(geography||[]).slice(0,8).map(r=>({label:r.state,value:Number(r.base_count||0)})))
+  },55,8);
+
+  if((teamPerformance||[]).length){
+    await pushImage({
+      title:'Cobertura da equipe',width:520,height:235,
+      blob:horizontalBarChartPng('Cobertura da equipe','Percentual da carteira já contatada',(teamPerformance||[]).slice(0,8).map(r=>({
+        label:r.full_name||r.email||'Equipe',value:Number(r.portfolio)?Math.round(Number(r.contacted||0)/Number(r.portfolio)*100):0
+      })),{suffix:'%'})
+    },71,1);
+    await pushImage({
+      title:'Atividade da equipe',width:520,height:235,
+      blob:horizontalBarChartPng('Atividade da equipe','Interações registradas no período',(teamPerformance||[]).slice(0,8).map(r=>({
+        label:r.full_name||r.email||'Equipe',value:Number(r.interactions||0)
+      })))
+    },71,8);
+  }
+
+  return {
+    name:'Dashboard',
+    rows,
+    widths:Array(cols).fill(12),
+    merges:['A1:N1','A2:B2','D2:E2','A4:B4','C4:D4','E4:F4','G4:I4','J4:L4','M4:N4','A5:B5','C5:D5','E5:F5','G5:I5','J5:L5','M5:N5'],
+    images,
+    showGridLines:false,
+    zoomScale:.85
+  };
+}
+
+function chartCanvas(title,subtitle,width=520,height=235){
+  const canvas=document.createElement('canvas');
+  const scale=2;canvas.width=width*scale;canvas.height=height*scale;
+  const ctx=canvas.getContext('2d');ctx.scale(scale,scale);
+  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,width,height);
+  ctx.strokeStyle='#e4e7ec';ctx.lineWidth=1;ctx.strokeRect(.5,.5,width-1,height-1);
+  ctx.fillStyle='#101828';ctx.font='700 16px Arial';ctx.fillText(title,18,26);
+  ctx.fillStyle='#667085';ctx.font='11px Arial';ctx.fillText(subtitle||'',18,44);
+  return {canvas,ctx,width,height,left:46,top:62,right:18,bottom:34};
+}
+function canvasToPng(canvas){
+  return new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Não foi possível gerar o gráfico.')),'image/png'));
+}
+function emptyChart(ctx,width,height,text='Sem dados suficientes'){
+  ctx.fillStyle='#98a2b3';ctx.font='12px Arial';ctx.textAlign='center';ctx.fillText(text,width/2,height/2+12);ctx.textAlign='left';
+}
+async function lineChartPng(title,subtitle,data){
+  const {canvas,ctx,width,height,left,top,right,bottom}=chartCanvas(title,subtitle);
+  const rows=(data||[]).filter(r=>Number.isFinite(Number(r.value)));
+  if(!rows.length||!rows.some(r=>Number(r.value)>0)){emptyChart(ctx,width,height);return canvasToPng(canvas)}
+  const w=width-left-right,h=height-top-bottom,max=Math.max(1,...rows.map(r=>Number(r.value)||0));
+  ctx.strokeStyle='#eaecf0';ctx.lineWidth=1;
+  for(let i=0;i<4;i++){const y=top+h*i/3;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(left+w,y);ctx.stroke()}
+  ctx.strokeStyle='#ef3d36';ctx.lineWidth=3;ctx.beginPath();
+  rows.forEach((r,i)=>{const x=left+(rows.length===1?0:w*i/(rows.length-1));const y=top+h-(Number(r.value)||0)/max*h;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)});
+  ctx.stroke();
+  ctx.fillStyle='#ef3d36';
+  rows.forEach((r,i)=>{const x=left+(rows.length===1?0:w*i/(rows.length-1));const y=top+h-(Number(r.value)||0)/max*h;ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fill()});
+  ctx.fillStyle='#667085';ctx.font='9px Arial';ctx.textAlign='center';
+  const every=Math.max(1,Math.ceil(rows.length/6));
+  rows.forEach((r,i)=>{if(i%every===0||i===rows.length-1)ctx.fillText(r.label||'',left+(rows.length===1?0:w*i/(rows.length-1)),height-12)});
+  ctx.textAlign='left';
+  return canvasToPng(canvas);
+}
+async function horizontalBarChartPng(title,subtitle,data,{suffix=''}={}){
+  const {canvas,ctx,width,height,left,top,right,bottom}=chartCanvas(title,subtitle);
+  const rows=(data||[]).filter(r=>r&&r.label!==undefined).slice(0,9);
+  if(!rows.length||!rows.some(r=>Number(r.value)>0)){emptyChart(ctx,width,height);return canvasToPng(canvas)}
+  const labelW=145,w=width-left-right-labelW,h=height-top-bottom,max=Math.max(1,...rows.map(r=>Number(r.value)||0));
+  const gap=6,barH=Math.max(10,(h-gap*(rows.length-1))/rows.length);
+  ctx.font='10px Arial';
+  rows.forEach((r,i)=>{
+    const y=top+i*(barH+gap);const value=Number(r.value)||0;
+    ctx.fillStyle='#475467';ctx.textAlign='right';ctx.fillText(shortLabel(String(r.label),24),left+labelW-8,y+barH*.7);
+    ctx.fillStyle='#f2f4f7';ctx.fillRect(left+labelW,y,w,barH);
+    ctx.fillStyle='#ef3d36';ctx.fillRect(left+labelW,y,Math.max(value?3:0,value/max*w),barH);
+    ctx.fillStyle='#101828';ctx.textAlign='left';ctx.font='700 10px Arial';ctx.fillText(formatChartNumber(value)+suffix,left+labelW+Math.max(value?3:0,value/max*w)+6,y+barH*.7);ctx.font='10px Arial';
+  });
+  ctx.textAlign='left';
+  return canvasToPng(canvas);
+}
+async function verticalBarChartPng(title,subtitle,data,{currency=false,suffix=''}={}){
+  const {canvas,ctx,width,height,left,top,right,bottom}=chartCanvas(title,subtitle);
+  const rows=(data||[]).filter(r=>r&&r.label!==undefined);
+  if(!rows.length||!rows.some(r=>Number(r.value)>0)){emptyChart(ctx,width,height);return canvasToPng(canvas)}
+  const w=width-left-right,h=height-top-bottom,max=Math.max(1,...rows.map(r=>Number(r.value)||0));
+  const slot=w/rows.length,barW=Math.min(58,slot*.58);
+  ctx.strokeStyle='#eaecf0';ctx.lineWidth=1;
+  for(let i=0;i<4;i++){const y=top+h*i/3;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(left+w,y);ctx.stroke()}
+  rows.forEach((r,i)=>{
+    const value=Number(r.value)||0;const bh=value/max*h;const x=left+i*slot+(slot-barW)/2;const y=top+h-bh;
+    ctx.fillStyle='#ef3d36';ctx.fillRect(x,y,barW,bh);
+    ctx.fillStyle='#101828';ctx.font='700 10px Arial';ctx.textAlign='center';ctx.fillText(currency?compactCurrency(value):formatChartNumber(value)+suffix,x+barW/2,Math.max(top+10,y-5));
+    ctx.fillStyle='#667085';ctx.font='9px Arial';ctx.fillText(shortLabel(String(r.label),15),x+barW/2,height-12);
+  });
+  ctx.textAlign='left';
+  return canvasToPng(canvas);
+}
+function shortLabel(text,max){return text.length>max?text.slice(0,max-1)+'…':text}
+function formatChartNumber(value){return new Intl.NumberFormat('pt-BR',{notation:value>=10000?'compact':'standard',maximumFractionDigits:1}).format(value||0)}
+function compactCurrency(value){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',notation:'compact',maximumFractionDigits:1}).format(value||0)}
