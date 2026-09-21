@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, Clock3, Target, UserRound, Workflow } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
-import { OPPORTUNITY_STAGE_LABELS, PRIORITY_LABELS, formatDate } from '@/lib/constants';
+import { OPPORTUNITY_SERVICE_LABELS, OPPORTUNITY_STAGE_LABELS, PRIORITY_LABELS, formatDate } from '@/lib/constants';
 import PublisherHelp from '@/components/PublisherHelp';
 
 const ACTIVE_OPPORTUNITY_STAGES=new Set(['identified','qualified','proposal','negotiation','on_hold']);
@@ -60,7 +60,7 @@ export default function PublisherRecordOverview({publisher,tasks=[],opportunitie
       <article><div className="publisher-overview-label"><UserRound size={14}/><span>Responsável atual</span><PublisherHelp text="Pessoa que está com a condução do próximo estágio comercial desta editora."/></div><strong>{ownerName}</strong><small>Quem está com a bola agora</small></article><article><div className="publisher-overview-label"><UserRound size={14}/><span>Prospector de origem</span><PublisherHelp text="Pessoa que iniciou a prospecção desta editora. Esse histórico permanece mesmo depois de um handoff."/></div><strong>{prospectorName}</strong><small>Quem originou o relacionamento comercial</small></article>
       <article><div className="publisher-overview-label"><Clock3 size={14}/><span>Próxima ação</span><PublisherHelp text="Próximo retorno ou movimento comercial previsto para esta editora."/></div><strong>{publisher.next_action_at?formatDate(publisher.next_action_at,true):'Sem retorno agendado'}</strong><small>{openTasks[0]?.title||'Nenhuma pendência imediata'}</small></article>
       <article><div className="publisher-overview-label"><Clock3 size={14}/><span>Último contato</span><PublisherHelp text="Interação comercial mais recente registrada no CRM."/></div><strong>{publisher.last_contact_at?formatDate(publisher.last_contact_at,true):'Ainda não registrado'}</strong><small>{lastInteraction?.summary||'Sem resumo recente'}</small></article>
-      <article><div className="publisher-overview-label"><Target size={14}/><span>Oportunidade ativa</span><PublisherHelp text="Negócio em andamento que ainda não foi ganho, perdido ou encerrado."/></div><strong>{activeOpportunity?.title||'Nenhuma ativa'}</strong><small>{activeOpportunity?`${OPPORTUNITY_STAGE_LABELS[activeOpportunity.stage]||activeOpportunity.stage}${activeOpportunity.next_step?` · ${activeOpportunity.next_step}`:''}`:'Sem negócio aberto no momento'}</small></article>
+      <article><div className="publisher-overview-label"><Target size={14}/><span>Oportunidade ativa</span><PublisherHelp text="Negócio em andamento que ainda não foi ganho, perdido ou encerrado."/></div><strong>{activeOpportunity?.title||'Nenhuma ativa'}</strong><small>{activeOpportunity?`${OPPORTUNITY_SERVICE_LABELS[activeOpportunity.service_key]||'Outro serviço / projeto'} · ${OPPORTUNITY_STAGE_LABELS[activeOpportunity.stage]||activeOpportunity.stage}${activeOpportunity.next_step?` · ${activeOpportunity.next_step}`:''}`:'Sem negócio aberto no momento'}</small></article>
       <article><div className="publisher-overview-label"><CalendarClock size={14}/><span>Próxima reunião</span><PublisherHelp text="Próxima reunião comercial agendada para esta editora."/></div><strong>{nextMeeting?formatDate(nextMeeting.scheduled_start,true):'Nenhuma agendada'}</strong><small>{nextMeeting?nextMeeting.title:'Sem compromisso futuro registrado'}</small></article>
     </div>
   </section>;
