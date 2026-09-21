@@ -13,6 +13,7 @@ const sections=[
   ['oportunidades','Oportunidades'],
   ['pipeline','Pipeline'],
   ['tarefas','Minha fila'],
+  ['notificacoes','Notificações e menções'],
   ['cadencias','Cadências'],
   ['modelos','Modelos comerciais'],
   ['agenda','Agenda comercial'],
@@ -70,6 +71,8 @@ export default function ManualPage(){
           <p>Grande parte da qualidade do CRM depende de registrar a informação no lugar correto. Os campos abaixo têm funções diferentes.</p>
           <div className="manual-definition-grid">
             <Definition term="Editora / conta">É o cadastro principal da empresa. Reúne dados cadastrais, perfil editorial, acompanhamento comercial e todo o histórico relacionado.</Definition>
+            <Definition term="Prospector de origem">É a pessoa que iniciou a prospecção da editora. Esse vínculo é histórico: continua preservado mesmo quando a condução comercial passa para outra pessoa.</Definition>
+            <Definition term="Responsável atual">É quem está com a condução do próximo estágio comercial naquele momento. Pode mudar ao longo da jornada sem apagar quem originou a conta.</Definition>
             <Definition term="Pessoa de contato">É uma pessoa da editora: nome, cargo, área, e-mail, telefone e indicação de decisor. Não é o registro de uma conversa.</Definition>
             <Definition term="Interação">É algo que aconteceu: ligação, e-mail, WhatsApp, LinkedIn, reunião ou outra abordagem. Deve registrar resultado, resumo e próximo passo.</Definition>
             <Definition term="Tarefa">É algo que ainda precisa ser feito. Pode ser manual ou criada automaticamente por reunião, follow-up ou cadência.</Definition>
@@ -110,8 +113,8 @@ export default function ManualPage(){
             <thead><tr><th>Ação</th><th>Quem vê / executa</th></tr></thead>
             <tbody>
               <tr><td>Criar nova editora</td><td>Supervisores e administradores.</td></tr>
-              <tr><td>Editar acompanhamento da ficha</td><td>Gestores ou prospectador responsável pela editora.</td></tr>
-              <tr><td>Registrar interação, criar tarefa, oportunidade e pessoa de contato pela ficha</td><td>Gestores ou responsável pela editora.</td></tr>
+              <tr><td>Editar etapa, prioridade, responsável atual, próxima ação principal e notas estruturantes</td><td>Gestores ou responsável atual pela editora.</td></tr>
+              <tr><td>Registrar interação, criar tarefa, oportunidade e pessoa de contato pela ficha</td><td>Gestores, responsável atual ou usuário com função Prospecção. A autoria de cada registro fica preservada.</td></tr>
               <tr><td>Agendar reunião</td><td>Gestores ou usuário com função Agendamento de reuniões.</td></tr>
               <tr><td>Adicionar material comercial</td><td>Gestores ou usuário com função Materiais pré-reunião ou Materiais de negociação.</td></tr>
               <tr><td>Criar modelo comercial ou nova cadência</td><td>Gestores.</td></tr>
@@ -120,15 +123,15 @@ export default function ManualPage(){
             </tbody>
           </table></div>
           <Callout title="Importante">
-            <p>O botão <b>Nova ação</b> da ficha não mostra todas as opções para todas as pessoas. O menu é montado conforme as permissões atuais do usuário.</p>
+            <p>O botão <b>Nova ação</b> não transforma a ficha em propriedade de uma pessoa. O menu é montado conforme as funções comerciais: quem tem Prospecção pode colaborar com interações, pessoas de contato, tarefas e oportunidades; reuniões e materiais seguem suas funções específicas. Os campos centrais da conta continuam sob responsabilidade do responsável atual ou da gestão.</p>
           </Callout>
         </Section>
 
         <Section id="visao-geral" title="Visão geral">
           <p>A <Link className="text-link" href="/app">Visão geral</Link> é o painel de entrada. Ela resume o que está acontecendo sem substituir as páginas operacionais.</p>
           <ul>
-            <li><b>Editoras / Minha carteira:</b> gestores veem a base ativa; prospectadores veem as contas sob sua responsabilidade.</li>
-            <li><b>Já contatadas:</b> ajuda a acompanhar a cobertura comercial da carteira ou da operação.</li>
+            <li><b>Editoras / Responsabilidade atual:</b> gestores veem a base ativa; usuários comuns acompanham as contas cuja condução está atualmente com eles.</li>
+            <li><b>Já contatadas:</b> ajuda a acompanhar a cobertura das contas sob responsabilidade atual ou da operação.</li>
             <li><b>Tarefas e próximos passos:</b> mostra pendências próximas que merecem atenção.</li>
             <li><b>Maiores Radar Scores:</b> destaca contas de maior pontuação, mas a ordem real de execução continua em Prioridades.</li>
             <li><b>Pipeline:</b> oferece uma visão resumida da distribuição atual por etapa.</li>
@@ -142,9 +145,9 @@ export default function ManualPage(){
           <h3>Como a fila deve ser interpretada</h3>
           <ul>
             <li>Tarefas atrasadas e próximas ações vencidas recebem atenção antes de contas apenas “promissoras”.</li>
-            <li>Pedidos de proposta, follow-ups, oportunidades qualificadas e contas sem responsável podem ganhar destaque conforme o contexto.</li>
+            <li>Pedidos de proposta, follow-ups, oportunidades qualificadas e contas sem responsável atual podem ganhar destaque conforme o contexto.</li>
             <li>A prioridade manual altera o peso da conta, mas não deve ser usada para esconder um prazo vencido.</li>
-            <li>O botão <b>Assumir</b> aparece em contas disponíveis sem responsável.</li>
+            <li>O botão <b>Assumir</b> aparece em contas disponíveis sem responsável atual.</li>
           </ul>
           <p>A tela mostra inicialmente as contas de maior prioridade. É possível carregar mais em blocos de 30, até o limite operacional de 200 itens nessa visão.</p>
           <h3>Radar Score</h3>
@@ -164,8 +167,9 @@ export default function ManualPage(){
           <h3>Visões salvas</h3>
           <p>Uma visão salva guarda a combinação atual de busca e filtros para reutilização. Ela é pessoal: salvar uma visão não altera a tela dos demais usuários. A página atual da paginação não é preservada.</p>
           <p>Use nomes objetivos, como <b>Infantil · SP</b>, <b>Sem contato · score 80+</b> ou <b>Minha carteira · Alta</b>.</p>
-          <h3>Assumir uma editora</h3>
-          <p>Quando uma conta está sem responsável, um prospectador pode assumi-la. O CRM protege a operação contra duas pessoas assumirem a mesma conta ao mesmo tempo: se outra pessoa chegar primeiro, a lista é atualizada e a apropriação não é duplicada.</p>
+          <h3>Assumir responsabilidade atual</h3>
+          <p>Quando uma conta está sem responsável atual, alguém da prospecção pode assumir a condução do estágio. Na primeira atribuição, essa pessoa também passa a ser registrada como <b>Prospector de origem</b>. Em handoffs posteriores, o responsável atual pode mudar, mas o prospector de origem permanece preservado.</p>
+          <p>O CRM protege a operação contra duas pessoas assumirem a mesma conta ao mesmo tempo: se outra pessoa concluir a ação primeiro, a lista é atualizada e a responsabilidade não é duplicada.</p>
           <p>Supervisores e administradores também podem criar novas editoras manualmente pelo botão <b>Nova editora</b>.</p>
         </Section>
 
@@ -173,7 +177,7 @@ export default function ManualPage(){
           <p>A ficha reúne o contexto completo da conta. A ordem atual foi pensada para leitura comercial rápida:</p>
           <p><b>Visão da conta → Contato rápido → Dados da editora → Radar Score detalhado → Pessoas de contato → Histórico de interações → Oportunidades → Reuniões → Materiais comerciais.</b></p>
           <h3>Visão da conta</h3>
-          <p>Resume responsável, próxima ação, última interação, oportunidade ativa, próxima reunião, etapa e prioridade. É o bloco para responder rapidamente: <b>“qual é a situação desta conta agora?”</b></p>
+          <p>Resume <b>Responsável atual</b>, <b>Prospector de origem</b>, próxima ação, última interação, oportunidade ativa, próxima reunião, etapa e prioridade. É o bloco para responder rapidamente quem originou a relação e quem está com a condução agora.</p>
           <h3>Contato rápido</h3>
           <p>Mostra telefone, e-mail geral, site e localização principal. É um atalho para os dados de contato mais usados.</p>
           <h3>Dados da editora e perfil editorial</h3>
@@ -181,12 +185,12 @@ export default function ManualPage(){
           <h3>Radar Score detalhado</h3>
           <p>O painel é expansível. Use-o quando precisar entender por que a conta recebeu determinada pontuação ou qual produto da Radar aparece com melhor aderência.</p>
           <h3>Acompanhamento</h3>
-          <p>Gestores ou o responsável pela editora podem atualizar etapa, prioridade, responsável, próxima ação e notas. Para prospectadores, contas de outra pessoa ficam em modo de leitura.</p>
+          <p>Gestores ou o <b>Responsável atual</b> podem atualizar etapa, prioridade, responsável atual, próxima ação principal e notas estruturantes. Isso não impede a colaboração: outros usuários com função Prospecção podem registrar ações na mesma ficha conforme o trabalho que realmente realizaram.</p>
           <Callout title="Notas não são histórico">
             <p>Use <b>Notas</b> para contexto duradouro: restrições, preferências, informações relevantes para futuras abordagens. Conversas e tentativas de contato devem ser registradas como <b>Interações</b>.</p>
           </Callout>
-          <h3>Nova ação</h3>
-          <p>O botão <b>Nova ação</b> concentra as ações de criação da ficha. Dependendo das permissões, pode exibir:</p>
+          <h3>Nova ação e trabalho colaborativo</h3>
+          <p>O botão <b>Nova ação</b> concentra as ações de criação da ficha. A editora pertence à operação da Radar, não ao usuário que iniciou o contato. Dependendo das funções comerciais, diferentes pessoas podem registrar o próprio trabalho na mesma conta. O menu pode exibir:</p>
           <ul>
             <li>Registrar interação;</li>
             <li>Criar tarefa;</li>
@@ -270,6 +274,29 @@ export default function ManualPage(){
           <p>Quando houver modelo comercial associado à tarefa, o CRM mostra o texto sugerido e permite copiá-lo.</p>
         </Section>
 
+
+        <Section id="notificacoes" title="Notificações e menções">
+          <p>A página <Link className="text-link" href="/app/notificacoes">Notificações</Link> é a caixa de entrada do trabalho compartilhado. O contador na navegação mostra quantos avisos ainda não foram lidos.</p>
+          <h3>O que gera notificação</h3>
+          <ul>
+            <li>uma <b>@menção</b> em notas da editora, resumo de interação, resultado ou próximo passo de reunião;</li>
+            <li>uma editora transferida para sua <b>responsabilidade atual</b>;</li>
+            <li>uma reunião em que você foi definido como apresentador;</li>
+            <li>reagendamento ou cancelamento de reunião relevante para você;</li>
+            <li>uma tarefa ou follow-up atribuído a você;</li>
+            <li>um material comercial atribuído à sua responsabilidade;</li>
+            <li>lembretes de tarefas e próximas ações que já existiam no CRM.</li>
+          </ul>
+          <h3>Como mencionar alguém</h3>
+          <p>Nos campos compatíveis, digite <b>@</b> e escolha uma pessoa da lista. O nome fica no texto e o CRM cria uma notificação vinculada ao usuário correto. Apenas escrever um nome sem selecioná-lo na lista não cria uma menção estruturada.</p>
+          <h3>Leitura e navegação</h3>
+          <p>É possível alternar entre <b>Não lidas</b> e <b>Todas</b>, abrir a notificação para ir diretamente ao registro relacionado e marcar todos os avisos como lidos. A lista é paginada em blocos de 30.</p>
+          <Callout title="Notificação não é Atividade">
+            <p><b>Notificações</b> mostram o que alguém precisa saber ou fazer. <b>Atividade</b> continua sendo o histórico auditável do que mudou no CRM.</p>
+          </Callout>
+          <p>O envio por e-mail ainda não faz parte desta versão. A central dentro do CRM é a fonte oficial de notificações neste momento.</p>
+        </Section>
+
         <Section id="cadencias" title="Cadências de prospecção">
           <p><Link className="text-link" href="/app/cadencias">Cadências</Link> automatizam a criação de uma sequência de tarefas, não o contato em si. A pessoa continua responsável por executar cada abordagem.</p>
           <h3>Iniciar uma cadência</h3>
@@ -320,9 +347,10 @@ export default function ManualPage(){
           <h3>Google Agenda</h3>
           <p>Se a agenda do apresentador estiver conectada, o CRM tenta <b>criar ou atualizar o evento no Google Agenda</b> depois de salvar a reunião. Se a sincronização falhar ou a agenda não estiver conectada, a reunião continua salva no CRM e uma mensagem informa a situação.</p>
           <p>Ao cancelar uma reunião que já possui evento sincronizado, o CRM também tenta remover o compromisso correspondente do Google Agenda.</p>
-          <h3>Pós-reunião</h3>
-          <p>Depois da apresentação, registre o resultado. O fluxo pode incluir interesse, observações, próximo passo, responsável e data de follow-up. Quando existe retorno programado, o CRM cria a tarefa correspondente para não depender de memória.</p>
-          <p>Também é possível marcar não comparecimento ou cancelamento, sempre registrando o status real da reunião.</p>
+          <h3>Pós-reunião e handoff</h3>
+          <p>Depois da apresentação, registre o resultado, interesse percebido, próximo passo e eventual follow-up. O formulário também permite definir o <b>Responsável pelo próximo estágio</b>. Por padrão, o apresentador é sugerido, mas é possível manter a responsabilidade atual ou escolher outra pessoa ativa da equipe.</p>
+          <p>Quando o responsável atual muda, o <b>Prospector de origem não muda</b>. O histórico continua mostrando quem fez os primeiros contatos. Oportunidades abertas acompanham o novo responsável atual; tarefas já atribuídas continuam com seus responsáveis específicos.</p>
+          <p>Quando existe retorno programado, o CRM cria o follow-up para a pessoa selecionada. Também é possível marcar não comparecimento ou cancelamento, sempre registrando o status real da reunião.</p>
         </Section>
 
         <Section id="materiais" title="Materiais comerciais">
@@ -336,7 +364,8 @@ export default function ManualPage(){
         <Section id="desempenho" title="Desempenho, metas e forecast">
           <p>A página <Link className="text-link" href="/app/desempenho">Desempenho</Link> acompanha resultados individuais e, para gestores, consolida a equipe.</p>
           <ul>
-            <li>Minha carteira;</li>
+            <li><b>Responsabilidade atual:</b> quantas editoras a pessoa conduz neste momento;</li>
+            <li><b>Contas originadas:</b> quantas editoras tiveram a prospecção iniciada por ela, mesmo que depois tenham sido transferidas;</li>
             <li>interações no período;</li>
             <li>editoras diferentes contatadas;</li>
             <li>tarefas concluídas e atrasadas;</li>
@@ -359,7 +388,7 @@ export default function ManualPage(){
             <li><b>Visão geral:</b> pontos de atenção, ritmo comercial, funil, reuniões, cobertura e pipeline financeiro.</li>
             <li><b>Funil e oportunidades:</b> conversão, tempo médio por etapa e valores por estágio.</li>
             <li><b>Cadências e reuniões:</b> desempenho das sequências, canais e resultados de reuniões.</li>
-            <li><b>Equipe:</b> disponível para gestores, com produtividade e carteira por pessoa.</li>
+            <li><b>Equipe:</b> disponível para gestores, separando contas originadas, responsabilidade atual e produtividade por pessoa.</li>
             <li><b>Inteligência Radar:</b> distribuição de score, aderência por produto e leituras da base.</li>
           </ul>
           <h3>Baixar relatório</h3>
@@ -491,7 +520,10 @@ export default function ManualPage(){
           <Faq q="Onde vejo por que uma editora recebeu determinado score?">Abra a ficha e expanda <b>Radar Score detalhado</b> ou use a explicação disponível em Prioridades.</Faq>
           <Faq q="Preciso criar uma oportunidade antes de toda reunião?">Não. Registre oportunidade quando houver negócio concreto. O CRM permite reunião sem oportunidade porque isso também acontece na operação real.</Faq>
           <Faq q="Qual a diferença entre pessoa de contato e interação?">Pessoa de contato é quem trabalha ou representa a editora. Interação é uma conversa, tentativa ou ação que aconteceu com a conta.</Faq>
-          <Faq q="O botão Nova ação mostra tudo para todos?">Não. As opções dependem do nível de acesso, da responsabilidade pela editora e das funções comerciais configuradas.</Faq>
+          <Faq q="O botão Nova ação mostra tudo para todos?">Não. As opções dependem das funções comerciais. Usuários com Prospecção podem colaborar em interações, pessoas de contato, tarefas e oportunidades; reuniões e materiais seguem funções específicas.</Faq>
+          <Faq q="Qual a diferença entre Prospector de origem e Responsável atual?">Prospector de origem é quem iniciou a prospecção e permanece como dado histórico. Responsável atual é quem conduz o próximo estágio da conta e pode mudar durante um handoff.</Faq>
+          <Faq q="O Lucas perde o crédito quando a conta passa para outra pessoa?">Não. A transferência altera a responsabilidade atual, mas preserva o prospector de origem e a autoria de todas as interações registradas.</Faq>
+          <Faq q="Como menciono alguém?">Digite @ em um campo compatível, escolha a pessoa na lista e salve. Ela recebe uma notificação na Central de Notificações.</Faq>
           <Faq q="Um compromisso pessoal do Google fica visível para a equipe?">Não. A consulta externa exibe somente o intervalo como indisponível.</Faq>
           <Faq q="Se o Google Agenda falhar, eu perco a reunião?">Não. O registro interno é preservado. A sincronização externa é uma etapa adicional.</Faq>
           <Faq q="Informei uma data de retorno depois da reunião. Preciso criar outra tarefa?">Quando o fluxo cria o follow-up automaticamente, não é necessário duplicar a tarefa. Confira Minha fila.</Faq>
