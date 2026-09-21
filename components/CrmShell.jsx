@@ -28,7 +28,7 @@ const NAV_GROUPS = [
     ['/app/qualidade', 'Qualidade da base', HeartPulse],
     ['/app/equipe', 'Equipe', Users],
   ]},
-  { label:'Administração', adminOnly:true, items:[
+  { label:'Administração', managerOnly:true, items:[
     ['/app/importar', 'Importar', FileUp],
   ]},
   { label:'Conta e ajuda', items:[
