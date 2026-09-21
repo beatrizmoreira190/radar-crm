@@ -98,3 +98,18 @@ body{background:linear-gradient(180deg,#f8f9fb 0,#f6f7f9 100%);}
 .data-health-loading strong{color:#344054;font-size:14px}
 .data-health-loading span{max-width:560px;font-size:12px;line-height:1.45}
 .data-health-refreshing span{display:flex;align-items:center;gap:7px}
+
+
+/* Second authenticated audit pass */
+.pipeline-toolbar{margin-bottom:14px;align-items:center;flex-wrap:wrap}
+.pipeline-toolbar .search-box{min-width:min(360px,100%);flex:1 1 320px}
+.pipeline-toolbar .filter-select{min-width:170px}
+.pipeline-score-filter{width:118px;flex:0 0 118px}
+.priority-queue-caption{margin:-2px 0 12px;padding:8px 10px;border:1px solid #eaecf0;border-radius:9px;background:#fcfcfd;color:#667085;font-size:10.5px;line-height:1.4}
+.priority-load-more{display:flex;justify-content:center;padding:16px 0 2px}
+.activity-row span{line-height:1.45}
+.activity-row small{text-transform:none}
+@media(max-width:720px){
+  .pipeline-toolbar{display:grid;grid-template-columns:1fr}
+  .pipeline-toolbar .search-box,.pipeline-toolbar .filter-select,.pipeline-score-filter{width:100%;min-width:0;max-width:none;flex:none}
+}
