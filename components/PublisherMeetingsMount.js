@@ -6,7 +6,8 @@ import { AlertCircle, Ban, CalendarClock, CheckCircle2, Clock3, Copy, FileCheck2
 import { useCrm } from '@/components/CrmProvider';
 import { INTEREST_LABELS, MEETING_STATUS_LABELS, MEETING_TYPE_LABELS, formatDate } from '@/lib/constants';
 import { availabilityRuleCheck, normalizeAvailabilityRule, overlapsWithBuffer, ruleSummary } from '@/lib/meetingAvailability';
-import PublisherHelp from '@/components/PublisherHelp';\nimport ModalDialog from '@/components/ModalDialog';
+import PublisherHelp from '@/components/PublisherHelp';
+import ModalDialog from '@/components/ModalDialog';
 
 function localInput(value){
   if(!value)return'';
