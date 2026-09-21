@@ -38,7 +38,8 @@ export default function PublisherRecordOverview({publisher,tasks=[],opportunitie
     if(!a.due_at&&!b.due_at)return 0;if(!a.due_at)return 1;if(!b.due_at)return-1;return new Date(a.due_at)-new Date(b.due_at);
   }),[tasks]);
   const lastInteraction=interactions[0]||null;
-  const ownerName=publisher?.owner_user_id?(teamMap[publisher.owner_user_id]?.full_name||teamMap[publisher.owner_user_id]?.email||'Equipe'):'Sem responsável';
+  const ownerName=publisher?.owner_user_id?(teamMap[publisher.owner_user_id]?.full_name||teamMap[publisher.owner_user_id]?.email||'Equipe'):'Sem responsável atual';
+  const prospectorName=publisher?.prospector_user_id?(teamMap[publisher.prospector_user_id]?.full_name||teamMap[publisher.prospector_user_id]?.email||'Equipe'):'Ainda não identificado';
   const stageName=stageMap[publisher?.stage_id]||'Sem etapa';
 
   if(!publisher)return null;
@@ -51,12 +52,12 @@ export default function PublisherRecordOverview({publisher,tasks=[],opportunitie
         <p>Principais informações para orientar o próximo passo comercial.</p>
       </div>
       <div className="publisher-record-state">
-        <span><Workflow size={13}/>{stageName}<PublisherHelp text="Etapa atual da editora no processo de prospecção."/></span>
+        <span><Workflow size={13}/>{stageName}<PublisherHelp text="Etapa atual da editora no processo comercial."/></span>
         <span>{PRIORITY_LABELS[publisher.priority]||publisher.priority||'Sem prioridade'}<PublisherHelp text="Prioridade geral da conta para organização da rotina comercial."/></span>
       </div>
     </div>
     <div className="publisher-record-overview-grid">
-      <article><div className="publisher-overview-label"><UserRound size={14}/><span>Responsável</span><PublisherHelp text="Pessoa responsável por conduzir a prospecção desta editora."/></div><strong>{ownerName}</strong><small>Quem conduz a conta hoje</small></article>
+      <article><div className="publisher-overview-label"><UserRound size={14}/><span>Responsável atual</span><PublisherHelp text="Pessoa que está com a condução do próximo estágio comercial desta editora."/></div><strong>{ownerName}</strong><small>Quem está com a bola agora</small></article><article><div className="publisher-overview-label"><UserRound size={14}/><span>Prospector de origem</span><PublisherHelp text="Pessoa que iniciou a prospecção desta editora. Esse histórico permanece mesmo depois de um handoff."/></div><strong>{prospectorName}</strong><small>Quem originou o relacionamento comercial</small></article>
       <article><div className="publisher-overview-label"><Clock3 size={14}/><span>Próxima ação</span><PublisherHelp text="Próximo retorno ou movimento comercial previsto para esta editora."/></div><strong>{publisher.next_action_at?formatDate(publisher.next_action_at,true):'Sem retorno agendado'}</strong><small>{openTasks[0]?.title||'Nenhuma pendência imediata'}</small></article>
       <article><div className="publisher-overview-label"><Clock3 size={14}/><span>Último contato</span><PublisherHelp text="Interação comercial mais recente registrada no CRM."/></div><strong>{publisher.last_contact_at?formatDate(publisher.last_contact_at,true):'Ainda não registrado'}</strong><small>{lastInteraction?.summary||'Sem resumo recente'}</small></article>
       <article><div className="publisher-overview-label"><Target size={14}/><span>Oportunidade ativa</span><PublisherHelp text="Negócio em andamento que ainda não foi ganho, perdido ou encerrado."/></div><strong>{activeOpportunity?.title||'Nenhuma ativa'}</strong><small>{activeOpportunity?`${OPPORTUNITY_STAGE_LABELS[activeOpportunity.stage]||activeOpportunity.stage}${activeOpportunity.next_step?` · ${activeOpportunity.next_step}`:''}`:'Sem negócio aberto no momento'}</small></article>

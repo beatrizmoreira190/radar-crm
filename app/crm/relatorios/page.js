@@ -11,7 +11,7 @@ const PIPELINE_TYPE_LABELS={open:'Em aberto',won:'Cliente',nurture:'Nutrição',
 const EXPORT_OPTIONS=[
   {key:'complete',label:'Completo — gestão + base'},
   {key:'executive',label:'Executivo — visão gerencial'},
-  {key:'commercial',label:'Comercial — prospecção e carteira'},
+  {key:'commercial',label:'Comercial — prospecção e responsabilidade'},
   {key:'pipeline',label:'Pipeline e oportunidades'},
   {key:'team',label:'Equipe e produtividade',managerOnly:true},
   {key:'cadences',label:'Cadências e abordagens'},
@@ -32,17 +32,18 @@ const REPORT_SHEET_KEYS={
 export default function ReportsPage(){
   const {supabase,membership,teamMap,activityVersion,isManager,user}=useCrm();
   const org=membership?.organization_id;
-  const [summary,setSummary]=useState(null); const [analytics,setAnalytics]=useState(null); const [days,setDays]=useState(30); const [loading,setLoading]=useState(true); const [exporting,setExporting]=useState(false); const [notice,setNotice]=useState(''); const [view,setView]=useState('overview'); const [exportType,setExportType]=useState('complete');
+  const [summary,setSummary]=useState(null); const [analytics,setAnalytics]=useState(null); const [originMetrics,setOriginMetrics]=useState(null); const [days,setDays]=useState(30); const [loading,setLoading]=useState(true); const [exporting,setExporting]=useState(false); const [notice,setNotice]=useState(''); const [view,setView]=useState('overview'); const [exportType,setExportType]=useState('complete');
 
   async function load(){
     if(!org)return;
     setLoading(true);setNotice('');
-    const [{data:summaryData,error:summaryError},{data:analyticsData,error:analyticsError}]=await Promise.all([
+    const [{data:summaryData,error:summaryError},{data:analyticsData,error:analyticsError},{data:originData,error:originError}]=await Promise.all([
       supabase.rpc('crm_report_summary',{p_organization_id:org,p_days:days}),
-      supabase.rpc('crm_report_dashboard',{p_organization_id:org,p_days:days})
+      supabase.rpc('crm_report_dashboard',{p_organization_id:org,p_days:days}),
+      supabase.rpc('crm_origin_metrics',{p_organization_id:org})
     ]);
-    if(summaryError||analyticsError)setNotice(summaryError?.message||analyticsError?.message||'Não foi possível calcular os relatórios.');
-    setSummary(summaryData||null);setAnalytics(analyticsData||null);setLoading(false);
+    if(summaryError||analyticsError||originError)setNotice(summaryError?.message||analyticsError?.message||originError?.message||'Não foi possível calcular os relatórios.');
+    setSummary(summaryData||null);setAnalytics(analyticsData||null);setOriginMetrics(originData||null);setLoading(false);
   }
   useEffect(()=>{load()},[org,days,activityVersion]);
 
@@ -56,7 +57,8 @@ export default function ReportsPage(){
   const current=analytics?.current||{}; const previous=analytics?.previous||{};
   const activitySeries=analytics?.activity_series||[]; const funnel=analytics?.funnel||[]; const stageAging=analytics?.stage_aging||[];
   const scoreDistribution=analytics?.score_distribution||[]; const productFit=analytics?.product_fit||[]; const cadencePerformance=analytics?.cadences?.performance||[]; const cadenceChannels=analytics?.cadences?.channels||[];
-  const meetingAnalytics=analytics?.meetings||{}; const financial=analytics?.financial||{}; const teamPerformance=analytics?.team||[]; const geography=analytics?.geography||[];
+  const meetingAnalytics=analytics?.meetings||{}; const financial=analytics?.financial||{}; const geography=analytics?.geography||[];
+  const teamPerformance=useMemo(()=>{const map=Object.fromEntries((originMetrics?.team||[]).map(item=>[item.user_id,item]));return (analytics?.team||[]).map(row=>({...row,originated_publishers:map[row.user_id]?.originated_publishers||0,current_responsibility:map[row.user_id]?.current_responsibility??row.portfolio??0}))},[analytics,originMetrics]);
   const insights=useMemo(()=>buildActionableInsights(summary,analytics,personal),[summary,analytics,personal]);
   const exportOptions=EXPORT_OPTIONS.filter(option=>!option.managerOnly||isManager);
 
@@ -74,7 +76,7 @@ export default function ReportsPage(){
 
   async function fetchAllPublishers(){
     return fetchPaged(()=>{
-      let query=supabase.from('publishers').select('id,name,trade_name,cnpj,city,state,priority,score,radar_fit_score,commercial_potential_score,data_quality_score,best_product,fit_pnld_literario,fit_pnld_didatico,fit_pnld_tecnico_metodologico,fit_radar_licitacoes,fit_radar_oportunidades,stage_id,owner_user_id,last_contact_at,next_action_at,commercial_temperature,general_email,phone,website').eq('organization_id',org).eq('archived',false);
+      let query=supabase.from('publishers').select('id,name,trade_name,cnpj,city,state,priority,score,radar_fit_score,commercial_potential_score,data_quality_score,best_product,fit_pnld_literario,fit_pnld_didatico,fit_pnld_tecnico_metodologico,fit_radar_licitacoes,fit_radar_oportunidades,stage_id,owner_user_id,prospector_user_id,last_contact_at,next_action_at,commercial_temperature,general_email,phone,website').eq('organization_id',org).eq('archived',false);
       if(!isManager)query=query.eq('owner_user_id',user?.id);
       return query.order('name');
     });
@@ -181,7 +183,7 @@ export default function ReportsPage(){
       };
       mergeExecutive(personal?'RADAR — Relatório pessoal':'RADAR — Relatório gerencial',S.title);
       executiveRows.push([xcell('Tipo de relatório',S.meta),reportLabel,xcell('Período',S.meta),'Últimos '+days+' dias']);
-      executiveRows.push([xcell('Gerado em',S.meta),dt(generatedAt),xcell('Escopo',S.meta),personal?'Minha carteira':'Operação comercial']);
+      executiveRows.push([xcell('Gerado em',S.meta),dt(generatedAt),xcell('Escopo',S.meta),personal?'Responsabilidade atual':'Operação comercial']);
       executiveRows.push([]);
       mergeExecutive('INDICADORES');
       executiveRows.push(header(['Indicador','Período atual','Período anterior','Variação']));
@@ -197,7 +199,7 @@ export default function ReportsPage(){
         const cur=Number(current[key]||0),prev=Number(previous[key]||0);
         executiveRows.push([label,int(cur),int(prev),deltaText(cur,prev)]);
       });
-      executiveRows.push(['Cobertura da carteira',percent(total?contacted/total:0),'','']);
+      executiveRows.push(['Cobertura da responsabilidade atual',percent(total?contacted/total:0),'','']);
       executiveRows.push(['Pipeline bruto',money(financial.gross_open||0),'','']);
       executiveRows.push(['Pipeline ponderado',money(financial.weighted_open||0),'','']);
       executiveRows.push(['Tarefas atrasadas',int(overdue),'','']);
@@ -260,8 +262,8 @@ export default function ReportsPage(){
       financeRows.unshift(['TOTAL',int((financial.by_stage||[]).reduce((a,row)=>a+Number(row.count||0),0)),money(financial.gross_open||0),money(financial.weighted_open||0)]);
 
       const teamRows=(teamPerformance||[]).map(row=>[
-        row.full_name||row.email||'Equipe',row.email||'',int(row.portfolio),int(row.contacted),
-        percent(Number(row.portfolio)?Number(row.contacted)/Number(row.portfolio):0),
+        row.full_name||row.email||'Equipe',row.email||'',int(row.originated_publishers),int(row.current_responsibility),
+        int(row.contacted),percent(Number(row.current_responsibility)?Number(row.contacted)/Number(row.current_responsibility):0),
         int(row.interactions),int(row.meetings),int(row.opportunities),int(row.overdue)
       ]);
 
@@ -279,12 +281,12 @@ export default function ReportsPage(){
         percent(Number(row.base_count)?Number(row.contacted)/Number(row.base_count):0),int(row.interactions)
       ]);
 
-      const publisherHeaders=['Editora','Nome fantasia','CNPJ','Cidade','UF','Etapa','Prioridade','Temperatura','Radar Score','Aderência Radar','Potencial comercial','Qualidade dos dados','Melhor produto','PNLD Literário','PNLD Didático','PNLD Técnico-Metodológico','Radar de Licitações','Radar de Oportunidades','Responsável','Último contato','Próxima ação','E-mail','Telefone','Site'];
+      const publisherHeaders=['Editora','Nome fantasia','CNPJ','Cidade','UF','Etapa','Prioridade','Temperatura','Radar Score','Aderência Radar','Potencial comercial','Qualidade dos dados','Melhor produto','PNLD Literário','PNLD Didático','PNLD Técnico-Metodológico','Radar de Licitações','Radar de Oportunidades','Responsável atual','Prospector de origem','Último contato','Próxima ação','E-mail','Telefone','Site'];
       const publisherData=publishers.map(p=>[
         p.name||'',p.trade_name||'',p.cnpj||'',p.city||'',p.state||'',stageMap[p.stage_id]||'Sem etapa',
         PRIORITY_LABELS[p.priority]||p.priority||'',p.commercial_temperature||'',int(p.score),int(p.radar_fit_score),int(p.commercial_potential_score),int(p.data_quality_score),
         RADAR_PRODUCT_LABELS[p.best_product]||'',int(p.fit_pnld_literario),int(p.fit_pnld_didatico),int(p.fit_pnld_tecnico_metodologico),int(p.fit_radar_licitacoes),int(p.fit_radar_oportunidades),
-        teamMap[p.owner_user_id]?.full_name||teamMap[p.owner_user_id]?.email||'',dt(p.last_contact_at),dt(p.next_action_at),p.general_email||'',p.phone||'',p.website||''
+        teamMap[p.owner_user_id]?.full_name||teamMap[p.owner_user_id]?.email||'',teamMap[p.prospector_user_id]?.full_name||teamMap[p.prospector_user_id]?.email||'',dt(p.last_contact_at),dt(p.next_action_at),p.general_email||'',p.phone||'',p.website||''
       ]);
 
       const interactionHeaders=['Data/hora','Editora','Responsável','Contato','Canal','Direção','Resultado','Assunto','Resumo','Resposta / retorno','Interesse','Sinal de oportunidade','Próximo passo','Próxima ação','Duração (min)','Prioridade'];
@@ -338,11 +340,11 @@ export default function ReportsPage(){
         channels:makeTable('Abordagens','Resultados dos canais utilizados nas tarefas de cadência.',['Canal','Tentativas','Resultados positivos','Taxa positiva'],channelRows,[22,14,20,16]),
         meetings:makeTable('Reuniões','Resumo das reuniões no período selecionado.',['Indicador','Valor'],meetingRows,[48,18]),
         financial:makeTable('Pipeline financeiro','Valor bruto e ponderado das oportunidades em aberto.',['Etapa','Oportunidades','Valor bruto','Valor ponderado'],financeRows,[24,16,20,20]),
-        team:makeTable('Equipe','Cobertura de carteira e produtividade comercial por responsável.',['Responsável','E-mail','Carteira','Contatadas','Cobertura','Interações','Reuniões','Oportunidades','Tarefas atrasadas'],teamRows,[28,30,12,12,14,14,12,16,18]),
+        team:makeTable('Equipe','Origem de contas, responsabilidade atual e produtividade comercial.',['Pessoa','E-mail','Originadas','Responsabilidade atual','Contatadas','Cobertura atual','Interações','Reuniões','Oportunidades','Tarefas atrasadas'],teamRows,[28,30,12,18,12,14,14,12,16,18]),
         score:makeTable('Radar Score','Distribuição da base por faixa de Radar Score e alertas de alta prioridade.',['Faixa / alerta','Editoras'],scoreRows,[34,16]),
         products:makeTable('Aderência por produto','Editoras com aderência alta (≥70) em cada produto Radar.',['Produto','Alta aderência','Ainda sem contato','% sem contato'],productRows,[34,18,18,16]),
         geography:makeTable('Geografia','Cobertura e atividade comercial por estado.',['UF','Base','Contatadas','Cobertura','Interações no período'],geoRows,[10,14,14,14,20]),
-        publishers:makeTable('Editoras',personal?'Base atual da carteira do usuário.':'Base ativa da operação.',publisherHeaders,publisherData,[30,26,18,22,8,24,14,14,12,15,18,17,25,14,14,22,18,20,24,20,20,28,18,32]),
+        publishers:makeTable('Editoras',personal?'Editoras sob responsabilidade atual do usuário.':'Base ativa da operação.',publisherHeaders,publisherData,[30,26,18,22,8,24,14,14,12,15,18,17,25,14,14,22,18,20,24,24,20,20,28,18,32]),
         interactions:makeTable('Interações','Contatos registrados nos últimos '+days+' dias.',interactionHeaders,interactionData,[19,28,24,22,14,12,22,28,42,42,14,20,40,19,14,14]),
         opportunities:makeTable('Oportunidades','Negociações registradas no CRM.',opportunityHeaders,opportunityData,[28,30,24,18,18,14,24,18,19,38,32,19,19]),
         tasks:makeTable('Tarefas','Tarefas abertas e tarefas concluídas nos últimos '+days+' dias.',taskHeaders,taskData,[28,38,16,16,14,24,19,19,22,36,20,19,42]),
@@ -362,7 +364,7 @@ export default function ReportsPage(){
 
   return <div className="page-wrap reports-v2">
     <div className="page-head">
-      <div><div className="eyebrow">Inteligência comercial</div><h1>Relatórios</h1><p>{personal?'Acompanhe sua carteira, ritmo comercial e próximos pontos de atenção.':'Acompanhe desempenho, conversão, cobertura e oportunidades da operação em um só lugar.'}</p></div>
+      <div><div className="eyebrow">Inteligência comercial</div><h1>Relatórios</h1><p>{personal?'Acompanhe sua responsabilidade atual, ritmo comercial e próximos pontos de atenção.':'Acompanhe desempenho, conversão, cobertura e oportunidades da operação em um só lugar.'}</p></div>
       <div className="report-actions">
         <select className="filter-select" value={days} onChange={e=>setDays(Number(e.target.value))}><option value={30}>Últimos 30 dias</option><option value={60}>Últimos 60 dias</option><option value={90}>Últimos 90 dias</option></select>
         <select className="filter-select report-export-select" value={exportType} onChange={e=>setExportType(e.target.value)}>{exportOptions.map(option=><option key={option.key} value={option.key}>{option.label}</option>)}</select>
@@ -448,7 +450,7 @@ export default function ReportsPage(){
       </>}
 
       {view==='team'&&isManager&&<>
-        <section className="card panel"><div className="panel-head"><div><h2>Cobertura e produtividade da equipe</h2><p>Carteira, contatos, reuniões, oportunidades e pendências por responsável.</p></div><Users size={20}/></div><TeamTable data={teamPerformance}/></section>
+        <section className="card panel"><div className="panel-head"><div><h2>Cobertura e produtividade da equipe</h2><p>Origem das contas, responsabilidade atual, contatos, reuniões, oportunidades e pendências.</p></div><Users size={20}/></div><TeamTable data={teamPerformance}/></section>
         <section className="card panel"><div className="panel-head"><div><h2>Atividade por estado</h2><p>Onde a base está concentrada e onde o esforço comercial está acontecendo.</p></div><MapPin size={20}/></div><GeographyTable data={geography}/></section>
       </>}
 
@@ -553,7 +555,7 @@ function CadenceTable({data}){
 }
 function TeamTable({data}){
   if(!data?.length)return <p className="muted">Ainda não há atividade suficiente da equipe.</p>;
-  return <div className="report-table-wrap"><table className="report-table"><thead><tr><th>Responsável</th><th>Carteira</th><th>Cobertura</th><th>Interações</th><th>Reuniões</th><th>Oportunidades</th><th>Atrasadas</th></tr></thead><tbody>{data.map(row=><tr key={row.user_id}><td><strong>{row.full_name||row.email||'Equipe'}</strong></td><td>{Number(row.portfolio||0).toLocaleString('pt-BR')}</td><td>{Number(row.portfolio)?Math.round(Number(row.contacted||0)/Number(row.portfolio)*100):0}%</td><td>{Number(row.interactions||0)}</td><td>{Number(row.meetings||0)}</td><td>{Number(row.opportunities||0)}</td><td>{Number(row.overdue||0)}</td></tr>)}</tbody></table></div>
+  return <div className="report-table-wrap"><table className="report-table"><thead><tr><th>Pessoa</th><th>Originadas</th><th>Responsabilidade atual</th><th>Cobertura atual</th><th>Interações</th><th>Reuniões</th><th>Oportunidades</th><th>Atrasadas</th></tr></thead><tbody>{data.map(row=><tr key={row.user_id}><td><strong>{row.full_name||row.email||'Equipe'}</strong></td><td>{Number(row.originated_publishers||0).toLocaleString('pt-BR')}</td><td>{Number(row.current_responsibility||0).toLocaleString('pt-BR')}</td><td>{Number(row.current_responsibility)?Math.round(Number(row.contacted||0)/Number(row.current_responsibility)*100):0}%</td><td>{Number(row.interactions||0)}</td><td>{Number(row.meetings||0)}</td><td>{Number(row.opportunities||0)}</td><td>{Number(row.overdue||0)}</td></tr>)}</tbody></table></div>
 }
 function ProductFitTable({data}){
   if(!data?.length)return <p className="muted">Aderência ainda não calculada.</p>;
@@ -637,8 +639,8 @@ async function buildExcelDashboard({personal,days,current,previous,total,contact
 
   if((teamPerformance||[]).length){
     await pushImage({
-      title:'Cobertura da equipe',width:520,height:235,
-      blob:horizontalBarChartPng('Cobertura da equipe','Percentual da carteira já contatada',(teamPerformance||[]).slice(0,8).map(r=>({
+      title:'Cobertura da responsabilidade atual',width:520,height:235,
+      blob:horizontalBarChartPng('Cobertura da responsabilidade atual','Percentual das editoras sob responsabilidade atual já contatadas',(teamPerformance||[]).slice(0,8).map(r=>({
         label:r.full_name||r.email||'Equipe',value:Number(r.portfolio)?Math.round(Number(r.contacted||0)/Number(r.portfolio)*100):0
       })),{suffix:'%'})
     },71,1);

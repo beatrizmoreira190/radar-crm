@@ -158,13 +158,13 @@ export default function PipelinePage(){
   }
 
   return <div className="page-wrap">
-    <div className="page-head"><div><div className="eyebrow">Funil comercial</div><h1>Pipeline</h1><p>{isManager?'Acompanhe a distribuição da equipe e mova as editoras conforme a prospecção avança.':'Acompanhe as editoras da sua carteira e mova cada conta conforme a prospecção avança.'}</p></div></div>
+    <div className="page-head"><div><div className="eyebrow">Funil comercial</div><h1>Pipeline</h1><p>{isManager?'Acompanhe a distribuição da equipe e mova as editoras conforme a prospecção avança.':'Acompanhe as editoras sob sua responsabilidade atual e mova cada conta conforme o processo comercial avança.'}</p></div></div>
     {notice&&<div className="notice-bar"><span>{notice}</span><button aria-label="Fechar aviso" onClick={()=>setNotice('')}><X size={15}/></button></div>}
     {moveToast&&<div className="notice-bar pipeline-undo-toast" role="status"><span><strong>{moveToast.publisherName}</strong> movida para <strong>{moveToast.destination}</strong>.</span><div className="pipeline-undo-actions"><button type="button" disabled={Boolean(movingId)} onClick={undoMove}><Undo2 size={14}/> Desfazer</button><button type="button" aria-label="Fechar confirmação" disabled={Boolean(movingId)} onClick={()=>setMoveToast(null)}><X size={15}/></button></div></div>}
 
     <div className="toolbar pipeline-toolbar">
       <div className="search-box"><Search size={17}/><input className="input" value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar editora ou CNPJ…"/></div>
-      {isManager&&<select className="filter-select" value={owner} onChange={e=>setOwner(e.target.value)}><option value="">Todos os responsáveis</option><option value="unassigned">Sem responsável</option>{team.filter(member=>member.active).map(member=><option key={member.user_id} value={member.user_id}>{member.full_name||member.email}</option>)}</select>}
+      {isManager&&<select className="filter-select" value={owner} onChange={e=>setOwner(e.target.value)}><option value="">Todos os responsáveis atuais</option><option value="unassigned">Sem responsável atual</option>{team.filter(member=>member.active).map(member=><option key={member.user_id} value={member.user_id}>{member.full_name||member.email}</option>)}</select>}
       <select className="filter-select" value={priority} onChange={e=>setPriority(e.target.value)}><option value="">Todas as prioridades</option>{Object.entries(PRIORITY_LABELS).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select>
       <input className="input pipeline-score-filter" type="number" min="0" max="100" value={scoreMin} onChange={e=>setScoreMin(e.target.value)} placeholder="Score mín." aria-label="Radar Score mínimo"/>
       {hasFilters&&<button className="btn secondary" type="button" onClick={clearFilters}>Limpar filtros</button>}
@@ -177,7 +177,7 @@ export default function PipelinePage(){
         <Link href={`/app/editoras/${p.id}`} className="pipeline-list-main"><strong>{p.name}</strong><span>{[p.city,p.state].filter(Boolean).join(' / ')||'Sem localização'}</span></Link>
         <div className="pipeline-list-meta"><span className={`badge ${p.priority==='high'||p.priority==='urgent'?'red':p.priority==='medium'?'amber':''}`}>{PRIORITY_LABELS[p.priority]||p.priority}</span><span className="score-pill">{p.score??0}</span></div>
         <label>Mover para<select disabled={movingId===p.id} value={p.stage_id||''} onChange={e=>move(p,e.target.value)}><option value="">Sem etapa</option>{stages.map(st=><option value={st.id} key={st.id}>{st.name}</option>)}</select></label>
-      </article>)}</div>:(!isManager&&(counts?.all||0)===0?<div className="empty-state"><Target/><strong>Sua carteira ainda está vazia.</strong><p>Assuma editoras para começar a acompanhar o funil e organizar sua prospecção.</p><Link href="/app/editoras" className="btn small" style={{marginTop:10}}>Ver editoras disponíveis</Link></div>:<div className="empty-state"><Target/><strong>Nenhuma editora nesta visualização.</strong><p>{hasFilters?'Tente remover alguns filtros ou buscar outro termo.':'Selecione outro status ou mova uma editora para cá.'}</p></div>)}
+      </article>)}</div>:(!isManager&&(counts?.all||0)===0?<div className="empty-state"><Target/><strong>Você ainda não tem editoras sob sua responsabilidade atual.</strong><p>Assuma uma editora quando você for conduzir o próximo estágio comercial.</p><Link href="/app/editoras" className="btn small" style={{marginTop:10}}>Ver editoras disponíveis</Link></div>:<div className="empty-state"><Target/><strong>Nenhuma editora nesta visualização.</strong><p>{hasFilters?'Tente remover alguns filtros ou buscar outro termo.':'Selecione outro status ou mova uma editora para cá.'}</p></div>)}
       {selectedCount!=null&&selectedCount>PAGE_SIZE&&<Pagination page={page} totalPages={totalPages} onChange={setPage}/>}
     </section>
   </div>;
