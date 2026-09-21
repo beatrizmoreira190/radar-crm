@@ -71,7 +71,7 @@ function localCheck(rows){
   const errors=[];const warnings=[];const seenSource=new Map();const seenCnpj=new Map();const nameUf=new Map();
   for(const row of rows){
     const rowNo=row._row;const name=String(row.name||'').trim();const cnpj=cleanCnpj(row.cnpj);const sourceRef=String(row.source_ref||'').trim();const state=String(row.state||'').trim().toUpperCase();const hasStrong=Boolean(sourceRef||cnpj);
-    if(!name)errors.push({row:rowNo,name:'',status:'error',error:'Nome da editora é obrigatório.'});
+    if(!name)errors.push({row:rowNo,name:'',status:'error',error:'Nome da editora é obrigatório.'});else if(isSuspiciousPublisherName(name))errors.push({row:rowNo,name,status:'error',error:'Nome da editora contém trecho técnico/HTML e precisa ser revisado antes da importação.'});
     if(row.cnpj&&cnpj.length!==14)errors.push({row:rowNo,name,status:'error',error:'CNPJ deve conter 14 dígitos.'});
     if(state&&isBrazil(row.country)&&!BRAZIL_STATES.includes(state))errors.push({row:rowNo,name,status:'error',error:`UF inválida: ${state}.`});
     if(sourceRef){if(seenSource.has(sourceRef))errors.push({row:rowNo,name,status:'error',error:`Referência de origem repetida no arquivo (também na linha ${seenSource.get(sourceRef)}).`});else seenSource.set(sourceRef,rowNo)}
