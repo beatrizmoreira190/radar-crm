@@ -71,6 +71,11 @@ export default function PublisherMeetingsMount(){
   },[canSchedule,presenters.length,id]);
 
   function openNew(){if(!presenters.length){setNotice('Nenhum usuário está configurado com a função Apresentação comercial. Defina essa função na área Equipe antes de agendar.');return}setPrefill(null);setEditing(null);setShowModal(true)}
+  useEffect(()=>{
+    function onPublisherAction(event){if(event.detail?.type==='meeting'&&canSchedule)openNew()}
+    window.addEventListener('radar:publisher-action',onPublisherAction);
+    return()=>window.removeEventListener('radar:publisher-action',onPublisherAction);
+  },[canSchedule,presenters.length]);
   function openEdit(meeting){setPrefill(null);setEditing(meeting);setShowModal(true)}
   function close(){setShowModal(false);setEditing(null);setPrefill(null)}
   async function syncMeetingCalendar(meetingId){
@@ -117,7 +122,7 @@ export default function PublisherMeetingsMount(){
 
   return <>
     <section className="card panel publisher-meetings-card">
-      <div className="section-title"><div><div className="help-heading"><h2>Reuniões</h2><PublisherHelp text="Reuniões comerciais vinculadas à editora, incluindo preparação, participantes, resultado e próximos passos."/></div><p className="muted">Apresentações, preparação, resultado e próximos passos desta editora.</p></div>{canSchedule&&<button className="btn small" type="button" onClick={openNew}><Plus size={14}/> Agendar reunião</button>}</div>
+      <div className="section-title"><div><div className="help-heading"><h2>Reuniões</h2><PublisherHelp text="Reuniões comerciais vinculadas à editora, incluindo preparação, participantes, resultado e próximos passos."/></div><p className="muted">Apresentações, preparação, resultado e próximos passos desta editora.</p></div></div>
       {notice&&<div className="notice-bar" style={{marginBottom:12}}><span>{notice}</span><button type="button" onClick={()=>setNotice('')}><X size={14}/></button></div>}
       {loading?<div className="table-empty">Carregando reuniões…</div>:ordered.length?<div className="meeting-list">{ordered.map(meeting=>{
         const external=participantMap[meeting.id]||[];const presenter=personLabel(teamMap[meeting.presenter_user_id]);const scheduler=personLabel(teamMap[meeting.scheduled_by]);
