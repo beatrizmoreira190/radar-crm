@@ -51,8 +51,10 @@ export default function ProfilePage(){
     const {data}=supabase.storage.from('crm-avatars').getPublicUrl(path);setAvatar(data.publicUrl);setBusy(false);
   }
   async function save(){
+    const displayName=name.trim();
+    if(!displayName){setNotice('Informe seu nome antes de salvar o perfil.');return}
     setBusy(true);setNotice('');
-    const {error}=await supabase.from('org_members').update({full_name:name,job_title:job||null,avatar_url:avatar||null,updated_at:new Date().toISOString()}).eq('organization_id',membership.organization_id).eq('user_id',user.id);
+    const {error}=await supabase.from('org_members').update({full_name:displayName,job_title:job.trim()||null,avatar_url:avatar||null,updated_at:new Date().toISOString()}).eq('organization_id',membership.organization_id).eq('user_id',user.id);
     if(error)setNotice(error.message);else{setNotice('Perfil atualizado.');await refreshTeam();await refresh()}
     setBusy(false);
   }
@@ -102,7 +104,7 @@ export default function ProfilePage(){
     <section className="card profile-card">
       <div className="profile-avatar-area"><Avatar member={{...membership,full_name:name,avatar_url:avatar}} size={104}/><label className="avatar-upload"><Camera size={16}/> Alterar foto<input type="file" accept="image/png,image/jpeg,image/webp" onChange={upload}/></label></div>
       <div className="profile-fields">
-        <label>Nome completo<input className="input" value={name} onChange={e=>setName(e.target.value)}/></label>
+        <label>Nome completo<input className="input" required value={name} onChange={e=>setName(e.target.value)} placeholder="Nome e sobrenome"/></label>
         <label>Cargo / função<input className="input" value={job} onChange={e=>setJob(e.target.value)} placeholder="Ex.: Prospecção comercial"/></label>
         <label>E-mail<input className="input" disabled value={user?.email||membership?.email||''}/></label>
         <label>Nível de acesso<input className="input" disabled value={ROLE_LABELS[membership?.role]||membership?.role}/></label>

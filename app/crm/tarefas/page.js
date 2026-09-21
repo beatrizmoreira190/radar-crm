@@ -6,6 +6,7 @@ import { useCrm } from '@/components/CrmProvider';
 import { PRIORITY_LABELS, RESULT_LABELS, TASK_TYPE_LABELS, formatDate } from '@/lib/constants';
 import Pagination from '@/components/Pagination';
 import ModalDialog from '@/components/ModalDialog';
+import { PtBrDateTimeField } from '@/components/PtBrDateFields';
 
 const AUTOMATION_LABELS={meeting_preparation:'Preparação automática',meeting_outcome:'Resultado automático',meeting_follow_up:'Follow-up automático'};
 const CADENCE_RESULTS=['no_answer','left_message','connected','replied','asked_email','meeting_scheduled','callback_scheduled','busy','follow_up','proposal_requested','qualified','not_interested','wrong_contact','contact_updated','other'];
@@ -171,7 +172,7 @@ function NewTask({supabase,org,user,onClose,onSaved}){
       </div>
       <label>Tipo<select value={f.task_type} onChange={e=>setF(x=>({...x,task_type:e.target.value}))}>{Object.entries(TASK_TYPE_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
       <label>Prioridade<select value={f.priority} onChange={e=>setF(x=>({...x,priority:e.target.value}))}>{Object.entries(PRIORITY_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
-      <label className="span-2">Prazo<input type="datetime-local" className="input" value={f.due_at} onChange={e=>setF(x=>({...x,due_at:e.target.value}))}/></label>
+      <label className="span-2">Prazo<PtBrDateTimeField value={f.due_at} onChange={value=>setF(x=>({...x,due_at:value}))} ariaLabel="Prazo"/></label>
       <label className="span-2">Descrição<textarea rows={3} value={f.description} onChange={e=>setF(x=>({...x,description:e.target.value}))}/></label>
     </div>
     <div className="modal-actions"><button type="button" className="btn secondary" disabled={busy} onClick={onClose}>Cancelar</button><button className="btn" disabled={busy}>{busy?'Salvando…':'Salvar tarefa'}</button></div>
@@ -214,7 +215,7 @@ function CadenceResultModal({supabase,org,task,onClose,onSaved}){
     <div className="form-grid">
       <label className="span-2">O que aconteceu?<select value={result} onChange={e=>setResult(e.target.value)}>{CADENCE_RESULTS.map(key=><option key={key} value={key}>{RESULT_LABELS[key]||key}</option>)}</select></label>
       <div className="span-2" style={{padding:'9px 10px',borderRadius:8,background:'#f8fafc',border:'1px solid #e4e7ec',fontSize:11,color:'#475467',lineHeight:1.45}}>{reaction}</div>
-      {needsDate&&<label className="span-2">Retomar em<input required type="datetime-local" className="input" value={resumeAt} onChange={e=>setResumeAt(e.target.value)}/></label>}
+      {needsDate&&<label className="span-2">Retomar em<PtBrDateTimeField required value={resumeAt} onChange={setResumeAt} ariaLabel="Retomar em"/></label>}
       <label className="span-2">Observação<textarea rows={3} value={note} onChange={e=>setNote(e.target.value)} placeholder="Contexto útil para o próximo contato (opcional)"/></label>
     </div>
     <div className="modal-actions"><button className="btn secondary" type="button" disabled={busy} onClick={onClose}>Cancelar</button><button className="btn" disabled={busy}>{busy?'Atualizando…':'Concluir tarefa'}</button></div>
