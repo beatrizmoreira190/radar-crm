@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { CalendarClock, ExternalLink, FileText, Pencil, Plus, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 import { MATERIAL_STATUS_LABELS, MATERIAL_TYPE_LABELS, formatDate } from '@/lib/constants';
-import PublisherHelp from '@/components/PublisherHelp';
+import PublisherHelp from '@/components/PublisherHelp';\nimport ModalDialog from '@/components/ModalDialog';
 
 function linkHost(value=''){
   try{return new URL(value).hostname.replace(/^www\./,'')}catch{return 'Link externo'}
@@ -133,7 +133,7 @@ function MaterialModal({supabase,org,publisherId,user,team,meetings,material,onC
     if(result.error)setError(result.error.message);else onSaved(editing?'updated':'created');
   }
 
-  return <div className="modal-backdrop"><form className="modal" onSubmit={save}><div className="modal-head"><div><h3>{editing?'Editar material comercial':'Adicionar material comercial'}</h3><p>O CRM salva apenas o link; o arquivo continua no Drive, Canva, Gamma, Notion ou outra plataforma.</p></div><button type="button" onClick={onClose}><X/></button></div>{error&&<div className="notice error">{error}</div>}<div className="form-grid">
+  return <ModalDialog title={editing?'Editar material comercial':'Adicionar material comercial'} description="O CRM salva apenas o link; o arquivo continua no Drive, Canva, Gamma, Notion ou outra plataforma." onClose={onClose} onSubmit={save} busy={busy}>{error&&<div className="notice error" role="alert">{error}</div>}<div className="form-grid">
     <label className="span-2">Título<input required className="input" value={form.title} onChange={e=>setForm(x=>({...x,title:e.target.value}))} placeholder="Ex.: Projeto de leitura para a Editora X"/></label>
     <label>Tipo<select value={form.material_type} onChange={e=>setForm(x=>({...x,material_type:e.target.value}))}>{Object.entries(MATERIAL_TYPE_LABELS).map(([key,label])=><option value={key} key={key}>{label}</option>)}</select></label>
     <label>Status<select value={form.status} onChange={e=>setForm(x=>({...x,status:e.target.value}))}>{Object.entries(MATERIAL_STATUS_LABELS).map(([key,label])=><option value={key} key={key}>{label}</option>)}</select></label>
@@ -141,5 +141,5 @@ function MaterialModal({supabase,org,publisherId,user,team,meetings,material,onC
     <label>Responsável<select value={form.responsible_user_id} onChange={e=>setForm(x=>({...x,responsible_user_id:e.target.value}))}>{team.map(member=><option value={member.user_id} key={member.user_id}>{member.full_name||member.email||'Equipe'}</option>)}</select></label>
     <label>Reunião relacionada<select value={form.meeting_id} onChange={e=>setForm(x=>({...x,meeting_id:e.target.value}))}><option value="">Sem reunião vinculada</option>{meetings.map(m=><option value={m.id} key={m.id}>{formatDate(m.scheduled_start,true)} · {m.title}</option>)}</select></label>
     <label className="span-2">Observação<textarea rows={3} value={form.description} onChange={e=>setForm(x=>({...x,description:e.target.value}))} placeholder="Contexto ou orientação para uso deste material"/></label>
-  </div><div className="modal-actions"><button className="btn secondary" type="button" onClick={onClose}>Cancelar</button><button className="btn" disabled={busy}>{busy?'Salvando…':editing?'Salvar alterações':'Adicionar material'}</button></div></form></div>;
+  </div><div className="modal-actions"><button className="btn secondary" type="button" disabled={busy} onClick={onClose}>Cancelar</button><button className="btn" disabled={busy}>{busy?'Salvando…':editing?'Salvar alterações':'Adicionar material'}</button></div></ModalDialog>;
 }
