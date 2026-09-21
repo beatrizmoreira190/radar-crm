@@ -121,7 +121,7 @@ const FIELD_CONFIG={
 
 const FIELD_ORDER=Object.keys(FIELD_CONFIG);
 
-const OPPORTUNITY_FIELDS=new Set(['service_type','estimated_value','probability','expected_close_date','loss_reason']);
+const OPPORTUNITY_FIELDS=new Set(['stage','service_type','estimated_value','probability','expected_close_date','loss_reason']);
 const CONTACT_FIELDS=new Set(['department','mobile','is_decision_maker']);
 const MEETING_FIELDS=new Set(['meeting_type','scheduled_start','duration_minutes','presenter_user_id','scheduled_by','follow_up_at','outcome_interest','outcome_notes','calendar_sync_status']);
 const MATERIAL_FIELDS=new Set(['material_type','responsible_user_id','meeting_id','url']);
@@ -259,7 +259,7 @@ export default function ActivityPage(){
       return value?'Sim':'Não';
     }
     if(cfg.type==='datetime')return formatDate(value,true);
-    if(cfg.type==='date')return formatDate(value);
+    if(cfg.type==='date'){const match=String(value).match(/^(\\d{4})-(\\d{2})-(\\d{2})/);return match?`${match[3]}/${match[2]}/${match[1]}`:formatDate(value);}
     if(cfg.type==='currency')return currency(value);
     if(cfg.type==='percent')return value==null?'Não informado':Number(value).toLocaleString('pt-BR')+'%';
     if(cfg.type==='duration')return Number(value).toLocaleString('pt-BR')+' min';
@@ -276,6 +276,8 @@ export default function ActivityPage(){
     if(cfg.type==='meeting_status')return MEETING_STATUS_LABELS[value]||value;
     if(cfg.type==='material_type')return MATERIAL_TYPE_LABELS[value]||value;
     if(cfg.type==='material_status')return MATERIAL_STATUS_LABELS[value]||value;
+    if(cfg.type==='status'&&entityType==='tasks')return ({open:'Aberta',in_progress:'Em andamento',done:'Concluída',cancelled:'Cancelada'})[value]||value;
+    if(cfg.type==='status'&&entityType==='cadences')return ({active:'Ativa',paused:'Pausada',completed:'Concluída',cancelled:'Encerrada'})[value]||value;
     if(cfg.type==='sync_status')return ({synced:'Sincronizado',pending:'Pendente',not_synced:'Não sincronizado',error:'Erro'})[value]||value;
     if(Array.isArray(value))return value.join(', ')||'Nenhum';
     if(typeof value==='object')return 'Dados estruturados atualizados';
