@@ -10,7 +10,7 @@ import './final-polish.css';
 import './fullcalendar-radar.css';
 import './publisher-record-v2.css';
 
-// No-op: trigger production deployment after the Vercel build limit reset.
+// No-op: trigger production deployment after merging the authenticated UX audit fixes.
 export const metadata = {
   title: 'RADAR - CRM EDITORAS',
   description: 'CRM interno de prospecção editorial da Radar',
