@@ -31,10 +31,10 @@
 .quick-contact-empty{opacity:.65}
 
 /* Main record structure */
-.publisher-record-grid{grid-template-columns:minmax(0,1fr) 340px!important;gap:16px!important;align-items:start}
-.publisher-record-main{gap:14px!important}
-.publisher-record-aside{gap:12px!important;position:sticky;top:12px;align-self:start}
-.publisher-record-main>.card,.publisher-record-main>[data-radar-intelligence],.publisher-record-main>[data-publisher-meetings],.publisher-record-main>[data-publisher-materials]{scroll-margin-top:18px}
+.publisher-record-grid{width:100%;max-width:100%;min-width:0;grid-template-columns:minmax(0,1fr) minmax(280px,340px)!important;gap:16px!important;align-items:start}
+.publisher-record-main{min-width:0;max-width:100%;gap:14px!important}
+.publisher-record-aside{min-width:0;max-width:100%;gap:12px!important;position:sticky;top:12px;align-self:start}
+.publisher-record-main>.card,.publisher-record-main>[data-radar-intelligence],.publisher-record-main>[data-publisher-meetings],.publisher-record-main>[data-publisher-materials]{scroll-margin-top:18px}\n.publisher-record-main>*{min-width:0;max-width:100%}\n.publisher-record-aside>*{min-width:0;max-width:100%}\n.publisher-quick-contact,.publisher-record-overview{min-width:0;max-width:100%}
 .publisher-data-card,.publisher-score-card,.publisher-contacts-card,.publisher-history-card,.publisher-opportunities-card,.publisher-meetings-section,.publisher-materials-section{position:relative}
 .publisher-record-main .card.panel{padding:17px 18px}
 .publisher-record-main .section-title{align-items:flex-start}
@@ -65,14 +65,14 @@
 .publisher-meetings-card{border-top:3px solid #4665d8!important}
 .publisher-materials-card{border-top:3px solid #8b5cf6!important}
 
-@media(max-width:1180px){
+@media(max-width:1420px){
   .publisher-record-grid{grid-template-columns:minmax(0,1fr) 300px!important}
   .publisher-record-overview-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
   .publisher-record-overview-grid article:nth-child(3){border-right:0}
   .publisher-record-overview-grid article:nth-child(n+4){border-top:1px solid #eef0f3}
   .quick-contact-items{grid-template-columns:1fr 1fr}
 }
-@media(max-width:900px){
+@media(max-width:1120px){
   .publisher-record-grid{grid-template-columns:1fr!important}
   .publisher-record-aside{position:static}
   .publisher-quick-contact{grid-template-columns:1fr}
@@ -276,6 +276,6 @@
 .publisher-meetings-card>.section-title .btn,
 .publisher-materials-card>.section-title .btn{box-shadow:none!important}
 
-@media(max-width:900px){
+@media(max-width:1120px){
   .publisher-record-aside{display:grid!important}
 }
