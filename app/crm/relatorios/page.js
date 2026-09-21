@@ -19,10 +19,10 @@ const EXPORT_OPTIONS=[
   {key:'publishers',label:'Base de editoras'}
 ];
 const REPORT_SHEET_KEYS={
-  complete:['dashboard','executive','comparison','trend','funnel','aging','cadences','channels','meetings','opportunityPipeline','team','score','products','geography','publishers','interactions','opportunities','tasks','meetingDetails','cadenceDetails'],
-  executive:['dashboard','executive','comparison','trend','funnel','aging','meetings','opportunityPipeline','score','products','geography'],
+  complete:['dashboard','executive','comparison','trend','funnel','aging','cadences','channels','meetings','opportunityPipeline','opportunityServices','team','score','products','geography','publishers','interactions','opportunities','tasks','meetingDetails','cadenceDetails'],
+  executive:['dashboard','executive','comparison','trend','funnel','aging','meetings','opportunityPipeline','opportunityServices','score','products','geography'],
   commercial:['executive','comparison','score','products','publishers','interactions','tasks'],
-  pipeline:['executive','funnel','aging','opportunityPipeline','opportunities','meetingDetails'],
+  pipeline:['executive','funnel','aging','opportunityPipeline','opportunityServices','opportunities','meetingDetails'],
   team:['executive','comparison','team','interactions','meetingDetails','tasks'],
   cadences:['executive','cadences','channels','cadenceDetails','tasks'],
   meetings:['executive','meetings','meetingDetails'],
