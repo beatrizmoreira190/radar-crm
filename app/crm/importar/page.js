@@ -1,6 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, ShieldCheck, Upload, X } from 'lucide-react';
+import { AlertTriangle, BookOpen, CheckCircle2, ChevronDown, ChevronUp, Database, Download, FileSpreadsheet, Info, ListChecks, RefreshCw, ShieldCheck, Upload, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 import { BRAZIL_STATES, EDITORIAL_PROFILE_OPTIONS } from '@/lib/constants';
 
@@ -84,17 +84,17 @@ function localCheck(rows){
 }
 
 export default function ImportPage(){
-  const {supabase,membership,isAdmin}=useCrm();const org=membership?.organization_id;
+  const {supabase,membership,isManager}=useCrm();const org=membership?.organization_id;
   const [fileName,setFileName]=useState('');const [headers,setHeaders]=useState([]);const [rawRows,setRawRows]=useState([]);const [mapping,setMapping]=useState([]);
   const [mode,setMode]=useState('skip');const [validating,setValidating]=useState(false);const [validationProgress,setValidationProgress]=useState(0);const [validation,setValidation]=useState(null);
-  const [progress,setProgress]=useState(0);const [busy,setBusy]=useState(false);const [result,setResult]=useState(null);const [notice,setNotice]=useState('');
+  const [progress,setProgress]=useState(0);const [busy,setBusy]=useState(false);const [result,setResult]=useState(null);const [notice,setNotice]=useState('');const [guideOpen,setGuideOpen]=useState(true);
 
   const transformed=useMemo(()=>rawRows.map((row,idx)=>{const obj={_row:String(idx+2)};mapping.forEach((key,i)=>{if(!key)return;const value=String(row[i]??'').trim();obj[key]=LIST_FIELDS.has(key)?splitMulti(value):value});return obj}),[rawRows,mapping]);
   const nameMapped=mapping.includes('name');
   const mappedKeys=mapping.filter(Boolean);
   const importCount=validation?Number(validation.inserted||0)+Number(validation.updated||0):0;
 
-  if(!isAdmin)return <div className="page-wrap"><div className="card panel"><h2>Acesso restrito</h2><p className="muted">A importação de dados cadastrais é exclusiva de administradores.</p></div></div>;
+  if(!isManager)return <div className="page-wrap"><div className="card panel"><h2>Acesso restrito</h2><p className="muted">A importação de dados cadastrais é exclusiva de administradores e supervisores.</p></div></div>;
 
   function resetValidation(){setValidation(null);setResult(null);setValidationProgress(0);setProgress(0)}
   async function choose(e){const file=e.target.files?.[0];if(!file)return;setNotice('');setResult(null);setValidation(null);const text=await file.text();const delimiter=detectDelimiter(text);const matrix=parseDelimited(text,delimiter);if(matrix.length<2){setNotice('O arquivo precisa ter uma linha de cabeçalho e pelo menos uma linha de dados.');return}const hs=matrix[0].map((h,i)=>String(h).replace(/^\uFEFF/,'').trim()||`Coluna ${i+1}`);setFileName(file.name);setHeaders(hs);setRawRows(matrix.slice(1).filter(r=>r.some(v=>String(v).trim())));setMapping(autoMap(hs));setProgress(0);setValidationProgress(0)}
@@ -142,10 +142,11 @@ export default function ImportPage(){
 
   return <div className="page-wrap">
     <div className="page-head"><div><div className="eyebrow">Dados em massa</div><h1>Importar editoras</h1><p>Valide a planilha, compare com a base e só depois confirme a gravação. Campos vazios nunca apagam dados existentes.</p></div><button className="btn secondary" onClick={downloadTemplate}><Download size={16}/> Baixar modelo atualizado</button></div>
+    <ImportGuide open={guideOpen} onToggle={()=>setGuideOpen(v=>!v)} onDownloadTemplate={downloadTemplate}/>
     {notice&&<div className="notice-bar"><span>{notice}</span><button onClick={()=>setNotice('')}><X size={15}/></button></div>}
 
     <section className="card panel import-upload">
-      <div className="panel-head"><div><h2>1. Escolher arquivo</h2><p>Use um CSV com cabeçalho. Campos múltiplos, como Perfil editorial, podem ser separados por <strong>|</strong>.</p></div><FileSpreadsheet size={21}/></div>
+      <div className="panel-head"><div><h2>1. Escolher arquivo</h2><p>Use um CSV com cabeçalho. Em campos com vários valores, use <strong>|</strong> para separar cada item. Ex.: <strong>Literatura | Infantil | Educação</strong>.</p></div><FileSpreadsheet size={21}/></div>
       <label className="import-drop"><Upload size={25}/><strong>{fileName||'Selecionar arquivo CSV'}</strong><span>{fileName?`${rawRows.length.toLocaleString('pt-BR')} linhas encontradas`:'Clique para procurar no computador'}</span><input type="file" accept=".csv,text/csv,text/plain" onChange={choose}/></label>
     </section>
 
@@ -190,6 +191,89 @@ export default function ImportPage(){
     </section>}
   </div>
 }
+
+
+function ImportGuide({open,onToggle,onDownloadTemplate}){
+  return <section className="card panel import-guide">
+    <div className="import-guide-head">
+      <div className="import-guide-heading">
+        <div className="import-guide-icon"><BookOpen size={22}/></div>
+        <div><div className="import-guide-kicker">Guia de preenchimento</div><h2>Como preparar uma importação sem colocar a base em risco</h2><p>Este roteiro foi pensado para quem vai administrar a base no futuro. Siga a ordem abaixo e use o modelo sempre que possível.</p></div>
+      </div>
+      <button className="btn secondary small" type="button" onClick={onToggle}>{open?'Ocultar guia':'Abrir guia completo'} {open?<ChevronUp size={15}/>:<ChevronDown size={15}/>}</button>
+    </div>
+
+    <div className="import-guide-steps">
+      <GuideStep number="1" title="Baixe o modelo" text="Comece pelo modelo atualizado para já ter os nomes de colunas que o CRM reconhece."/>
+      <GuideStep number="2" title="Preencha a planilha" text="Nome da editora é obrigatório. Os demais campos podem ficar vazios quando a informação não estiver disponível."/>
+      <GuideStep number="3" title="Separe listas com |" text="Perfil editorial, segmentos de atuação e e-mails alternativos aceitam vários valores na mesma célula."/>
+      <GuideStep number="4" title="Valide antes de importar" text="A validação compara com a base e mostra novas, duplicadas, atualizações, avisos e erros sem salvar nada."/>
+    </div>
+
+    {open&&<div className="import-guide-body">
+      <div className="import-guide-highlight">
+        <div className="import-guide-highlight-copy"><Info size={18}/><div><strong>A regra mais importante para campos com vários valores</strong><p>Use a barra vertical <b>|</b> entre os itens. Cada trecho vira um valor separado dentro do CRM.</p></div></div>
+        <div className="import-guide-code"><code>Literatura | Infantil | Educação</code><span>O CRM grava 3 perfis editoriais diferentes.</span></div>
+      </div>
+
+      <div className="import-guide-examples">
+        <GuideExample title="Perfil editorial" example="Literatura | Infantil | Cultura afro-brasileira" text="Descreve o que a editora publica. Use, de preferência, os termos exatos da taxonomia do Radar Score."/>
+        <GuideExample title="Segmentos de atuação" example="Escolar | Universitário | Trade/Livrarias" text="Descreve os mercados em que a editora atua. Não é a mesma coisa que perfil editorial."/>
+        <GuideExample title="E-mails alternativos" example="comercial@editora.com | financeiro@editora.com" text="Use para contatos institucionais adicionais. O e-mail principal continua em “E-mail geral”."/>
+      </div>
+
+      <div className="import-guide-section">
+        <div className="section-title"><div><h3>Regras que evitam os erros mais comuns</h3><p className="muted">O importador faz algumas proteções automaticamente, mas a qualidade da planilha continua fazendo diferença.</p></div></div>
+        <div className="import-guide-rules">
+          <GuideRule icon={<Database size={17}/>} title="Como o CRM identifica uma editora existente">
+            Primeiro procura pela <b>Referência de origem</b>; depois pelo <b>CNPJ</b>; e, quando não há uma chave forte, por <b>Nome + UF</b>. Se CNPJ e referência apontarem para editoras diferentes, a linha é bloqueada para revisão.
+          </GuideRule>
+          <GuideRule icon={<RefreshCw size={17}/>} title="Atualizar não significa apagar">
+            No modo <b>Atualizar somente os campos preenchidos</b>, célula vazia preserva o dado que já existe. Ex.: se o CSV não tiver telefone, o telefone atual da editora continua intacto.
+          </GuideRule>
+          <GuideRule icon={<ListChecks size={17}/>} title="Status, confiança, prioridade e pipeline">
+            Prioridade: <b>Baixa, Média, Alta ou Urgente</b>. Status do perfil: <b>Confirmado, Parcial, Não identificado ou Revisar</b>. Confiança: <b>Baixa, Média ou Alta</b>. A etapa do pipeline precisa ter o mesmo nome de uma etapa ativa do CRM.
+          </GuideRule>
+          <GuideRule icon={<ShieldCheck size={17}/>} title="Radar Score nunca é digitado na planilha">
+            Score, Radar Fit, potencial comercial, qualidade dos dados, aderência por produto e melhor produto são calculados pelo sistema. Quando dados relevantes mudam, o CRM recalcula esses indicadores automaticamente.
+          </GuideRule>
+        </div>
+      </div>
+
+      <details className="import-guide-details">
+        <summary>Dicionário rápido dos campos mais importantes</summary>
+        <div className="import-guide-field-table">
+          <GuideField field="Nome da editora" format="Texto — obrigatório" example="Editora Horizonte" note="Sem este campo a linha não pode ser importada."/>
+          <GuideField field="CNPJ" format="14 dígitos, com ou sem pontuação" example="12.345.678/0001-90" note="É uma das principais chaves para localizar duplicatas."/>
+          <GuideField field="Referência de origem" format="Código estável da fonte" example="base-2026-00451" note="Se a mesma fonte for importada de novo, mantenha a mesma referência. Não crie um código novo para a mesma editora."/>
+          <GuideField field="Perfil editorial" format="Lista separada por |" example="Literatura | Infantil" note="Influência diretamente a aderência editorial no Radar Score. Use a taxonomia oficial sempre que possível."/>
+          <GuideField field="Status do perfil editorial" format="Confirmado / Parcial / Não identificado / Revisar" example="Confirmado" note="Se houve pesquisa suficiente, indique o status. Se ainda não houve classificação, pode deixar em branco."/>
+          <GuideField field="Confiança do perfil editorial" format="Alta / Média / Baixa" example="Alta" note="Indica a segurança da classificação. Se o perfil ainda não foi pesquisado, deixe em branco."/>
+          <GuideField field="Segmentos de atuação" format="Lista separada por |" example="Escolar | Trade/Livrarias" note="Mercado de atuação comercial; não confundir com o conteúdo publicado."/>
+          <GuideField field="Prioridade" format="Baixa / Média / Alta / Urgente" example="Média" note="Em uma editora já existente, deixar em branco preserva a prioridade atual."/>
+          <GuideField field="Etapa do pipeline" format="Nome de etapa ativa" example="A prospectar" note="Se o nome não existir no CRM, a etapa é ignorada e aparece como aviso."/>
+          <GuideField field="E-mails alternativos" format="Lista separada por |" example="comercial@editora.com | financeiro@editora.com" note="Use somente para e-mails adicionais. O principal deve ficar em E-mail geral."/>
+        </div>
+      </details>
+
+      <details className="import-guide-details">
+        <summary>Ver os perfis editoriais reconhecidos pelo Radar Score</summary>
+        <p className="muted">Para evitar aviso e garantir que a classificação participe corretamente do Radar Score, copie os nomes abaixo exatamente como aparecem.</p>
+        <div className="import-guide-taxonomy">{EDITORIAL_PROFILE_OPTIONS.map(item=><span className="badge blue" key={item}>{item}</span>)}</div>
+      </details>
+
+      <div className="import-guide-bottom">
+        <div><strong>Checklist antes de confirmar</strong><span>1) Nome preenchido · 2) CNPJ conferido · 3) listas separadas por | · 4) perfis editoriais padronizados · 5) validação sem erros.</span></div>
+        <button className="btn secondary" type="button" onClick={onDownloadTemplate}><Download size={15}/> Baixar modelo</button>
+      </div>
+    </div>}
+  </section>
+}
+
+function GuideStep({number,title,text}){return <div className="import-guide-step"><span>{number}</span><div><strong>{title}</strong><p>{text}</p></div></div>}
+function GuideExample({title,example,text}){return <div className="import-guide-example"><strong>{title}</strong><code>{example}</code><p>{text}</p></div>}
+function GuideRule({icon,title,children}){return <div className="import-guide-rule"><div className="import-guide-rule-icon">{icon}</div><div><strong>{title}</strong><p>{children}</p></div></div>}
+function GuideField({field,format,example,note}){return <div className="import-guide-field-row"><strong>{field}</strong><span>{format}</span><code>{example}</code><p>{note}</p></div>}
 
 function ValidationTable({details}){
   const visible=details.filter(d=>d.error||d.warning||d.status==='skip'||d.status==='update').slice(0,30);
