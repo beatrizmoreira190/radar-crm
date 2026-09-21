@@ -48,7 +48,7 @@ export default function PublisherRecordOverview({publisher,tasks=[],opportunitie
       <div>
         <span className="eyebrow">Visão da conta</span>
         <strong>O que você precisa saber antes de agir</strong>
-        <p>Contexto comercial essencial, sem esconder os dados completos da ficha.</p>
+        <p>Principais informações para orientar o próximo passo comercial.</p>
       </div>
       <div className="publisher-record-state">
         <span><Workflow size={13}/>{stageName}<PublisherHelp text="Etapa atual da editora no processo de prospecção."/></span>
