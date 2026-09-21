@@ -104,7 +104,8 @@ export default function TeamPage(){
   const [pending,setPending]=useState([]);
   const [pendingRoles,setPendingRoles]=useState({});
   const [notice,setNotice]=useState('');
-  const [loadingPending,setLoadingPending]=useState(false);\n  const [expandedMember,setExpandedMember]=useState('');
+  const [loadingPending,setLoadingPending]=useState(false);
+  const [expandedMember,setExpandedMember]=useState('');
 
   useEffect(()=>{setDrafts(Object.fromEntries(team.map(m=>[m.user_id,{role:m.role,active:m.active,commercial_functions:m.commercial_functions||[],full_name:m.full_name||'',job_title:m.job_title||''}])) )},[team]);
 
