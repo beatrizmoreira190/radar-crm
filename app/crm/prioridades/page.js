@@ -3,33 +3,85 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, Building2, Info, ListChecks, RefreshCw, UserPlus, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
+import ModalDialog from '@/components/ModalDialog';
 import { PRIORITY_LABELS, RADAR_PRODUCT_LABELS, formatDate } from '@/lib/constants';
+
+const INITIAL_LIMIT=60;
+const LOAD_MORE_STEP=30;
+const MAX_LIMIT=200;
 
 export default function PrioritiesPage(){
   const {supabase,membership,user,activityVersion}=useCrm();
   const org=membership?.organization_id;
-  const [rows,setRows]=useState([]); const [loading,setLoading]=useState(true); const [notice,setNotice]=useState(''); const [guidance,setGuidance]=useState(null); const [selected,setSelected]=useState(null);
-  async function load(){if(!org)return;setLoading(true);const {data,error}=await supabase.rpc('crm_smart_queue',{p_organization_id:org,p_limit:60});if(error)setNotice(error.message);setRows(data||[]);setLoading(false)}
-  useEffect(()=>{load()},[org,activityVersion]);
-  const stats=useMemo(()=>({urgent:rows.filter(r=>['overdue_task','due_followup'].includes(r.action_code)).length,claim:rows.filter(r=>r.action_code==='claim').length,first:rows.filter(r=>r.action_code==='first_contact').length,follow:rows.filter(r=>['prepare_proposal','follow_up','advance_opportunity','reengage'].includes(r.action_code)).length}),[rows]);
-  async function claim(row){const {data,error}=await supabase.from('publishers').update({owner_user_id:user.id,updated_by:user.id,updated_at:new Date().toISOString()}).eq('organization_id',org).eq('id',row.publisher_id).is('owner_user_id',null).select('id,owner_user_id').maybeSingle();if(error)setNotice(error.message);else if(!data){setNotice(`${row.name} acabou de ser assumida por outra pessoa. Atualizei sua fila.`);load()}else{setNotice(`Você assumiu ${row.name}.`);load()}}
-  async function explain(row){setSelected(row);setGuidance(null);const {data,error}=await supabase.rpc('crm_publisher_guidance',{p_organization_id:org,p_publisher_id:row.publisher_id});if(error)setNotice(error.message);else setGuidance(data)}
+  const [rows,setRows]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [notice,setNotice]=useState('');
+  const [guidance,setGuidance]=useState(null);
+  const [selected,setSelected]=useState(null);
+  const [queueLimit,setQueueLimit]=useState(INITIAL_LIMIT);
+  const [hasMore,setHasMore]=useState(false);
+
+  async function load(){
+    if(!org)return;
+    setLoading(true);
+    const requestLimit=Math.min(queueLimit+1,MAX_LIMIT);
+    const {data,error}=await supabase.rpc('crm_smart_queue',{p_organization_id:org,p_limit:requestLimit});
+    if(error){
+      setNotice(error.message);
+      setRows([]);
+      setHasMore(false);
+    }else{
+      const list=data||[];
+      setRows(list.slice(0,queueLimit));
+      setHasMore(queueLimit<MAX_LIMIT&&list.length>queueLimit);
+    }
+    setLoading(false);
+  }
+
+  useEffect(()=>{load()},[org,activityVersion,queueLimit]);
+
+  const stats=useMemo(()=>({
+    urgent:rows.filter(r=>['overdue_task','due_followup'].includes(r.action_code)).length,
+    claim:rows.filter(r=>r.action_code==='claim').length,
+    first:rows.filter(r=>r.action_code==='first_contact').length,
+    follow:rows.filter(r=>['prepare_proposal','follow_up','advance_opportunity','reengage'].includes(r.action_code)).length
+  }),[rows]);
+
+  async function claim(row){
+    const {data,error}=await supabase.from('publishers').update({owner_user_id:user.id,updated_by:user.id,updated_at:new Date().toISOString()}).eq('organization_id',org).eq('id',row.publisher_id).is('owner_user_id',null).select('id,owner_user_id').maybeSingle();
+    if(error)setNotice(error.message);
+    else if(!data){setNotice(`${row.name} acabou de ser assumida por outra pessoa. Atualizei sua fila.`);load()}
+    else{setNotice(`Você assumiu ${row.name}.`);load()}
+  }
+
+  async function explain(row){
+    setSelected(row);
+    setGuidance(null);
+    const {data,error}=await supabase.rpc('crm_publisher_guidance',{p_organization_id:org,p_publisher_id:row.publisher_id});
+    if(error)setNotice(error.message);else setGuidance(data);
+  }
+
   const fits=guidance?.product_fits||{};
+  const limitCopy=hasMore
+    ? `Exibindo as ${rows.length.toLocaleString('pt-BR')} contas de maior prioridade. Há outras contas na fila.`
+    : `Exibindo ${rows.length.toLocaleString('pt-BR')} conta${rows.length===1?'':'s'} prioritária${rows.length===1?'':'s'}.`;
+
   return <div className="page-wrap">
-    <div className="page-head"><div><div className="eyebrow">Execução inteligente</div><h1>Prioridades</h1><p>O Radar Score mostra quais contas valem mais; prazos, resultado do último contato e prioridade manual definem o que deve ser feito agora.</p></div><button className="btn secondary" onClick={load}><RefreshCw size={16}/> Atualizar fila</button></div>
-    {notice&&<div className="notice-bar"><span>{notice}</span><button onClick={()=>setNotice('')}><X size={15}/></button></div>}
+    <div className="page-head"><div><div className="eyebrow">Execução inteligente</div><h1>Prioridades</h1><p>O Radar Score mostra quais contas valem mais; prazos, resultado do último contato e prioridade manual definem o que deve ser feito agora.</p></div><button className="btn secondary" disabled={loading} onClick={load}><RefreshCw size={16}/> {loading?'Atualizando…':'Atualizar fila'}</button></div>
+    {notice&&<div className="notice-bar"><span>{notice}</span><button aria-label="Fechar aviso" onClick={()=>setNotice('')}><X size={15}/></button></div>}
     <div className="priority-summary-grid">
       <Summary label="Ação vencida" value={stats.urgent} icon={<AlertTriangle/>}/><Summary label="Continuidade comercial" value={stats.follow} icon={<RefreshCw/>}/><Summary label="Disponíveis para assumir" value={stats.claim} icon={<UserPlus/>}/><Summary label="Primeiro contato" value={stats.first} icon={<Building2/>}/>
     </div>
-    <section className="card panel"><div className="panel-head"><div><h2>O que fazer agora</h2><p>Ordem: atrasos e retornos vencidos → propostas e follow-ups pedidos → oportunidades qualificadas → novas contas de alto Radar Score. Urgente/Alta pesa dentro dessa hierarquia.</p></div><ListChecks size={21}/></div>
-      {loading?<div className="table-empty">Calculando prioridades…</div>:rows.length?<div className="smart-queue">{rows.map((r,i)=><article className="smart-queue-row" key={r.publisher_id}>
+    <section className="card panel" aria-busy={loading}><div className="panel-head"><div><h2>O que fazer agora</h2><p>Ordem: atrasos e retornos vencidos → propostas e follow-ups pedidos → oportunidades qualificadas → novas contas de alto Radar Score. Urgente/Alta pesa dentro dessa hierarquia.</p></div><ListChecks size={21}/></div>
+      {!loading&&rows.length>0&&<div className="priority-queue-caption" role="status">{limitCopy}</div>}
+      {loading?<div className="table-empty">Calculando prioridades…</div>:rows.length?<><div className="smart-queue">{rows.map((r,i)=><article className="smart-queue-row" key={r.publisher_id}>
         <div className="queue-position">{i+1}</div><div className="queue-main"><div className="queue-title"><Link href={`/app/editoras/${r.publisher_id}`}>{r.name}</Link><span className={`badge ${['overdue_task','due_followup'].includes(r.action_code)?'red':r.action_code==='claim'?'blue':['prepare_proposal','advance_opportunity'].includes(r.action_code)?'green':'amber'}`}>{r.action_label}</span></div><span>{[r.city,r.state].filter(Boolean).join(' / ')||'Sem localização'} · {r.stage_name||'Sem etapa'}</span><small>{r.reason}</small></div>
         <div className="queue-score"><small>Radar Score</small><strong>{r.score??0}</strong><button className="link-btn compact" onClick={()=>explain(r)}><Info size={14}/> Entender</button></div>
         <div className="queue-meta"><span>{PRIORITY_LABELS[r.priority]||r.priority||'—'}</span><small>{r.next_action_at?`Próxima ação ${formatDate(r.next_action_at,true)}`:r.last_contact_at?`Último contato ${formatDate(r.last_contact_at,true)}`:'Nunca contatada'}</small></div>
         <div className="queue-actions">{r.action_code==='claim'?<button className="btn small" onClick={()=>claim(r)}><UserPlus size={14}/> Assumir</button>:<Link className="btn small" href={`/app/editoras/${r.publisher_id}`}>Abrir <ArrowRight size={14}/></Link>}</div>
-      </article>)}</div>:<div className="empty-state"><ListChecks/><strong>Nenhuma prioridade encontrada.</strong><p>Sua fila está limpa neste momento.</p></div>}
+      </article>)}</div>{hasMore&&<div className="priority-load-more"><button type="button" className="btn secondary" onClick={()=>setQueueLimit(limit=>Math.min(MAX_LIMIT,limit+LOAD_MORE_STEP))}>Carregar mais {Math.min(LOAD_MORE_STEP,MAX_LIMIT-queueLimit)}</button></div>}</>:<div className="empty-state"><ListChecks/><strong>Nenhuma prioridade encontrada.</strong><p>Sua fila está limpa neste momento.</p></div>}
     </section>
-    {selected&&<div className="modal-backdrop"><div className="modal score-modal"><div className="modal-head"><div><h3>Radar Score · {selected.name}</h3><p>70% aderência editorial + 20% potencial comercial + 10% prospectabilidade.</p></div><button onClick={()=>{setSelected(null);setGuidance(null)}}><X/></button></div>{!guidance?<div className="table-empty">Carregando explicação…</div>:<><div className="score-explain-head"><div><small>Score atual</small><strong>{guidance.score??0}</strong></div><div><small>Melhor oportunidade</small><strong>{RADAR_PRODUCT_LABELS[guidance.best_product]||'Ainda não identificada'}</strong><p>{guidance.reason}</p></div></div><div className="chips" style={{marginBottom:12}}><span className="badge blue">Aderência {guidance.radar_fit_score??0}</span><span className="badge">Potencial {guidance.commercial_potential_score??0}</span><span className="badge">Dados {guidance.data_quality_score??0}</span></div><div className="score-reasons">{Object.entries(RADAR_PRODUCT_LABELS).map(([key,label])=><div className="score-reason" key={key}><span>{label}</span><strong>{Number(fits[key]||0)}</strong></div>)}</div><div className="score-reasons" style={{marginTop:12}}>{Array.isArray(guidance.score_reason)&&guidance.score_reason.length?guidance.score_reason.map((x,i)=><div className="score-reason" key={`${x.code||'r'}-${i}`}><span>{x.label||x.code}</span><strong className={Number(x.points)<0?'negative':''}>{Number(x.points)>0?'+':''}{x.points}</strong></div>):<p className="muted">O score será detalhado à medida que a conta receber dados e perfil editorial.</p>}</div><div className="modal-actions"><Link className="btn" href={`/app/editoras/${selected.publisher_id}`}>Abrir ficha <ArrowRight size={15}/></Link></div></>}</div></div>}
+    {selected&&<ModalDialog className="score-modal" title={`Radar Score · ${selected.name}`} description="70% aderência editorial + 20% potencial comercial + 10% prospectabilidade." onClose={()=>{setSelected(null);setGuidance(null)}}>{!guidance?<div className="table-empty">Carregando explicação…</div>:<><div className="score-explain-head"><div><small>Score atual</small><strong>{guidance.score??0}</strong></div><div><small>Melhor oportunidade</small><strong>{RADAR_PRODUCT_LABELS[guidance.best_product]||'Ainda não identificada'}</strong><p>{guidance.reason}</p></div></div><div className="chips" style={{marginBottom:12}}><span className="badge blue">Aderência {guidance.radar_fit_score??0}</span><span className="badge">Potencial {guidance.commercial_potential_score??0}</span><span className="badge">Dados {guidance.data_quality_score??0}</span></div><div className="score-reasons">{Object.entries(RADAR_PRODUCT_LABELS).map(([key,label])=><div className="score-reason" key={key}><span>{label}</span><strong>{Number(fits[key]||0)}</strong></div>)}</div><div className="score-reasons" style={{marginTop:12}}>{Array.isArray(guidance.score_reason)&&guidance.score_reason.length?guidance.score_reason.map((x,i)=><div className="score-reason" key={`${x.code||'r'}-${i}`}><span>{x.label||x.code}</span><strong className={Number(x.points)<0?'negative':''}>{Number(x.points)>0?'+':''}{x.points}</strong></div>):<p className="muted">O score será detalhado à medida que a conta receber dados e perfil editorial.</p>}</div><div className="modal-actions"><Link className="btn" href={`/app/editoras/${selected.publisher_id}`}>Abrir ficha <ArrowRight size={15}/></Link></div></>}</ModalDialog>}
   </div>
 }
 function Summary({label,value,icon}){return <div className="card priority-summary"><div className="metric-icon">{icon}</div><div><span>{label}</span><strong>{Number(value||0).toLocaleString('pt-BR')}</strong></div></div>}
