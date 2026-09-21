@@ -9,6 +9,7 @@ import { availabilityRuleCheck, normalizeAvailabilityRule, overlapsWithBuffer, r
 import PublisherHelp from '@/components/PublisherHelp';
 import ModalDialog from '@/components/ModalDialog';
 import { PtBrDateTimeField } from '@/components/PtBrDateFields';
+import MentionTextarea from '@/components/MentionTextarea';
 
 function localInput(value){
   if(!value)return'';
@@ -32,6 +33,7 @@ export default function PublisherMeetingsMount(){
   const [contacts,setContacts]=useState([]);
   const [materials,setMaterials]=useState([]);
   const [publisherName,setPublisherName]=useState('Editora');
+  const [publisherOwnerUserId,setPublisherOwnerUserId]=useState('');
   const [loading,setLoading]=useState(true);
   const [notice,setNotice]=useState('');
   const [editing,setEditing]=useState(null);
@@ -53,10 +55,10 @@ export default function PublisherMeetingsMount(){
       supabase.from('meetings').select('*').eq('organization_id',org).eq('publisher_id',id).order('scheduled_start',{ascending:false}).limit(40),
       supabase.from('contacts').select('id,full_name,email,job_title,department,active').eq('organization_id',org).eq('publisher_id',id).eq('active',true).order('full_name'),
       supabase.from('publisher_materials').select('id,title,material_type,status,url,meeting_id').eq('organization_id',org).eq('publisher_id',id).neq('status','archived').order('updated_at',{ascending:false}),
-      supabase.from('publishers').select('name').eq('organization_id',org).eq('id',id).maybeSingle()
+      supabase.from('publishers').select('name,owner_user_id,prospector_user_id').eq('organization_id',org).eq('id',id).maybeSingle()
     ]);
     if(mr.error)setNotice(mr.error.message);if(cr.error)setNotice(cr.error.message);if(matR.error)setNotice(matR.error.message);if(pubR.error)setNotice(pubR.error.message);
-    const rows=mr.data||[];setMeetings(rows);setContacts(cr.data||[]);setMaterials(matR.data||[]);setPublisherName(pubR.data?.name||'Editora');
+    const rows=mr.data||[];setMeetings(rows);setContacts(cr.data||[]);setMaterials(matR.data||[]);setPublisherName(pubR.data?.name||'Editora');setPublisherOwnerUserId(pubR.data?.owner_user_id||'');
     if(rows.length){const pr=await supabase.from('meeting_participants').select('*').eq('organization_id',org).in('meeting_id',rows.map(m=>m.id)).order('created_at');if(pr.error)setNotice(pr.error.message);else setParticipants(pr.data||[])}else setParticipants([]);
     setLoading(false);
   }
@@ -151,7 +153,7 @@ export default function PublisherMeetingsMount(){
       })}</div>:<div className="empty-state"><CalendarClock/><strong>Nenhuma reunião cadastrada.</strong><p>{canSchedule?'Agende a apresentação quando a editora avançar para uma conversa.':'As reuniões comerciais desta editora aparecerão aqui.'}</p></div>}
     </section>
     {showModal&&<MeetingModal supabase={supabase} org={org} publisherId={id} publisherName={publisherName} user={user} team={team} presenters={presenters} contacts={contacts} meeting={editing} prefill={prefill} participants={editing?(participantMap[editing.id]||[]):[]} materials={readyMaterials} canEditScheduling={!editing||isManager||editing.scheduled_by===user?.id} onClose={close} onSaved={async message=>{close();setNotice(message);await load()}}/>}
-    {postMeeting&&<PostMeetingModal supabase={supabase} org={org} meeting={postMeeting} publisherName={publisherName} team={team} user={user} onClose={()=>setPostMeeting(null)} onSaved={async()=>{setPostMeeting(null);setNotice('Resultado registrado. A fila de tarefas foi atualizada automaticamente.');await load()}}/>}
+    {postMeeting&&<PostMeetingModal supabase={supabase} org={org} meeting={postMeeting} publisherId={id} publisherName={publisherName} publisherOwnerUserId={publisherOwnerUserId} team={team} user={user} onClose={()=>setPostMeeting(null)} onSaved={async result=>{setPostMeeting(null);setNotice(result?.handoff?'Resultado registrado e responsabilidade atual transferida. A fila de tarefas foi atualizada automaticamente.':'Resultado registrado. A fila de tarefas foi atualizada automaticamente.');await load()}}/>}
     <style jsx>{`
       .meeting-list{display:grid;gap:8px}.meeting-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:12px;align-items:start;padding:13px 0;border-top:1px solid #eaecf0}.meeting-row:first-child{border-top:0;padding-top:2px}.meeting-icon{width:36px;height:36px;border-radius:9px;background:#f2f4f7;color:#475467;display:grid;place-items:center}.meeting-main{min-width:0}.meeting-title{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.meeting-meta,.meeting-people{display:flex;gap:7px 16px;flex-wrap:wrap;color:#667085;font-size:11px;margin-top:5px}.meeting-meta span{display:flex;align-items:center;gap:4px}.participant-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}.meeting-main p{font-size:12px;line-height:1.45;color:#475467;margin:8px 0 0}.meeting-outcome,.meeting-next{padding-top:7px;border-top:1px dashed #eaecf0}.meeting-material{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;border-radius:999px;padding:3px 6px}.meeting-material.ready{background:#ecfdf3;color:#027a48}.meeting-material.warning{background:#fffaeb;color:#b54708}.meeting-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:9px}.mini-action{border:1px solid #d0d5dd;background:#fff;color:#475467;border-radius:7px;padding:5px 7px;font-size:9px;font-weight:700;display:inline-flex;align-items:center;gap:4px;cursor:pointer}.mini-action:hover{background:#f9fafb}.mini-action.success{color:#027a48;border-color:#abefc6}.mini-action.danger{color:#b42318;border-color:#fecdca}@media(max-width:700px){.meeting-row{grid-template-columns:34px minmax(0,1fr)}.meeting-row>.btn{grid-column:2;justify-self:start}.publisher-meetings-card :global(.section-title){align-items:flex-start}}
     `}</style>
@@ -214,10 +216,61 @@ function MeetingModal({supabase,org,publisherId,publisherName,user,team,presente
   `}</style></ModalDialog>;
 }
 
-function PostMeetingModal({supabase,org,meeting,publisherName,team,user,onClose,onSaved}){
-  const [form,setForm]=useState({outcome_interest:meeting.outcome_interest||'',outcome_notes:meeting.outcome_notes||'',next_step:meeting.next_step||'',follow_up_at:localInput(meeting.follow_up_at),follow_up_assigned_to:meeting.follow_up_assigned_to||meeting.scheduled_by||user?.id||''});
+function PostMeetingModal({supabase,org,meeting,publisherId,publisherName,publisherOwnerUserId,team,user,onClose,onSaved}){
+  const [form,setForm]=useState({
+    outcome_interest:meeting.outcome_interest||'',
+    outcome_notes:meeting.outcome_notes||'',
+    next_step:meeting.next_step||'',
+    follow_up_at:localInput(meeting.follow_up_at),
+    follow_up_assigned_to:meeting.follow_up_assigned_to||meeting.scheduled_by||user?.id||'',
+    next_owner_user_id:meeting.presenter_user_id||'__keep__'
+  });
+  const [outcomeMentions,setOutcomeMentions]=useState([]);
+  const [nextStepMentions,setNextStepMentions]=useState([]);
   const [busy,setBusy]=useState(false);const [error,setError]=useState('');
   const activeTeam=team.filter(member=>member.active);
-  async function save(e){e.preventDefault();setBusy(true);setError('');const {error:saveError}=await supabase.from('meetings').update({status:'completed',outcome_interest:form.outcome_interest||null,outcome_notes:form.outcome_notes.trim()||null,next_step:form.next_step.trim()||null,follow_up_at:form.follow_up_at?new Date(form.follow_up_at).toISOString():null,follow_up_assigned_to:form.follow_up_at?(form.follow_up_assigned_to||meeting.scheduled_by):null}).eq('organization_id',org).eq('id',meeting.id);setBusy(false);if(saveError)setError(saveError.message);else onSaved()}
-  return <ModalDialog title="Registrar resultado" description={`${publisherName} · ${formatDate(meeting.scheduled_start,true)}`} onClose={onClose} onSubmit={save} busy={busy}>{error&&<div className="notice error" role="alert">{error}</div>}<div className="form-grid"><label>Interesse percebido<select value={form.outcome_interest} onChange={e=>setForm(x=>({...x,outcome_interest:e.target.value}))}><option value="">Não informado</option>{Object.entries(INTEREST_LABELS).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label><label>Responsável pelo próximo contato<select disabled={!form.follow_up_at} value={form.follow_up_assigned_to} onChange={e=>setForm(x=>({...x,follow_up_assigned_to:e.target.value}))}>{activeTeam.map(member=><option key={member.user_id} value={member.user_id}>{personLabel(member)}</option>)}</select></label><label className="span-2">Resultado da reunião<textarea required rows={4} value={form.outcome_notes} onChange={e=>setForm(x=>({...x,outcome_notes:e.target.value}))} placeholder="Interesse demonstrado, temas que chamaram atenção, objeções e decisões"/></label><label className="span-2">Próximo passo<textarea rows={3} value={form.next_step} onChange={e=>setForm(x=>({...x,next_step:e.target.value}))} placeholder="Ex.: enviar curadoria de literatura infantil e retomar após avaliação da equipe"/></label><label className="span-2">Data do próximo contato<PtBrDateTimeField value={form.follow_up_at} onChange={value=>setForm(x=>({...x,follow_up_at:value}))} ariaLabel="Data do próximo contato"/><small className="muted" style={{fontSize:10}}>Ao informar uma data, o CRM cria automaticamente um follow-up na fila do responsável selecionado.</small></label></div><div className="modal-actions"><button type="button" className="btn secondary" disabled={busy} onClick={onClose}>Cancelar</button><button className="btn" disabled={busy}>{busy?'Salvando…':'Concluir reunião'}</button></div></ModalDialog>;
+  const currentOwner=activeTeam.find(member=>member.user_id===publisherOwnerUserId);
+  async function save(e){
+    e.preventDefault();
+    setBusy(true);setError('');
+    const {data,error:saveError}=await supabase.rpc('crm_complete_meeting_handoff',{
+      p_organization_id:org,
+      p_meeting_id:meeting.id,
+      p_outcome_interest:form.outcome_interest||null,
+      p_outcome_notes:form.outcome_notes.trim()||null,
+      p_next_step:form.next_step.trim()||null,
+      p_follow_up_at:form.follow_up_at?new Date(form.follow_up_at).toISOString():null,
+      p_follow_up_assigned_to:form.follow_up_at?(form.follow_up_assigned_to||null):null,
+      p_next_owner_user_id:form.next_owner_user_id==='__keep__'?null:(form.next_owner_user_id||null)
+    });
+    if(saveError){setBusy(false);setError(saveError.message);return}
+    const mentionIds=[...new Set([...outcomeMentions,...nextStepMentions])];
+    if(mentionIds.length){
+      await supabase.rpc('crm_notify_mentions',{
+        p_organization_id:org,
+        p_user_ids:mentionIds,
+        p_title:'Você foi mencionado em um resultado de reunião',
+        p_body:`${publisherName} · ${[form.outcome_notes,form.next_step].filter(Boolean).join(' · ')}`.slice(0,900),
+        p_href:`/app/editoras/${publisherId}`,
+        p_source_type:'meeting',
+        p_source_id:meeting.id,
+        p_dedupe_prefix:`mention:meeting:${meeting.id}:${Date.now()}`
+      });
+      window.dispatchEvent(new Event('crm-notifications-changed'));
+    }
+    setBusy(false);
+    onSaved(data||{});
+  }
+  return <ModalDialog title="Registrar resultado" description={`${publisherName} · ${formatDate(meeting.scheduled_start,true)}`} onClose={onClose} onSubmit={save} busy={busy}>
+    {error&&<div className="notice error" role="alert">{error}</div>}
+    <div className="form-grid">
+      <label>Interesse percebido<select value={form.outcome_interest} onChange={e=>setForm(x=>({...x,outcome_interest:e.target.value}))}><option value="">Não informado</option>{Object.entries(INTEREST_LABELS).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
+      <label>Responsável pelo próximo contato<select disabled={!form.follow_up_at} value={form.follow_up_assigned_to} onChange={e=>setForm(x=>({...x,follow_up_assigned_to:e.target.value}))}>{activeTeam.map(member=><option key={member.user_id} value={member.user_id}>{personLabel(member)}</option>)}</select></label>
+      <label className="span-2">Resultado da reunião<MentionTextarea required rows={4} value={form.outcome_notes} onChange={value=>setForm(x=>({...x,outcome_notes:value}))} team={activeTeam} mentions={outcomeMentions} onMentionsChange={setOutcomeMentions} placeholder="Interesse demonstrado, temas, objeções e decisões. Digite @ para mencionar alguém."/></label>
+      <label className="span-2">Próximo passo<MentionTextarea rows={3} value={form.next_step} onChange={value=>setForm(x=>({...x,next_step:value}))} team={activeTeam} mentions={nextStepMentions} onMentionsChange={setNextStepMentions} placeholder="Ex.: enviar curadoria e retomar após avaliação. Digite @ para mencionar alguém."/></label>
+      <label className="span-2">Responsável pelo próximo estágio<select value={form.next_owner_user_id} onChange={e=>setForm(x=>({...x,next_owner_user_id:e.target.value}))}><option value="__keep__">Manter responsável atual{currentOwner?` — ${personLabel(currentOwner)}`:''}</option>{activeTeam.map(member=><option key={member.user_id} value={member.user_id}>{personLabel(member)}{member.user_id===meeting.presenter_user_id?' — apresentador(a)':''}</option>)}</select><small className="muted" style={{fontSize:10}}>Isso define quem fica com a condução da conta depois da reunião. O prospector de origem continua preservado.</small></label>
+      <label className="span-2">Data do próximo contato<PtBrDateTimeField value={form.follow_up_at} onChange={value=>setForm(x=>({...x,follow_up_at:value}))} ariaLabel="Data do próximo contato"/><small className="muted" style={{fontSize:10}}>Ao informar uma data, o CRM cria automaticamente um follow-up para a pessoa selecionada.</small></label>
+    </div>
+    <div className="modal-actions"><button type="button" className="btn secondary" disabled={busy} onClick={onClose}>Cancelar</button><button className="btn" disabled={busy}>{busy?'Salvando…':'Concluir reunião'}</button></div>
+  </ModalDialog>;
 }
