@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Bookmark, Building2, Filter, Plus, Search, UserCheck, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
-import Pagination from '@/components/Pagination';\nimport ModalDialog from '@/components/ModalDialog';
+import Pagination from '@/components/Pagination';
+import ModalDialog from '@/components/ModalDialog';
 import { BRAZIL_STATES, EDITORIAL_PROFILE_OPTIONS, EDITORIAL_PROFILE_STATUS_LABELS, PRIORITY_LABELS, formatDate } from '@/lib/constants';
 
 const PAGE_SIZE = 40;
