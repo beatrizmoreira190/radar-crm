@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { PtBrDateTimeField } from '@/components/PtBrDateFields';
 import { useRouter } from 'next/navigation';
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/react/timegrid';
@@ -417,7 +418,7 @@ export default function CommercialAgendaFullCalendar(){
       <label className="span-2">Editora<div className="search-box quick-publisher-search"><Search size={14}/><input className="input" value={publisherQuery} onChange={e=>setPublisherQuery(e.target.value)} placeholder="Buscar editora em toda a base"/></div><small className="muted" style={{fontSize:10}}>A busca consulta toda a base de editoras. Digite parte do nome para localizar qualquer cadastro.</small><select size={Math.min(6,Math.max(3,publisherChoices.length||3))} value={quick.publisher_id} onChange={e=>setQuick(x=>({...x,publisher_id:e.target.value}))}><option value="">{publisherSearchLoading?'Buscando editoras…':publisherChoices.length?'Selecione uma editora':'Nenhuma editora encontrada'}</option>{publisherChoices.map(item=><option key={item.id} value={item.id}>{item.name}{[item.city,item.state].filter(Boolean).length?` — ${[item.city,item.state].filter(Boolean).join(' / ')}`:''}</option>)}</select></label>
       <label>Apresentador<select value={quick.presenter_user_id} onChange={e=>changeQuickPresenter(e.target.value)}>{presenterOptions.map(member=><option key={member.user_id} value={member.user_id}>{member.full_name||member.email||'Equipe'}</option>)}</select></label>
       <label>Duração<select value={quick.duration_minutes} onChange={e=>setQuick(x=>({...x,duration_minutes:Number(e.target.value)}))}>{ALLOWED_DURATIONS.map(value=><option value={value} key={value}>{value===60?'1 hora':value===90?'1h30':`${value} min`}</option>)}</select></label>
-      <label className="span-2">Data e horário<input className="input" type="datetime-local" value={quick.scheduled_start} onChange={e=>setQuick(x=>({...x,scheduled_start:e.target.value}))}/></label>
+      <label className="span-2">Data e horário<PtBrDateTimeField value={quick.scheduled_start} onChange={value=>setQuick(x=>({...x,scheduled_start:value}))} ariaLabel="Data e horário"/></label>
     </div><div className="modal-actions"><button className="btn secondary" type="button" onClick={()=>setQuick(null)}>Cancelar</button><button className="btn" type="button" onClick={continueQuick}>Continuar para a editora</button></div></div></div>}
   </div>;
 }
