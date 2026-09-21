@@ -11,7 +11,7 @@ const PIPELINE_TYPE_LABELS={open:'Em aberto',won:'Cliente',nurture:'Nutrição',
 const EXPORT_OPTIONS=[
   {key:'complete',label:'Completo — gestão + base'},
   {key:'executive',label:'Executivo — visão gerencial'},
-  {key:'commercial',label:'Comercial — prospecção e carteira'},
+  {key:'commercial',label:'Comercial — prospecção e responsabilidade'},
   {key:'pipeline',label:'Pipeline e oportunidades'},
   {key:'team',label:'Equipe e produtividade',managerOnly:true},
   {key:'cadences',label:'Cadências e abordagens'},
@@ -183,7 +183,7 @@ export default function ReportsPage(){
       };
       mergeExecutive(personal?'RADAR — Relatório pessoal':'RADAR — Relatório gerencial',S.title);
       executiveRows.push([xcell('Tipo de relatório',S.meta),reportLabel,xcell('Período',S.meta),'Últimos '+days+' dias']);
-      executiveRows.push([xcell('Gerado em',S.meta),dt(generatedAt),xcell('Escopo',S.meta),personal?'Minha carteira':'Operação comercial']);
+      executiveRows.push([xcell('Gerado em',S.meta),dt(generatedAt),xcell('Escopo',S.meta),personal?'Responsabilidade atual':'Operação comercial']);
       executiveRows.push([]);
       mergeExecutive('INDICADORES');
       executiveRows.push(header(['Indicador','Período atual','Período anterior','Variação']));
@@ -199,7 +199,7 @@ export default function ReportsPage(){
         const cur=Number(current[key]||0),prev=Number(previous[key]||0);
         executiveRows.push([label,int(cur),int(prev),deltaText(cur,prev)]);
       });
-      executiveRows.push(['Cobertura da carteira',percent(total?contacted/total:0),'','']);
+      executiveRows.push(['Cobertura da responsabilidade atual',percent(total?contacted/total:0),'','']);
       executiveRows.push(['Pipeline bruto',money(financial.gross_open||0),'','']);
       executiveRows.push(['Pipeline ponderado',money(financial.weighted_open||0),'','']);
       executiveRows.push(['Tarefas atrasadas',int(overdue),'','']);
@@ -364,7 +364,7 @@ export default function ReportsPage(){
 
   return <div className="page-wrap reports-v2">
     <div className="page-head">
-      <div><div className="eyebrow">Inteligência comercial</div><h1>Relatórios</h1><p>{personal?'Acompanhe sua carteira, ritmo comercial e próximos pontos de atenção.':'Acompanhe desempenho, conversão, cobertura e oportunidades da operação em um só lugar.'}</p></div>
+      <div><div className="eyebrow">Inteligência comercial</div><h1>Relatórios</h1><p>{personal?'Acompanhe sua responsabilidade atual, ritmo comercial e próximos pontos de atenção.':'Acompanhe desempenho, conversão, cobertura e oportunidades da operação em um só lugar.'}</p></div>
       <div className="report-actions">
         <select className="filter-select" value={days} onChange={e=>setDays(Number(e.target.value))}><option value={30}>Últimos 30 dias</option><option value={60}>Últimos 60 dias</option><option value={90}>Últimos 90 dias</option></select>
         <select className="filter-select report-export-select" value={exportType} onChange={e=>setExportType(e.target.value)}>{exportOptions.map(option=><option key={option.key} value={option.key}>{option.label}</option>)}</select>
@@ -450,7 +450,7 @@ export default function ReportsPage(){
       </>}
 
       {view==='team'&&isManager&&<>
-        <section className="card panel"><div className="panel-head"><div><h2>Cobertura e produtividade da equipe</h2><p>Carteira, contatos, reuniões, oportunidades e pendências por responsável.</p></div><Users size={20}/></div><TeamTable data={teamPerformance}/></section>
+        <section className="card panel"><div className="panel-head"><div><h2>Cobertura e produtividade da equipe</h2><p>Origem das contas, responsabilidade atual, contatos, reuniões, oportunidades e pendências.</p></div><Users size={20}/></div><TeamTable data={teamPerformance}/></section>
         <section className="card panel"><div className="panel-head"><div><h2>Atividade por estado</h2><p>Onde a base está concentrada e onde o esforço comercial está acontecendo.</p></div><MapPin size={20}/></div><GeographyTable data={geography}/></section>
       </>}
 
