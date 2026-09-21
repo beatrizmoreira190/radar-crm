@@ -41,7 +41,8 @@ const ENTITY_LABELS={
 
 const FIELD_CONFIG={
   stage_id:{label:'Etapa do Pipeline',type:'stage'},
-  owner_user_id:{label:'Responsável',type:'user'},
+  owner_user_id:{label:'Responsável atual',type:'user'},
+  prospector_user_id:{label:'Prospector de origem',type:'user'},
   priority:{label:'Prioridade',type:'priority'},
   next_action_at:{label:'Próxima ação',type:'datetime'},
   notes:{label:'Notas',type:'text'},
