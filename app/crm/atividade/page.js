@@ -15,11 +15,11 @@ import {
   MEETING_STATUS_LABELS,
   MEETING_TYPE_LABELS,
   OPPORTUNITY_STAGE_LABELS,
+  OPPORTUNITY_SERVICE_LABELS,
   PRIORITY_LABELS,
   RESULT_LABELS,
   ROLE_LABELS,
   TASK_TYPE_LABELS,
-  currency,
   formatDate,
   timeAgo
 } from '@/lib/constants';
@@ -85,9 +85,13 @@ const FIELD_CONFIG={
   result_code:{label:'Resultado',type:'result'},
   result_note:{label:'Observação do resultado',type:'text'},
 
-  service_type:{label:'Serviço / projeto',type:'text'},
-  estimated_value:{label:'Valor estimado',type:'currency'},
-  probability:{label:'Probabilidade',type:'percent'},
+  service_key:{label:'Serviço Radar',type:'opportunity_service'},
+  service_type:{label:'Outro serviço / projeto',type:'text'},
+  radar_opportunities_title_count:{label:'Títulos em divulgação',type:'integer'},
+  pnld_notice:{label:'Edital / programa PNLD',type:'text'},
+  pnld_category:{label:'Categoria / objeto PNLD',type:'text'},
+  pnld_works_count:{label:'Obras no PNLD',type:'integer'},
+  licitacoes_scope:{label:'Escopo do Radar de Licitações',type:'text'},
   expected_close_date:{label:'Fechamento previsto',type:'date'},
   next_step:{label:'Próximo passo',type:'text'},
   loss_reason:{label:'Motivo da perda',type:'text'},
@@ -122,7 +126,7 @@ const FIELD_CONFIG={
 
 const FIELD_ORDER=Object.keys(FIELD_CONFIG);
 
-const OPPORTUNITY_FIELDS=new Set(['stage','service_type','estimated_value','probability','expected_close_date','loss_reason']);
+const OPPORTUNITY_FIELDS=new Set(['stage','service_key','service_type','radar_opportunities_title_count','pnld_notice','pnld_category','pnld_works_count','licitacoes_scope','expected_close_date','loss_reason']);
 const CONTACT_FIELDS=new Set(['department','mobile','is_decision_maker']);
 const MEETING_FIELDS=new Set(['meeting_type','scheduled_start','duration_minutes','presenter_user_id','scheduled_by','follow_up_at','outcome_interest','outcome_notes','calendar_sync_status']);
 const MATERIAL_FIELDS=new Set(['material_type','responsible_user_id','meeting_id','url']);
@@ -261,8 +265,8 @@ export default function ActivityPage(){
     }
     if(cfg.type==='datetime')return formatDate(value,true);
     if(cfg.type==='date'){const match=String(value).match(/^(\\d{4})-(\\d{2})-(\\d{2})/);return match?`${match[3]}/${match[2]}/${match[1]}`:formatDate(value);}
-    if(cfg.type==='currency')return currency(value);
-    if(cfg.type==='percent')return value==null?'Não informado':Number(value).toLocaleString('pt-BR')+'%';
+    if(cfg.type==='integer')return value==null?'Não informado':Number(value).toLocaleString('pt-BR');
+    if(cfg.type==='opportunity_service')return OPPORTUNITY_SERVICE_LABELS[value]||value;
     if(cfg.type==='duration')return Number(value).toLocaleString('pt-BR')+' min';
     if(cfg.type==='list')return Array.isArray(value)?(value.join(', ')||'Nenhum'):String(value);
     if(cfg.type==='commercial_functions')return Array.isArray(value)?(value.map(v=>COMMERCIAL_FUNCTION_LABELS[v]||v).join(', ')||'Nenhuma'):String(value);

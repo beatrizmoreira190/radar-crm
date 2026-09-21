@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, BarChart3, Building2, CalendarDays, CircleDollarSign, Clock3, Download, Gauge, Lightbulb, MapPin, MessageSquareText, Target, TrendingDown, TrendingUp, Users, Workflow, X } from 'lucide-react';
+import { Activity, BarChart3, Building2, CalendarDays, Clock3, Download, Gauge, Lightbulb, MapPin, MessageSquareText, Target, TrendingDown, TrendingUp, Users, Workflow, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
-import { CHANNEL_LABELS, INTEREST_LABELS, MEETING_STATUS_LABELS, OPPORTUNITY_STAGE_LABELS, PRIORITY_LABELS, RADAR_PRODUCT_LABELS, RESULT_LABELS, TASK_TYPE_LABELS, currency } from '@/lib/constants';
+import { CHANNEL_LABELS, INTEREST_LABELS, MEETING_STATUS_LABELS, OPPORTUNITY_SERVICE_LABELS, OPPORTUNITY_STAGE_LABELS, PRIORITY_LABELS, RADAR_PRODUCT_LABELS, RESULT_LABELS, TASK_TYPE_LABELS } from '@/lib/constants';
 import { XLSX_STYLE, downloadXlsx, xcell } from '@/lib/xlsxExport';
 
 const TASK_STATUS_LABELS={open:'Aberta',in_progress:'Em andamento',done:'Concluída',cancelled:'Cancelada'};
@@ -19,10 +19,10 @@ const EXPORT_OPTIONS=[
   {key:'publishers',label:'Base de editoras'}
 ];
 const REPORT_SHEET_KEYS={
-  complete:['dashboard','executive','comparison','trend','funnel','aging','cadences','channels','meetings','financial','team','score','products','geography','publishers','interactions','opportunities','tasks','meetingDetails','cadenceDetails'],
-  executive:['dashboard','executive','comparison','trend','funnel','aging','meetings','financial','score','products','geography'],
-  commercial:['executive','comparison','score','products','publishers','interactions','tasks'],
-  pipeline:['executive','funnel','aging','financial','opportunities','meetingDetails'],
+  complete:['dashboard','executive','comparison','trend','funnel','aging','cadences','channels','meetings','opportunityPipeline','opportunityServices','team','score','products','geography','publishers','interactions','opportunities','tasks','meetingDetails','cadenceDetails'],
+  executive:['dashboard','executive','comparison','trend','funnel','aging','meetings','opportunityPipeline','opportunityServices','score','products','geography'],
+  commercial:['executive','comparison','opportunityPipeline','opportunityServices','opportunities','score','products','publishers','interactions','tasks'],
+  pipeline:['executive','funnel','aging','opportunityPipeline','opportunityServices','opportunities','meetingDetails'],
   team:['executive','comparison','team','interactions','meetingDetails','tasks'],
   cadences:['executive','cadences','channels','cadenceDetails','tasks'],
   meetings:['executive','meetings','meetingDetails'],
@@ -32,18 +32,19 @@ const REPORT_SHEET_KEYS={
 export default function ReportsPage(){
   const {supabase,membership,teamMap,activityVersion,isManager,user}=useCrm();
   const org=membership?.organization_id;
-  const [summary,setSummary]=useState(null); const [analytics,setAnalytics]=useState(null); const [originMetrics,setOriginMetrics]=useState(null); const [days,setDays]=useState(30); const [loading,setLoading]=useState(true); const [exporting,setExporting]=useState(false); const [notice,setNotice]=useState(''); const [view,setView]=useState('overview'); const [exportType,setExportType]=useState('complete');
+  const [summary,setSummary]=useState(null); const [analytics,setAnalytics]=useState(null); const [originMetrics,setOriginMetrics]=useState(null); const [opportunityPipeline,setOpportunityPipeline]=useState(null); const [days,setDays]=useState(30); const [loading,setLoading]=useState(true); const [exporting,setExporting]=useState(false); const [notice,setNotice]=useState(''); const [view,setView]=useState('overview'); const [exportType,setExportType]=useState('complete');
 
   async function load(){
     if(!org)return;
     setLoading(true);setNotice('');
-    const [{data:summaryData,error:summaryError},{data:analyticsData,error:analyticsError},{data:originData,error:originError}]=await Promise.all([
+    const [{data:summaryData,error:summaryError},{data:analyticsData,error:analyticsError},{data:originData,error:originError},{data:pipelineData,error:pipelineError}]=await Promise.all([
       supabase.rpc('crm_report_summary',{p_organization_id:org,p_days:days}),
       supabase.rpc('crm_report_dashboard',{p_organization_id:org,p_days:days}),
-      supabase.rpc('crm_origin_metrics',{p_organization_id:org})
+      supabase.rpc('crm_origin_metrics',{p_organization_id:org}),
+      supabase.rpc('crm_opportunity_pipeline_summary',{p_organization_id:org,p_days:days})
     ]);
-    if(summaryError||analyticsError||originError)setNotice(summaryError?.message||analyticsError?.message||originError?.message||'Não foi possível calcular os relatórios.');
-    setSummary(summaryData||null);setAnalytics(analyticsData||null);setOriginMetrics(originData||null);setLoading(false);
+    if(summaryError||analyticsError||originError||pipelineError)setNotice(summaryError?.message||analyticsError?.message||originError?.message||pipelineError?.message||'Não foi possível calcular os relatórios.');
+    setSummary(summaryData||null);setAnalytics(analyticsData||null);setOriginMetrics(originData||null);setOpportunityPipeline(pipelineData||null);setLoading(false);
   }
   useEffect(()=>{load()},[org,days,activityVersion]);
 
@@ -57,7 +58,7 @@ export default function ReportsPage(){
   const current=analytics?.current||{}; const previous=analytics?.previous||{};
   const activitySeries=analytics?.activity_series||[]; const funnel=analytics?.funnel||[]; const stageAging=analytics?.stage_aging||[];
   const scoreDistribution=analytics?.score_distribution||[]; const productFit=analytics?.product_fit||[]; const cadencePerformance=analytics?.cadences?.performance||[]; const cadenceChannels=analytics?.cadences?.channels||[];
-  const meetingAnalytics=analytics?.meetings||{}; const financial=analytics?.financial||{}; const geography=analytics?.geography||[];
+  const meetingAnalytics=analytics?.meetings||{}; const geography=analytics?.geography||[]; const opportunityStats=opportunityPipeline||{};
   const teamPerformance=useMemo(()=>{const map=Object.fromEntries((originMetrics?.team||[]).map(item=>[item.user_id,item]));return (analytics?.team||[]).map(row=>({...row,originated_publishers:map[row.user_id]?.originated_publishers||0,current_responsibility:map[row.user_id]?.current_responsibility??row.portfolio??0}))},[analytics,originMetrics]);
   const insights=useMemo(()=>buildActionableInsights(summary,analytics,personal),[summary,analytics,personal]);
   const exportOptions=EXPORT_OPTIONS.filter(option=>!option.managerOnly||isManager);
@@ -93,7 +94,7 @@ export default function ReportsPage(){
 
   async function fetchOpportunities(){
     return fetchPaged(()=>{
-      let query=supabase.from('opportunities').select('id,publisher_id,owner_user_id,created_by,title,service_type,description,stage,estimated_value,probability,expected_close_date,loss_reason,next_step,next_action_at,created_at,updated_at,publishers(name)').eq('organization_id',org);
+      let query=supabase.from('opportunities').select('id,publisher_id,owner_user_id,created_by,title,service_key,service_type,radar_opportunities_title_count,pnld_notice,pnld_category,pnld_works_count,licitacoes_scope,description,stage,expected_close_date,loss_reason,next_step,next_action_at,created_at,updated_at,publishers(name)').eq('organization_id',org);
       if(!isManager)query=query.or(`owner_user_id.eq.${user?.id},created_by.eq.${user?.id}`);
       return query.order('updated_at',{ascending:false});
     });
@@ -154,7 +155,6 @@ export default function ReportsPage(){
       const int=value=>xcell(Number(value)||0,S.integer,'number');
       const decimal=value=>xcell(Number(value)||0,S.decimal,'number');
       const percent=value=>xcell(Number(value)||0,S.percent,'number');
-      const money=value=>xcell(Number(value)||0,S.currency,'number');
       const dt=value=>value?xcell(new Date(value),S.datetime,'datetime'):'';
       const date=value=>value?xcell(new Date(value),S.date,'date'):'';
       const wrap=value=>xcell(value||'',S.wrap);
@@ -200,8 +200,8 @@ export default function ReportsPage(){
         executiveRows.push([label,int(cur),int(prev),deltaText(cur,prev)]);
       });
       executiveRows.push(['Cobertura da responsabilidade atual',percent(total?contacted/total:0),'','']);
-      executiveRows.push(['Pipeline bruto',money(financial.gross_open||0),'','']);
-      executiveRows.push(['Pipeline ponderado',money(financial.weighted_open||0),'','']);
+      executiveRows.push(['Oportunidades abertas',int(opportunityStats.open_total||0),'','']);
+      executiveRows.push(['Em negociação',int(opportunityStats.negotiation_total||0),'','']);
       executiveRows.push(['Tarefas atrasadas',int(overdue),'','']);
       executiveRows.push([]);
       mergeExecutive('ONDE AGIR AGORA');
@@ -256,10 +256,16 @@ export default function ReportsPage(){
         ['Dias médios: primeiro contato → reunião',decimal(meetingAnalytics.avg_days_first_contact_to_meeting||0)]
       ];
 
-      const financeRows=(financial.by_stage||[]).map(row=>[
-        OPPORTUNITY_STAGE_LABELS[row.stage]||row.stage,int(row.count),money(row.gross_value),money(row.weighted_value)
+      const opportunityPipelineRows=(opportunityStats.by_stage||[]).map(row=>[
+        OPPORTUNITY_STAGE_LABELS[row.stage]||row.stage,int(row.count)
       ]);
-      financeRows.unshift(['TOTAL',int((financial.by_stage||[]).reduce((a,row)=>a+Number(row.count||0),0)),money(financial.gross_open||0),money(financial.weighted_open||0)]);
+      opportunityPipelineRows.unshift(['TOTAL ABERTO',int(opportunityStats.open_total||0)]);
+      const opportunityServiceRows=(opportunityStats.by_service||[]).map(row=>[
+        OPPORTUNITY_SERVICE_LABELS[row.service_key]||'Outro serviço / projeto',
+        int(row.open_count),
+        int(row.radar_opportunities_titles||0),
+        int(row.pnld_works||0)
+      ]);
 
       const teamRows=(teamPerformance||[]).map(row=>[
         row.full_name||row.email||'Equipe',row.email||'',int(row.originated_publishers),int(row.current_responsibility),
@@ -297,11 +303,11 @@ export default function ReportsPage(){
         wrap(i.next_step),dt(i.next_action_at),int(i.duration_minutes),PRIORITY_LABELS[i.priority]||i.priority||''
       ]);
 
-      const opportunityHeaders=['Editora','Oportunidade','Serviço / projeto','Etapa','Valor estimado','Probabilidade','Responsável','Fechamento previsto','Próxima ação','Próximo passo','Motivo da perda','Criada em','Atualizada em'];
+      const opportunityHeaders=['Editora','Oportunidade','Serviço Radar','Etapa','Títulos — Radar de Oportunidades','Edital / programa PNLD','Categoria / objeto PNLD','Obras PNLD','Escopo — Radar de Licitações','Outro serviço / projeto','Responsável atual','Previsão de conclusão','Próxima ação','Próximo passo','Motivo da perda','Criada em','Atualizada em','Descrição'];
       const opportunityData=opportunities.map(o=>[
-        o.publishers?.name||'',o.title||'',o.service_type||'',OPPORTUNITY_STAGE_LABELS[o.stage]||o.stage||'',money(o.estimated_value),
-        percent((Number(o.probability)||0)/100),teamMap[o.owner_user_id]?.full_name||teamMap[o.owner_user_id]?.email||'',date(o.expected_close_date),
-        dt(o.next_action_at),wrap(o.next_step),wrap(o.loss_reason),dt(o.created_at),dt(o.updated_at)
+        o.publishers?.name||'',o.title||'',OPPORTUNITY_SERVICE_LABELS[o.service_key]||'Outro serviço / projeto',OPPORTUNITY_STAGE_LABELS[o.stage]||o.stage||'',
+        int(o.radar_opportunities_title_count),o.pnld_notice||'',o.pnld_category||'',int(o.pnld_works_count),wrap(o.licitacoes_scope),o.service_type||'',
+        teamMap[o.owner_user_id]?.full_name||teamMap[o.owner_user_id]?.email||'',date(o.expected_close_date),dt(o.next_action_at),wrap(o.next_step),wrap(o.loss_reason),dt(o.created_at),dt(o.updated_at),wrap(o.description)
       ]);
 
       const taskHeaders=['Editora','Tarefa','Tipo','Status','Prioridade','Responsável','Prazo','Concluída em','Resultado','Observação do resultado','Origem','Criada em','Descrição'];
@@ -325,7 +331,7 @@ export default function ReportsPage(){
       ]);
 
       const dashboardSheet=keys.includes('dashboard')?await buildExcelDashboard({
-        personal,days,current,previous,total,contacted,overdue,financial,
+        personal,days,current,previous,total,contacted,overdue,opportunityStats,
         activitySeries,funnel,cadencePerformance,meetingAnalytics,scoreDistribution,productFit,geography,teamPerformance,teamMap
       }):null;
 
@@ -339,14 +345,15 @@ export default function ReportsPage(){
         cadences:makeTable('Cadências','Desempenho das cadências iniciadas no período.',['Cadência','Editoras','Respostas','Taxa de resposta','Reuniões','Taxa de reunião','Oportunidades','Taxa de oportunidade'],cadenceRows,[34,12,12,18,12,18,16,20]),
         channels:makeTable('Abordagens','Resultados dos canais utilizados nas tarefas de cadência.',['Canal','Tentativas','Resultados positivos','Taxa positiva'],channelRows,[22,14,20,16]),
         meetings:makeTable('Reuniões','Resumo das reuniões no período selecionado.',['Indicador','Valor'],meetingRows,[48,18]),
-        financial:makeTable('Pipeline financeiro','Valor bruto e ponderado das oportunidades em aberto.',['Etapa','Oportunidades','Valor bruto','Valor ponderado'],financeRows,[24,16,20,20]),
+        opportunityPipeline:makeTable('Pipeline de oportunidades','Oportunidades abertas por estágio, sem dados financeiros.',['Etapa','Oportunidades'],opportunityPipelineRows,[30,18]),
+        opportunityServices:makeTable('Oportunidades por serviço','Oportunidades abertas por linha de serviço da Radar.',['Serviço','Abertas','Títulos em divulgação','Obras PNLD'],opportunityServiceRows,[34,14,20,16]),
         team:makeTable('Equipe','Origem de contas, responsabilidade atual e produtividade comercial.',['Pessoa','E-mail','Originadas','Responsabilidade atual','Contatadas','Cobertura atual','Interações','Reuniões','Oportunidades','Tarefas atrasadas'],teamRows,[28,30,12,18,12,14,14,12,16,18]),
         score:makeTable('Radar Score','Distribuição da base por faixa de Radar Score e alertas de alta prioridade.',['Faixa / alerta','Editoras'],scoreRows,[34,16]),
         products:makeTable('Aderência por produto','Editoras com aderência alta (≥70) em cada produto Radar.',['Produto','Alta aderência','Ainda sem contato','% sem contato'],productRows,[34,18,18,16]),
         geography:makeTable('Geografia','Cobertura e atividade comercial por estado.',['UF','Base','Contatadas','Cobertura','Interações no período'],geoRows,[10,14,14,14,20]),
         publishers:makeTable('Editoras',personal?'Editoras sob responsabilidade atual do usuário.':'Base ativa da operação.',publisherHeaders,publisherData,[30,26,18,22,8,24,14,14,12,15,18,17,25,14,14,22,18,20,24,24,20,20,28,18,32]),
         interactions:makeTable('Interações','Contatos registrados nos últimos '+days+' dias.',interactionHeaders,interactionData,[19,28,24,22,14,12,22,28,42,42,14,20,40,19,14,14]),
-        opportunities:makeTable('Oportunidades','Negociações registradas no CRM.',opportunityHeaders,opportunityData,[28,30,24,18,18,14,24,18,19,38,32,19,19]),
+        opportunities:makeTable('Oportunidades','Negociações registradas no CRM sem valores comerciais sensíveis.',opportunityHeaders,opportunityData,[28,30,26,18,22,24,28,14,36,28,24,18,19,38,32,19,19,42]),
         tasks:makeTable('Tarefas','Tarefas abertas e tarefas concluídas nos últimos '+days+' dias.',taskHeaders,taskData,[28,38,16,16,14,24,19,19,22,36,20,19,42]),
         meetingDetails:makeTable('Reuniões detalhadas','Reuniões do período com status e encaminhamentos.',meetingHeaders,meetingData,[19,28,32,20,16,14,24,24,14,38,19,42]),
         cadenceDetails:makeTable('Cadências detalhadas','Inscrições em cadências iniciadas no período.',cadenceDetailHeaders,cadenceDetailData,[28,34,24,16,19,19,19,38,22])
@@ -380,7 +387,7 @@ export default function ReportsPage(){
         <ComparisonMetric icon={<Building2/>} label="Editoras trabalhadas" current={current.publishers_worked} previous={previous.publishers_worked} sub="com contato no período"/>
         <ComparisonMetric icon={<CalendarDays/>} label="Reuniões realizadas" current={current.meetings_completed} previous={previous.meetings_completed} sub="no período"/>
         <ComparisonMetric icon={<Target/>} label="Oportunidades criadas" current={current.opportunities_created} previous={previous.opportunities_created} sub="novas oportunidades"/>
-        <ValueMetric icon={<CircleDollarSign/>} label="Pipeline ponderado" value={currency(financial.weighted_open||0)} sub={'bruto: '+currency(financial.gross_open||0)}/>
+        <ValueMetric icon={<Target/>} label="Oportunidades abertas" value={Number(opportunityStats.open_total||0).toLocaleString('pt-BR')} sub={Number(opportunityStats.negotiation_total||0).toLocaleString('pt-BR')+' em negociação'}/>
         <ValueMetric icon={<Clock3/>} label="Tarefas atrasadas" value={Number(overdue||0).toLocaleString('pt-BR')} sub={Number(pending||0).toLocaleString('pt-BR')+' pendentes'}/>
       </div>
 
@@ -416,9 +423,9 @@ export default function ReportsPage(){
 
         <div className="report-two">
           <section className="card panel">
-            <div className="panel-head"><div><h2>Pipeline financeiro</h2><p>Valor bruto versus valor ponderado pela probabilidade.</p></div><CircleDollarSign size={20}/></div>
-            <div className="finance-total"><div><span>Bruto</span><strong>{currency(financial.gross_open||0)}</strong></div><div><span>Ponderado</span><strong>{currency(financial.weighted_open||0)}</strong></div></div>
-            <SimpleBarList data={(financial.by_stage||[]).map(row=>({label:OPPORTUNITY_STAGE_LABELS[row.stage]||row.stage,value:Number(row.gross_value)||0,display:currency(row.gross_value)}))}/>
+            <div className="panel-head"><div><h2>Pipeline de oportunidades</h2><p>Volume de oportunidades abertas por estágio, sem valores comerciais.</p></div><Target size={20}/></div>
+            <div className="finance-total"><div><span>Abertas</span><strong>{Number(opportunityStats.open_total||0).toLocaleString('pt-BR')}</strong></div><div><span>Em negociação</span><strong>{Number(opportunityStats.negotiation_total||0).toLocaleString('pt-BR')}</strong></div></div>
+            <SimpleBarList data={(opportunityStats.by_stage||[]).map(row=>({label:OPPORTUNITY_STAGE_LABELS[row.stage]||row.stage,value:Number(row.count)||0,display:Number(row.count||0).toLocaleString('pt-BR')}))}/>
           </section>
           <section className="card panel">
             <div className="panel-head"><div><h2>Cobertura comercial</h2><p>Quanto da base já entrou efetivamente no trabalho comercial.</p></div><Gauge size={20}/></div>
@@ -434,9 +441,10 @@ export default function ReportsPage(){
           <section className="card panel"><div className="panel-head"><div><h2>Conversão do funil</h2><p>Avanço acumulado e taxa de passagem entre etapas.</p></div><Workflow size={20}/></div><FunnelView data={funnel}/></section>
           <section className="card panel"><div className="panel-head"><div><h2>Tempo médio por etapa</h2><p>Ajuda a identificar contas paradas e gargalos do processo.</p></div><Clock3 size={20}/></div><SimpleBarList data={stageAging.map(row=>({label:row.name,value:Number(row.avg_days)||0,display:(Number(row.avg_days)||0).toLocaleString('pt-BR',{maximumFractionDigits:1})+' dias',sub:Number(row.count||0).toLocaleString('pt-BR')+' editoras'}))}/></section>
         </div>
-        <section className="card panel"><div className="panel-head"><div><h2>Pipeline financeiro por etapa</h2><p>Valores em aberto e valor ponderado pela probabilidade cadastrada.</p></div><CircleDollarSign size={20}/></div>
-          <div className="finance-total"><div><span>Pipeline bruto</span><strong>{currency(financial.gross_open||0)}</strong></div><div><span>Pipeline ponderado</span><strong>{currency(financial.weighted_open||0)}</strong></div></div>
-          <div className="report-table-wrap"><table className="report-table"><thead><tr><th>Etapa</th><th>Oportunidades</th><th>Valor bruto</th><th>Valor ponderado</th></tr></thead><tbody>{(financial.by_stage||[]).map(row=><tr key={row.stage}><td>{OPPORTUNITY_STAGE_LABELS[row.stage]||row.stage}</td><td>{Number(row.count||0).toLocaleString('pt-BR')}</td><td>{currency(row.gross_value)}</td><td>{currency(row.weighted_value)}</td></tr>)}</tbody></table></div>
+        <section className="card panel"><div className="panel-head"><div><h2>Oportunidades por etapa e serviço</h2><p>Acompanhe o volume comercial sem armazenar valores sensíveis.</p></div><Target size={20}/></div>
+          <div className="finance-total"><div><span>Abertas</span><strong>{Number(opportunityStats.open_total||0).toLocaleString('pt-BR')}</strong></div><div><span>Propostas enviadas</span><strong>{Number(opportunityStats.proposal_total||0).toLocaleString('pt-BR')}</strong></div><div><span>Em negociação</span><strong>{Number(opportunityStats.negotiation_total||0).toLocaleString('pt-BR')}</strong></div><div><span>Ganhas no período</span><strong>{Number(opportunityStats.won_period||0).toLocaleString('pt-BR')}</strong></div></div>
+          <div className="report-table-wrap"><table className="report-table"><thead><tr><th>Etapa</th><th>Oportunidades</th></tr></thead><tbody>{(opportunityStats.by_stage||[]).map(row=><tr key={row.stage}><td>{OPPORTUNITY_STAGE_LABELS[row.stage]||row.stage}</td><td>{Number(row.count||0).toLocaleString('pt-BR')}</td></tr>)}</tbody></table></div>
+          {(opportunityStats.by_service||[]).length>0&&<div className="report-table-wrap" style={{marginTop:14}}><table className="report-table"><thead><tr><th>Serviço</th><th>Abertas</th><th>Títulos em divulgação</th><th>Obras PNLD</th></tr></thead><tbody>{opportunityStats.by_service.map(row=><tr key={row.service_key}><td>{OPPORTUNITY_SERVICE_LABELS[row.service_key]||'Outro serviço / projeto'}</td><td>{Number(row.open_count||0).toLocaleString('pt-BR')}</td><td>{Number(row.radar_opportunities_titles||0).toLocaleString('pt-BR')}</td><td>{Number(row.pnld_works||0).toLocaleString('pt-BR')}</td></tr>)}</tbody></table></div>}
         </section>
       </>}
 
@@ -566,18 +574,18 @@ function GeographyTable({data}){
   return <div className="report-table-wrap"><table className="report-table"><thead><tr><th>UF</th><th>Base</th><th>Contatadas</th><th>Cobertura</th><th>Interações</th></tr></thead><tbody>{data.slice(0,15).map(row=><tr key={row.state}><td><strong>{row.state}</strong></td><td>{Number(row.base_count||0).toLocaleString('pt-BR')}</td><td>{Number(row.contacted||0).toLocaleString('pt-BR')}</td><td>{Number(row.base_count)?Math.round(Number(row.contacted||0)/Number(row.base_count)*100):0}%</td><td>{Number(row.interactions||0).toLocaleString('pt-BR')}</td></tr>)}</tbody></table></div>
 }
 
-async function buildExcelDashboard({personal,days,current,previous,total,contacted,overdue,financial,activitySeries,funnel,cadencePerformance,meetingAnalytics,scoreDistribution,productFit,geography,teamPerformance,teamMap}){
+async function buildExcelDashboard({personal,days,current,previous,total,contacted,overdue,opportunityStats,activitySeries,funnel,cadencePerformance,meetingAnalytics,scoreDistribution,productFit,geography,teamPerformance,teamMap}){
   const S=XLSX_STYLE;
   const cols=14;
   const rows=Array.from({length:86},()=>Array(cols).fill(''));
   rows[0][0]=xcell(personal?'RADAR — Dashboard pessoal':'RADAR — Dashboard gerencial',S.title);
   rows[1][0]=xcell('Período',S.meta);rows[1][1]='Últimos '+days+' dias';
   rows[1][3]=xcell('Gerado em',S.meta);rows[1][4]=xcell(new Date(),S.datetime,'datetime');
-  rows[3][0]=xcell('Interações',S.meta);rows[3][2]=xcell('Reuniões realizadas',S.meta);rows[3][4]=xcell('Oportunidades criadas',S.meta);rows[3][6]=xcell('Pipeline ponderado',S.meta);rows[3][9]=xcell('Cobertura comercial',S.meta);rows[3][12]=xcell('Tarefas atrasadas',S.meta);
+  rows[3][0]=xcell('Interações',S.meta);rows[3][2]=xcell('Reuniões realizadas',S.meta);rows[3][4]=xcell('Oportunidades criadas',S.meta);rows[3][6]=xcell('Oportunidades abertas',S.meta);rows[3][9]=xcell('Cobertura comercial',S.meta);rows[3][12]=xcell('Tarefas atrasadas',S.meta);
   rows[4][0]=xcell(Number(current?.interactions||0),S.integer,'number');
   rows[4][2]=xcell(Number(current?.meetings_completed||0),S.integer,'number');
   rows[4][4]=xcell(Number(current?.opportunities_created||0),S.integer,'number');
-  rows[4][6]=xcell(Number(financial?.weighted_open||0),S.currency,'number');
+  rows[4][6]=xcell(Number(opportunityStats?.open_total||0),S.integer,'number');
   rows[4][9]=xcell(total?contacted/total:0,S.percent,'number');
   rows[4][12]=xcell(Number(overdue||0),S.integer,'number');
 
@@ -601,11 +609,10 @@ async function buildExcelDashboard({personal,days,current,previous,total,contact
   },7,8);
 
   await pushImage({
-    title:'Pipeline financeiro',width:520,height:235,
-    blob:verticalBarChartPng('Pipeline financeiro','Valor bruto × ponderado',[
-      {label:'Bruto',value:Number(financial?.gross_open||0)},
-      {label:'Ponderado',value:Number(financial?.weighted_open||0)}
-    ],{currency:true})
+    title:'Pipeline de oportunidades',width:520,height:235,
+    blob:verticalBarChartPng('Pipeline de oportunidades','Oportunidades abertas por etapa',(opportunityStats?.by_stage||[]).map(row=>({
+      label:OPPORTUNITY_STAGE_LABELS[row.stage]||row.stage,value:Number(row.count||0)
+    })))
   },23,1);
   await pushImage({
     title:'Cadências',width:520,height:235,
