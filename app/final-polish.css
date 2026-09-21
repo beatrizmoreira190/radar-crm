@@ -324,3 +324,11 @@ body{background:linear-gradient(180deg,#f8f9fb 0,#f6f7f9 100%);}
   .handoff-team-performance .team-performance-head,
   .handoff-team-performance .team-performance-row{min-width:760px}
 }
+
+
+/* Opportunity pipeline without financial data */
+.opportunity-service-summary{margin-top:14px;padding-top:12px;border-top:1px solid #eaecf0;display:grid;gap:7px}
+.opportunity-service-summary>strong{font-size:10px;color:#667085;text-transform:uppercase;letter-spacing:.04em}
+.opportunity-service-summary>div{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:11px;color:#475467}
+.opportunity-service-summary b{color:#101828;font-size:12px}
+.forecast-total{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
