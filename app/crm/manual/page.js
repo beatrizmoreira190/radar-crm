@@ -57,7 +57,7 @@ export default function ManualPage(){
           <p>O CRM acompanha a jornada comercial de cada editora e organiza o trabalho da equipe. A lógica principal é simples: <b>entender a conta → executar uma ação → registrar o que aconteceu → definir o próximo passo</b>.</p>
           <Callout title="Rotina recomendada para começar o dia">
             <ol>
-              <li>Abra <Link className="text-link" href="/app">Visão geral</Link> para enxergar rapidamente tarefas, carteira, atividade e situação do pipeline.</li>
+              <li>Abra <Link className="text-link" href="/app">Visão geral</Link> para enxergar rapidamente tarefas, responsabilidade atual, atividade e situação do pipeline.</li>
               <li>Entre em <Link className="text-link" href="/app/prioridades">Prioridades</Link> para decidir quais editoras merecem atenção primeiro.</li>
               <li>Use <Link className="text-link" href="/app/tarefas">Minha fila</Link> para executar tarefas, follow-ups e lembretes.</li>
               <li>Antes de falar com uma editora, abra a ficha e leia <b>Visão da conta</b>, <b>Contato rápido</b>, histórico e Radar Score.</li>
@@ -94,7 +94,7 @@ export default function ManualPage(){
           <div className="manual-table-wrap"><table className="manual-table">
             <thead><tr><th>Perfil</th><th>Uso principal</th><th>Escopo</th></tr></thead>
             <tbody>
-              <tr><td>Prospectador</td><td>Prospecção e acompanhamento diário</td><td>Trabalha principalmente as editoras da própria carteira e pode assumir contas sem responsável.</td></tr>
+              <tr><td>Prospectador</td><td>Prospecção e acompanhamento diário</td><td>Colabora nas editoras conforme suas funções comerciais e pode assumir a responsabilidade atual de contas disponíveis.</td></tr>
               <tr><td>Supervisor</td><td>Acompanhamento da operação</td><td>Tem visão consolidada e acesso às áreas de gestão, sem administrar acessos da equipe.</td></tr>
               <tr><td>Administrador</td><td>Gestão completa do CRM</td><td>Gerencia equipe, acessos, funções, integrações e demais áreas de gestão.</td></tr>
               <tr><td>Administrador geral</td><td>Administração principal</td><td>Equivale ao nível administrativo mais alto da organização.</td></tr>
@@ -166,7 +166,7 @@ export default function ManualPage(){
           </ul>
           <h3>Visões salvas</h3>
           <p>Uma visão salva guarda a combinação atual de busca e filtros para reutilização. Ela é pessoal: salvar uma visão não altera a tela dos demais usuários. A página atual da paginação não é preservada.</p>
-          <p>Use nomes objetivos, como <b>Infantil · SP</b>, <b>Sem contato · score 80+</b> ou <b>Minha carteira · Alta</b>.</p>
+          <p>Use nomes objetivos, como <b>Infantil · SP</b>, <b>Sem contato · score 80+</b> ou <b>Sob minha responsabilidade · Alta</b>.</p>
           <h3>Assumir responsabilidade atual</h3>
           <p>Quando uma conta está sem responsável atual, alguém da prospecção pode assumir a condução do estágio. Na primeira atribuição, essa pessoa também passa a ser registrada como <b>Prospector de origem</b>. Em handoffs posteriores, o responsável atual pode mudar, mas o prospector de origem permanece preservado.</p>
           <p>O CRM protege a operação contra duas pessoas assumirem a mesma conta ao mesmo tempo: se outra pessoa concluir a ação primeiro, a lista é atualizada e a responsabilidade não é duplicada.</p>
@@ -241,11 +241,11 @@ export default function ManualPage(){
         </Section>
 
         <Section id="pipeline" title="Pipeline">
-          <p>O <Link className="text-link" href="/app/pipeline">Pipeline</Link> representa a etapa comercial atual das editoras. Prospectadores veem a própria carteira; gestores acompanham a distribuição consolidada.</p>
+          <p>O <Link className="text-link" href="/app/pipeline">Pipeline</Link> representa a etapa comercial atual das editoras. Usuários comuns veem as editoras sob sua responsabilidade atual; gestores acompanham a distribuição consolidada.</p>
           <h3>Filtros</h3>
           <ul>
             <li>busca por editora ou CNPJ;</li>
-            <li>responsável, para gestores;</li>
+            <li>responsável atual, para gestores;</li>
             <li>prioridade;</li>
             <li>Radar Score mínimo.</li>
           </ul>
