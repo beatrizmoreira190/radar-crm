@@ -76,7 +76,7 @@ export default function ManualPage(){
             <Definition term="Pessoa de contato">É uma pessoa da editora: nome, cargo, área, e-mail, telefone e indicação de decisor. Não é o registro de uma conversa.</Definition>
             <Definition term="Interação">É algo que aconteceu: ligação, e-mail, WhatsApp, LinkedIn, reunião ou outra abordagem. Deve registrar resultado, resumo e próximo passo.</Definition>
             <Definition term="Tarefa">É algo que ainda precisa ser feito. Pode ser manual ou criada automaticamente por reunião, follow-up ou cadência.</Definition>
-            <Definition term="Oportunidade">É uma possibilidade concreta de negócio. Tem etapa própria, valor, probabilidade, previsão de fechamento e próximo passo.</Definition>
+            <Definition term="Oportunidade">É uma possibilidade concreta de negócio. Registra o serviço da Radar, a etapa, os dados operacionais específicos daquele serviço, a previsão de conclusão e o próximo passo. O CRM não armazena valores comerciais nem probabilidade de fechamento.</Definition>
             <Definition term="Etapa do Pipeline">Representa a situação comercial geral da editora no funil da Radar. Não é a mesma coisa que a etapa de uma oportunidade.</Definition>
             <Definition term="Prioridade manual">Baixa, Média, Alta ou Urgente. Ajusta a atenção operacional, mas não substitui prazos vencidos nem o Radar Score.</Definition>
             <Definition term="Radar Score">Pontuação calculada por regras do CRM para ajudar a interpretar aderência e potencial. Não é uma decisão automática sobre abordar ou não uma editora.</Definition>
@@ -221,20 +221,18 @@ export default function ManualPage(){
         </Section>
 
         <Section id="oportunidades" title="Oportunidades">
-          <p>Crie uma oportunidade quando a conversa já representar uma possibilidade concreta de contratação, projeto, proposta ou negociação.</p>
-          <p>Uma oportunidade pode registrar:</p>
+          <p>Crie uma oportunidade quando a conversa já representar uma possibilidade concreta de contratação, proposta, inscrição ou acompanhamento comercial.</p>
+          <h3>Serviços da Radar</h3>
           <ul>
-            <li>título;</li>
-            <li>serviço ou projeto;</li>
-            <li>etapa da oportunidade;</li>
-            <li>valor estimado;</li>
-            <li>probabilidade de fechamento;</li>
-            <li>fechamento previsto;</li>
-            <li>próximo passo;</li>
-            <li>descrição do contexto;</li>
-            <li>motivo da perda, quando encerrada como perdida.</li>
+            <li><b>Radar de Oportunidades:</b> serviço de divulgação de livros. Registre a quantidade de títulos que a editora pretende divulgar.</li>
+            <li><b>PNLD:</b> serviço de inscrição e acompanhamento de obras em edital. Registre edital/programa, categoria ou objeto e quantidade de obras quando essas informações já estiverem definidas.</li>
+            <li><b>Radar de Licitações:</b> serviço de acompanhamento de editais/licitações. Registre o escopo do acompanhamento; não use quantidade de livros, porque esse serviço não é uma divulgação de títulos.</li>
+            <li><b>Outro serviço / projeto:</b> use apenas quando a oportunidade não se encaixar nas três linhas acima.</li>
           </ul>
-          <p>Valor e probabilidade alimentam o forecast. Exemplo: uma oportunidade de R$ 10.000 com probabilidade de 40% contribui com R$ 4.000 para o valor ponderado.</p>
+          <p>Toda oportunidade também registra título, etapa, previsão de conclusão, próximo passo, descrição do contexto e motivo da perda quando aplicável.</p>
+          <Callout title="Valores comerciais não entram no CRM" tone="warning">
+            <p>Preços, valores de pacotes e probabilidades de fechamento são informações sensíveis e não são armazenados nas oportunidades, relatórios ou exportações do CRM.</p>
+          </Callout>
           <Callout title="Oportunidade não é sinônimo de contato">
             <p>Uma conversa cordial, pedido de material ou primeiro contato não precisa virar oportunidade imediatamente. Registre oportunidade quando existir um negócio identificável.</p>
           </Callout>
@@ -361,7 +359,7 @@ export default function ManualPage(){
           <p>Reuniões futuras indicam se já existe material pronto relacionado ao atendimento.</p>
         </Section>
 
-        <Section id="desempenho" title="Desempenho, metas e forecast">
+        <Section id="desempenho" title="Desempenho, metas e pipeline de oportunidades">
           <p>A página <Link className="text-link" href="/app/desempenho">Desempenho</Link> acompanha resultados individuais e, para gestores, consolida a equipe.</p>
           <ul>
             <li><b>Responsabilidade atual:</b> quantas editoras a pessoa conduz neste momento;</li>
@@ -369,15 +367,14 @@ export default function ManualPage(){
             <li>interações no período;</li>
             <li>editoras diferentes contatadas;</li>
             <li>tarefas concluídas e atrasadas;</li>
-            <li>oportunidades criadas;</li>
-            <li>valor ganho no período;</li>
-            <li>forecast de oportunidades abertas.</li>
+            <li>oportunidades criadas e ganhas;</li>
+            <li>oportunidades abertas por etapa e por serviço.</li>
           </ul>
           <p>O período pode ser alternado entre 30, 60 e 90 dias.</p>
           <h3>Metas</h3>
           <p>Gestores podem definir metas por pessoa e período para interações, tarefas concluídas e oportunidades criadas. O progresso é calculado a partir dos registros reais do CRM.</p>
-          <h3>Forecast</h3>
-          <p>O forecast ponderado multiplica o valor estimado pela probabilidade cadastrada em cada oportunidade aberta. É uma projeção operacional, não uma garantia de receita.</p>
+          <h3>Pipeline de oportunidades</h3>
+          <p>Em vez de forecast financeiro, o CRM acompanha quantidade de oportunidades abertas, propostas enviadas, negociações, ganhos no período e distribuição por serviço. Para Radar de Oportunidades também pode totalizar títulos em divulgação; para PNLD, obras em processo.</p>
         </Section>
 
         <Section id="relatorios" title="Relatórios, análises e exportação em Excel">
@@ -385,15 +382,15 @@ export default function ManualPage(){
           <p>Escolha 30, 60 ou 90 dias para comparar atividade e resultados.</p>
           <h3>Abas disponíveis</h3>
           <ul>
-            <li><b>Visão geral:</b> pontos de atenção, ritmo comercial, funil, reuniões, cobertura e pipeline financeiro.</li>
-            <li><b>Funil e oportunidades:</b> conversão, tempo médio por etapa e valores por estágio.</li>
+            <li><b>Visão geral:</b> pontos de atenção, ritmo comercial, funil, reuniões, cobertura e pipeline de oportunidades.</li>
+            <li><b>Funil e oportunidades:</b> conversão, tempo médio por etapa, oportunidades por estágio e distribuição por serviço.</li>
             <li><b>Cadências e reuniões:</b> desempenho das sequências, canais e resultados de reuniões.</li>
             <li><b>Equipe:</b> disponível para gestores, separando contas originadas, responsabilidade atual e produtividade por pessoa.</li>
             <li><b>Inteligência Radar:</b> distribuição de score, aderência por produto e leituras da base.</li>
           </ul>
           <h3>Baixar relatório</h3>
           <p>O CRM gera arquivos <b>.xlsx</b> com conjuntos diferentes de abas. As opções incluem Completo, Executivo, Comercial, Pipeline e oportunidades, Cadências e abordagens, Reuniões e Base de editoras; gestores também podem exportar Equipe e produtividade.</p>
-          <p>A exportação respeita o escopo de acesso. Um prospectador não recebe uma exportação de equipe apenas por escolher outro tipo de relatório.</p>
+          <p>A exportação respeita o escopo de acesso. Um prospectador não recebe uma exportação de equipe apenas por escolher outro tipo de relatório. As planilhas de oportunidades não incluem preços, valores de pacote ou probabilidade de fechamento.</p>
         </Section>
 
         <Section id="atividade" title="Atividade">
