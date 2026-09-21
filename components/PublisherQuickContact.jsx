@@ -11,7 +11,7 @@ export default function PublisherQuickContact({publisher}){
 
   return <section className="publisher-quick-contact card" aria-label="Contato rápido da editora">
     <div className="quick-contact-heading">
-      <div><small>Contato essencial</small><strong>Fale com a editora sem procurar pela ficha</strong></div>
+      <div><small>Contato rápido</small><strong>Dados principais da editora</strong></div>
       <PublisherHelp text="Atalhos diretos para os dados de contato mais usados durante a prospecção."/>
     </div>
     <div className="quick-contact-items">
