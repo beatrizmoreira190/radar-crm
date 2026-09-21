@@ -369,11 +369,12 @@ export default function ManualPage(){
 
         <Section id="atividade" title="Atividade">
           <p>A página <Link className="text-link" href="/app/atividade">Atividade</Link> é o histórico resumido de mudanças relevantes.</p>
-          <p>O feed traduz registros internos para linguagem de uso, por exemplo: <b>Alterou a etapa · A prospectar → Contato realizado</b>, <b>Criou tarefa</b> ou <b>Alterou responsável</b>.</p>
+          <p>O feed traduz registros internos para linguagem de uso e mostra <b>todos os campos relevantes alterados no mesmo evento</b>, com valor anterior e novo. Ex.: etapa, prioridade, responsável e próxima ação podem aparecer juntas quando foram modificadas na mesma edição.</p>
           <ul>
             <li>Prospectadores revisam suas próprias movimentações.</li>
             <li>Gestores acompanham as principais movimentações da equipe.</li>
-            <li>A busca procura por ação, detalhe, tipo de registro e pessoa.</li>
+            <li>A busca percorre o histórico completo dentro do escopo permitido do usuário.</li>
+            <li>O histórico é paginado em blocos de 30 registros para manter a tela leve mesmo quando a auditoria crescer.</li>
           </ul>
           <p>Atividade é útil para auditoria e contexto, mas não substitui o Histórico de interações da ficha quando você precisa entender uma conversa comercial.</p>
         </Section>
