@@ -49,6 +49,11 @@ export default function PublisherMaterialsMount(){
   useEffect(()=>{load()},[org,id,activityVersion]);
 
   function openNew(){setEditing(null);setShowModal(true)}
+  useEffect(()=>{
+    function onPublisherAction(event){if(event.detail?.type==='material'&&canManage)openNew()}
+    window.addEventListener('radar:publisher-action',onPublisherAction);
+    return()=>window.removeEventListener('radar:publisher-action',onPublisherAction);
+  },[canManage]);
   function openEdit(material){setEditing(material);setShowModal(true)}
   function close(){setShowModal(false);setEditing(null)}
 
@@ -59,7 +64,7 @@ export default function PublisherMaterialsMount(){
           <div className="help-heading"><h2>Materiais comerciais</h2><PublisherHelp text="Apresentações, projetos, propostas, curadorias e outros materiais preparados para esta editora."/></div>
           <p className="muted">Links de apresentações, projetos, propostas e curadorias preparados para esta editora.</p>
         </div>
-        {canManage&&<button className="btn secondary small" type="button" onClick={openNew}><Plus size={14}/> Material</button>}
+        
       </div>
       {notice&&<div className="notice-bar" style={{marginBottom:12}}><span>{notice}</span><button type="button" onClick={()=>setNotice('')}><X size={14}/></button></div>}
       {loading?<div className="table-empty">Carregando materiais…</div>:materials.length?<div className="publisher-material-list">{materials.map(material=>{
