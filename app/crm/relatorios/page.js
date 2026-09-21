@@ -127,10 +127,51 @@ export default function ReportsPage(){
     });
   }
 
+  async function downloadCompleteReport(){
+    const {data:{session},error:sessionError}=await supabase.auth.getSession();
+    if(sessionError||!session?.access_token)throw new Error('Sua sessão expirou. Entre novamente no CRM para exportar o relatório.');
+
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),120000);
+    try{
+      const response=await fetch('/api/reports/complete?days='+days,{
+        method:'GET',
+        headers:{Authorization:'Bearer '+session.access_token},
+        cache:'no-store',
+        signal:controller.signal
+      });
+      if(!response.ok){
+        const body=await response.json().catch(()=>({}));
+        throw new Error(body?.error||'Não foi possível gerar o relatório completo.');
+      }
+      const blob=await response.blob();
+      if(!blob.size)throw new Error('O relatório foi gerado sem conteúdo.');
+      const url=URL.createObjectURL(blob);
+      const link=document.createElement('a');
+      link.href=url;
+      link.download=response.headers.get('x-radar-file-name')||('radar-completo-'+new Date().toISOString().slice(0,10)+'.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }catch(error){
+      if(error?.name==='AbortError')throw new Error('O relatório completo demorou mais de 2 minutos para ser gerado. Tente novamente.');
+      throw error;
+    }finally{
+      clearTimeout(timer);
+    }
+  }
+
   async function exportReport(){
     if(!summary||!analytics||!org)return;
     setExporting(true);setNotice('');
     try{
+      if(exportType==='complete'){
+        setNotice('Preparando o relatório completo no servidor…');
+        await downloadCompleteReport();
+        setNotice('Relatório completo gerado com sucesso.');
+        return;
+      }
       const keys=REPORT_SHEET_KEYS[exportType]||REPORT_SHEET_KEYS.complete;
       const needsPublishers=keys.includes('publishers');
       const needsInteractions=keys.includes('interactions');
