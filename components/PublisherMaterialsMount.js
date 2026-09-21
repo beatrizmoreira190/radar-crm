@@ -5,7 +5,8 @@ import { useParams } from 'next/navigation';
 import { CalendarClock, ExternalLink, FileText, Pencil, Plus, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 import { MATERIAL_STATUS_LABELS, MATERIAL_TYPE_LABELS, formatDate } from '@/lib/constants';
-import PublisherHelp from '@/components/PublisherHelp';\nimport ModalDialog from '@/components/ModalDialog';
+import PublisherHelp from '@/components/PublisherHelp';
+import ModalDialog from '@/components/ModalDialog';
 
 function linkHost(value=''){
   try{return new URL(value).hostname.replace(/^www\./,'')}catch{return 'Link externo'}
