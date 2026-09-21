@@ -5,6 +5,7 @@ import { Bell, BellRing, CheckCheck, CheckCircle2, Clock3, Copy, MessageSquareTe
 import { useCrm } from '@/components/CrmProvider';
 import { PRIORITY_LABELS, RESULT_LABELS, TASK_TYPE_LABELS, formatDate } from '@/lib/constants';
 import Pagination from '@/components/Pagination';
+import ModalDialog from '@/components/ModalDialog';
 
 const AUTOMATION_LABELS={meeting_preparation:'Preparação automática',meeting_outcome:'Resultado automático',meeting_follow_up:'Follow-up automático'};
 const CADENCE_RESULTS=['no_answer','left_message','connected','replied','asked_email','meeting_scheduled','callback_scheduled','busy','follow_up','proposal_requested','qualified','not_interested','wrong_contact','contact_updated','other'];
@@ -96,6 +97,7 @@ function NewTask({supabase,org,user,onClose,onSaved}){
   const [selectedPublisher,setSelectedPublisher]=useState(null);
   const [searching,setSearching]=useState(false);
   const [err,setErr]=useState('');
+  const [busy,setBusy]=useState(false);
 
   useEffect(()=>{
     const needle=publisherSearch.trim();
@@ -135,17 +137,19 @@ function NewTask({supabase,org,user,onClose,onSaved}){
 
   async function save(e){
     e.preventDefault();
+    if(busy)return;
+    setBusy(true);
+    setErr('');
     const {error}=await supabase.from('tasks').insert({
       organization_id:org,publisher_id:f.publisher_id||null,assigned_to:user.id,created_by:user.id,
       title:f.title,description:f.description||null,task_type:f.task_type,priority:f.priority,status:'open',
       due_at:f.due_at?new Date(f.due_at).toISOString():null
     });
-    if(error)setErr(error.message);else onSaved();
+    if(error){setErr(error.message);setBusy(false)}else onSaved();
   }
 
-  return <div className="modal-backdrop"><form className="modal" onSubmit={save}>
-    <div className="modal-head"><div><h3>Nova tarefa</h3><p>Inclua o próximo passo na sua fila.</p></div><button type="button" onClick={onClose}><X/></button></div>
-    {err&&<div className="notice error">{err}</div>}
+  return <ModalDialog title="Nova tarefa" description="Inclua o próximo passo na sua fila." onClose={onClose} onSubmit={save} busy={busy}>
+    {err&&<div className="notice error" role="alert">{err}</div>}
     <div className="form-grid">
       <label className="span-2">Título<input required className="input" value={f.title} onChange={e=>setF(x=>({...x,title:e.target.value}))}/></label>
       <div className="span-2">
@@ -170,8 +174,8 @@ function NewTask({supabase,org,user,onClose,onSaved}){
       <label className="span-2">Prazo<input type="datetime-local" className="input" value={f.due_at} onChange={e=>setF(x=>({...x,due_at:e.target.value}))}/></label>
       <label className="span-2">Descrição<textarea rows={3} value={f.description} onChange={e=>setF(x=>({...x,description:e.target.value}))}/></label>
     </div>
-    <div className="modal-actions"><button type="button" className="btn secondary" onClick={onClose}>Cancelar</button><button className="btn">Salvar tarefa</button></div>
-  </form></div>;
+    <div className="modal-actions"><button type="button" className="btn secondary" disabled={busy} onClick={onClose}>Cancelar</button><button className="btn" disabled={busy}>{busy?'Salvando…':'Salvar tarefa'}</button></div>
+  </ModalDialog>;
 }
 
 function CadenceResultModal({supabase,org,task,onClose,onSaved}){
@@ -205,15 +209,14 @@ function CadenceResultModal({supabase,org,task,onClose,onSaved}){
     if(error)setErr(error.message);else onSaved(data?.action||'Resultado registrado e cadência atualizada.');
   }
 
-  return <div className="modal-backdrop"><form className="modal" onSubmit={save}>
-    <div className="modal-head"><div><h3>Registrar resultado</h3><p>{task.publishers?.name||'Editora'} · {task.title}</p></div><button type="button" onClick={onClose}><X/></button></div>
-    {err&&<div className="notice error">{err}</div>}
+  return <ModalDialog title="Registrar resultado" description={`${task.publishers?.name||'Editora'} · ${task.title}`} onClose={onClose} onSubmit={save} busy={busy}>
+    {err&&<div className="notice error" role="alert">{err}</div>}
     <div className="form-grid">
       <label className="span-2">O que aconteceu?<select value={result} onChange={e=>setResult(e.target.value)}>{CADENCE_RESULTS.map(key=><option key={key} value={key}>{RESULT_LABELS[key]||key}</option>)}</select></label>
       <div className="span-2" style={{padding:'9px 10px',borderRadius:8,background:'#f8fafc',border:'1px solid #e4e7ec',fontSize:11,color:'#475467',lineHeight:1.45}}>{reaction}</div>
       {needsDate&&<label className="span-2">Retomar em<input required type="datetime-local" className="input" value={resumeAt} onChange={e=>setResumeAt(e.target.value)}/></label>}
       <label className="span-2">Observação<textarea rows={3} value={note} onChange={e=>setNote(e.target.value)} placeholder="Contexto útil para o próximo contato (opcional)"/></label>
     </div>
-    <div className="modal-actions"><button className="btn secondary" type="button" onClick={onClose}>Cancelar</button><button className="btn" disabled={busy}>{busy?'Atualizando…':'Concluir tarefa'}</button></div>
-  </form></div>;
+    <div className="modal-actions"><button className="btn secondary" type="button" disabled={busy} onClick={onClose}>Cancelar</button><button className="btn" disabled={busy}>{busy?'Atualizando…':'Concluir tarefa'}</button></div>
+  </ModalDialog>;
 }
