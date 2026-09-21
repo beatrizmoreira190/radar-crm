@@ -20,7 +20,6 @@ import {
   RESULT_LABELS,
   ROLE_LABELS,
   TASK_TYPE_LABELS,
-  currency,
   formatDate,
   timeAgo
 } from '@/lib/constants';
