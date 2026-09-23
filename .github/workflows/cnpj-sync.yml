@@ -1,0 +1,34 @@
+name: Atualização cadastral CNPJ
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: radar-cnpj-sync-worker
+  cancel-in-progress: false
+
+jobs:
+  worker:
+    if: github.repository == 'beatrizmoreira190/radar-crm'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Processar solicitação pendente
+        env:
+          CNPJ_SYNC_EDGE_URL: https://xogfqpeubtcqehaadywm.supabase.co/functions/v1/cnpj-sync-worker
+          PYTHONUNBUFFERED: '1'
+        run: python scripts/cnpj_sync.py
