@@ -141,6 +141,145 @@ begin
 end;
 $function$;
 
+-- Auditorias específicas seguem a mesma regra: apenas ação humana autenticada,
+-- com descrição explícita e payload compacto.
+create or replace function private.audit_meeting_change()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public','private','pg_temp'
+as $function$
+declare
+  actor uuid:=auth.uid();
+  audit_suppressed boolean:=coalesce(current_setting('app.crm_audit_suppress',true),'')='1';
+  lbl text;
+  meeting_name text;
+  publisher_name text;
+  oldj jsonb;
+  newj jsonb;
+  beforej jsonb;
+  afterj jsonb;
+  changed_keys text[];
+  ignored_keys text[]:=array[
+    'updated_at','google_event_id','google_event_url','google_meet_url',
+    'google_last_synced_at','google_sync_error','calendar_sync_status'
+  ];
+begin
+  if audit_suppressed or actor is null then
+    if tg_op='DELETE' then return old; else return new; end if;
+  end if;
+
+  meeting_name:=coalesce(
+    case when tg_op<>'DELETE' then nullif(btrim(new.title),'') end,
+    case when tg_op<>'INSERT' then nullif(btrim(old.title),'') end,
+    'Reunião'
+  );
+
+  select coalesce(nullif(btrim(p.commercial_name),''),nullif(btrim(p.trade_name),''),nullif(btrim(p.name),''),nullif(btrim(p.legal_name),''))
+    into publisher_name
+  from public.publishers p
+  where p.id=case when tg_op='DELETE' then old.publisher_id else new.publisher_id end;
+
+  if tg_op='UPDATE' then
+    oldj:=to_jsonb(old); newj:=to_jsonb(new);
+    select coalesce(array_agg(k.key order by k.key),array[]::text[])
+      into changed_keys
+    from jsonb_object_keys(oldj||newj) as k(key)
+    where oldj->k.key is distinct from newj->k.key
+      and not(k.key=any(ignored_keys));
+    if cardinality(changed_keys)=0 then return new; end if;
+
+    select coalesce(jsonb_object_agg(k,coalesce(oldj->k,'null'::jsonb)),'{}'::jsonb)
+      into beforej from unnest(changed_keys) as k;
+    select coalesce(jsonb_object_agg(k,coalesce(newj->k,'null'::jsonb)),'{}'::jsonb)
+      into afterj from unnest(changed_keys) as k;
+  elsif tg_op='INSERT' then
+    beforej:=null;
+    afterj:=jsonb_build_object(
+      'title',new.title,'meeting_type',new.meeting_type,'scheduled_start',new.scheduled_start,
+      'duration_minutes',new.duration_minutes,'status',new.status,'presenter_user_id',new.presenter_user_id
+    );
+  else
+    beforej:=jsonb_build_object(
+      'title',old.title,'meeting_type',old.meeting_type,'scheduled_start',old.scheduled_start,
+      'duration_minutes',old.duration_minutes,'status',old.status,'presenter_user_id',old.presenter_user_id
+    );
+    afterj:=null;
+  end if;
+
+  lbl:=case tg_op
+    when 'INSERT' then 'Agendou reunião'
+    when 'UPDATE' then case
+      when new.status is distinct from old.status and new.status='completed' then 'Concluiu reunião'
+      when new.status is distinct from old.status and new.status='cancelled' then 'Cancelou reunião'
+      when new.scheduled_start is distinct from old.scheduled_start then 'Reagendou reunião'
+      else 'Atualizou reunião'
+    end
+    else 'Excluiu reunião'
+  end;
+  lbl:=lbl||' · '||meeting_name||coalesce(' · '||publisher_name,'');
+
+  insert into public.audit_events(
+    organization_id,actor_user_id,entity_type,entity_id,action,label,before_data,after_data
+  ) values (
+    coalesce(case when tg_op<>'DELETE' then new.organization_id end,old.organization_id),
+    actor,'meetings',coalesce(case when tg_op<>'DELETE' then new.id end,old.id)::text,
+    lower(tg_op),lbl,beforej,afterj
+  );
+
+  if tg_op='DELETE' then return old; else return new; end if;
+end;
+$function$;
+
+create or replace function private.audit_org_member_change()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public','private','pg_temp'
+as $function$
+declare
+  actor uuid:=auth.uid();
+  audit_suppressed boolean:=coalesce(current_setting('app.crm_audit_suppress',true),'')='1';
+  lbl text;
+  member_name text;
+  beforej jsonb;
+  afterj jsonb;
+begin
+  if audit_suppressed or actor is null then return new; end if;
+
+  if new.role is distinct from old.role or new.active is distinct from old.active then
+    lbl:='Alterou acesso de membro';
+  else
+    lbl:='Atualizou perfil de membro';
+  end if;
+
+  member_name:=coalesce(nullif(btrim(new.full_name),''),nullif(btrim(new.email),'') ,'Membro da equipe');
+  lbl:=lbl||' · '||member_name;
+
+  beforej:=jsonb_strip_nulls(jsonb_build_object(
+    'role',case when old.role is distinct from new.role then old.role end,
+    'active',case when old.active is distinct from new.active then old.active end,
+    'full_name',case when old.full_name is distinct from new.full_name then old.full_name end,
+    'job_title',case when old.job_title is distinct from new.job_title then old.job_title end,
+    'email',case when old.email is distinct from new.email then old.email end
+  ));
+  afterj:=jsonb_strip_nulls(jsonb_build_object(
+    'role',case when old.role is distinct from new.role then new.role end,
+    'active',case when old.active is distinct from new.active then new.active end,
+    'full_name',case when old.full_name is distinct from new.full_name then new.full_name end,
+    'job_title',case when old.job_title is distinct from new.job_title then new.job_title end,
+    'email',case when old.email is distinct from new.email then new.email end
+  ));
+
+  insert into public.audit_events(
+    organization_id,actor_user_id,entity_type,entity_id,action,label,before_data,after_data
+  ) values (
+    new.organization_id,actor,'org_members',new.user_id::text,'update',lbl,beforej,afterj
+  );
+  return new;
+end;
+$function$;
+
 -- Remove do histórico o ruído já gerado por jobs/sincronizações.
 delete from public.audit_events
 where actor_user_id is null;
