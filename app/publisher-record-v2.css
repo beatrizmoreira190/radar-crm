@@ -1006,3 +1006,19 @@
   }
   .quick-contact-items>*:first-child{border-top:0!important}
 }
+
+
+/* Let the full address wrap in the quick-contact strip instead of truncating it. */
+.quick-contact-location{
+  align-items:flex-start!important;
+}
+.quick-contact-location strong,
+.quick-contact-location em{
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+}
+.quick-contact-location em{
+  display:block!important;
+  line-height:1.35!important;
+}
