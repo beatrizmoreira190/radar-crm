@@ -199,7 +199,6 @@ export default function PublisherDetailPage(){
           <Info label="Porte" value={publisher.company_size||publisher.size_label} help={HELP.companySize}/>
           <Info label="Localização" value={[publisher.address_street,publisher.address_number,publisher.city,publisher.state].filter(Boolean).join(', ')} help={HELP.location}/>
           <Info label="Segmentos de atuação" value={(publisher.market_segments||[]).join(', ')} help={HELP.marketSegments}/>
-          <Info label="Perfil cadastral" value={publisher.profile} help={HELP.registeredProfile}/>
         </div>
 
         {(cnpjVerification||publisher.web_enrichment_status||commercialSources.length>0||publicSources.length>0)&&<details className="publisher-source-details">
