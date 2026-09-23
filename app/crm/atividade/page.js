@@ -17,6 +17,8 @@ import {
   OPPORTUNITY_STAGE_LABELS,
   OPPORTUNITY_SERVICE_LABELS,
   PRIORITY_LABELS,
+  PUBLISHER_ARCHIVE_REASON_LABELS,
+  PUBLISHER_COMMERCIAL_PROFILE_LABELS,
   RESULT_LABELS,
   ROLE_LABELS,
   TASK_TYPE_LABELS,
@@ -49,7 +51,8 @@ const FIELD_CONFIG={
   commercial_temperature:{label:'Temperatura comercial',type:'text'},
   archived:{label:'Arquivada',type:'boolean'},
   name:{label:'Nome',type:'text'},
-  trade_name:{label:'Nome fantasia',type:'text'},
+  trade_name:{label:'Nome fantasia oficial',type:'text'},
+  commercial_name:{label:'Nome comercial / marca',type:'text'},
   legal_name:{label:'Razão social',type:'text'},
   cnpj:{label:'CNPJ',type:'text'},
   website:{label:'Site',type:'text'},
@@ -60,7 +63,13 @@ const FIELD_CONFIG={
   secondary_phone:{label:'Telefone secundário',type:'text'},
   general_email:{label:'E-mail geral',type:'text'},
   alternate_emails:{label:'E-mails alternativos',type:'list'},
-  profile:{label:'Perfil cadastral',type:'text'},
+  instagram:{label:'Instagram',type:'text'},
+  linkedin_url:{label:'LinkedIn',type:'text'},
+  commercial_profile_code:{label:'Perfil comercial Radar',type:'commercial_profile'},
+  commercial_profile_source:{label:'Origem do perfil comercial',type:'commercial_profile_source'},
+  commercial_profile_note:{label:'Observação do perfil comercial',type:'text'},
+  archive_reason_code:{label:'Motivo do arquivamento',type:'archive_reason'},
+  archive_reason_note:{label:'Observação do arquivamento',type:'text'},
   company_size:{label:'Porte',type:'text'},
   book_types:{label:'Tipos de livro',type:'text'},
   market_segments:{label:'Segmentos de atuação',type:'list'},
@@ -270,6 +279,9 @@ export default function ActivityPage(){
     if(cfg.type==='duration')return Number(value).toLocaleString('pt-BR')+' min';
     if(cfg.type==='list')return Array.isArray(value)?(value.join(', ')||'Nenhum'):String(value);
     if(cfg.type==='commercial_functions')return Array.isArray(value)?(value.map(v=>COMMERCIAL_FUNCTION_LABELS[v]||v).join(', ')||'Nenhuma'):String(value);
+    if(cfg.type==='commercial_profile')return PUBLISHER_COMMERCIAL_PROFILE_LABELS[value]||value;
+    if(cfg.type==='commercial_profile_source')return ({manual:'Confirmado manualmente',editorial_profile:'Confirmado pelo perfil editorial',system_default:'Padrão do sistema'})[value]||value;
+    if(cfg.type==='archive_reason')return PUBLISHER_ARCHIVE_REASON_LABELS[value]||value;
     if(cfg.type==='editorial_status')return EDITORIAL_PROFILE_STATUS_LABELS[value]||value;
     if(cfg.type==='editorial_confidence')return EDITORIAL_PROFILE_CONFIDENCE_LABELS[value]||value;
     if(cfg.type==='opportunity_stage')return OPPORTUNITY_STAGE_LABELS[value]||value;
@@ -313,16 +325,17 @@ export default function ActivityPage(){
     const entity=entityLabel(row.entity_type);
     const ctx=context(row);
     const changeList=changes(row);
+    const explicitLabel=String(row.label||'').trim();
     if(row.action==='update'){
       return {
-        title:'Atualizou '+entity.toLowerCase()+(ctx?' · '+ctx:''),
+        title:explicitLabel||('Atualizou '+entity.toLowerCase()+(ctx?' · '+ctx:'')),
         changes:changeList,
-        detail:changeList.length?'':(row.label||'Atualização registrada')
+        detail:changeList.length?'':'Atualização registrada'
       };
     }
-    if(row.action==='insert'||row.action==='create')return {title:'Criou '+entity.toLowerCase()+(ctx?' · '+ctx:''),changes:[],detail:row.label||''};
-    if(row.action==='delete')return {title:'Removeu '+entity.toLowerCase()+(ctx?' · '+ctx:''),changes:[],detail:row.label||''};
-    return {title:row.label||'Atualizou '+entity.toLowerCase(),changes:changeList,detail:ctx};
+    if(row.action==='insert'||row.action==='create')return {title:explicitLabel||('Criou '+entity.toLowerCase()+(ctx?' · '+ctx:'')),changes:[],detail:''};
+    if(row.action==='delete')return {title:explicitLabel||('Removeu '+entity.toLowerCase()+(ctx?' · '+ctx:'')),changes:[],detail:''};
+    return {title:explicitLabel||('Atualizou '+entity.toLowerCase()),changes:changeList,detail:ctx};
   }
 
   const enriched=useMemo(()=>rows.map(row=>({...row,_description:describe(row)})),[rows,stageMap,teamMap]);
@@ -335,7 +348,7 @@ export default function ActivityPage(){
       <div>
         <div className="eyebrow">Histórico</div>
         <h1>Atividade</h1>
-        <p>Veja exatamente o que mudou em cada registro, com valores anteriores e novos, sem depender de nomes técnicos do banco.</p>
+        <p>Histórico das ações humanas realizadas diretamente no CRM, com a editora ou registro identificado e os valores alterados.</p>
       </div>
     </div>
 
