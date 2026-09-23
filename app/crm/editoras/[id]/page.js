@@ -1,12 +1,12 @@
 'use client';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ArrowLeft, CheckCircle2, CircleHelp, Clock3, DatabaseZap, Globe2, Plus, Save, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 import { PtBrDateField, PtBrDateTimeField } from '@/components/PtBrDateFields';
 import MentionTextarea from '@/components/MentionTextarea';
-import { CHANNEL_LABELS, EDITORIAL_PROFILE_CONFIDENCE_LABELS, EDITORIAL_PROFILE_STATUS_LABELS, INTEREST_LABELS, OPPORTUNITY_SERVICE_LABELS, OPPORTUNITY_STAGE_LABELS, PRIORITY_LABELS, RESULT_LABELS, TASK_TYPE_LABELS, formatDate } from '@/lib/constants';
+import { CHANNEL_LABELS, EDITORIAL_PROFILE_CONFIDENCE_LABELS, EDITORIAL_PROFILE_STATUS_LABELS, INTEREST_LABELS, OPPORTUNITY_SERVICE_LABELS, OPPORTUNITY_STAGE_LABELS, PRIORITY_LABELS, PUBLISHER_ARCHIVE_REASON_LABELS, RESULT_LABELS, TASK_TYPE_LABELS, formatDate, publisherStageBadgeClass } from '@/lib/constants';
 import PublisherRecordOverview from '@/components/PublisherRecordOverview';
 import PublisherQuickContact from '@/components/PublisherQuickContact';
 import PublisherRadarPanel from '@/components/PublisherRadarPanel';
@@ -96,7 +96,7 @@ function opportunityServiceDetail(opportunity){
 }
 
 export default function PublisherDetailPage(){
-  const {id}=useParams(); const {supabase,membership,user,teamMap,team,isManager,hasCommercialFunction,activityVersion}=useCrm(); const org=membership?.organization_id;
+  const {id}=useParams(); const router=useRouter(); const {supabase,membership,user,teamMap,team,isManager,hasCommercialFunction,activityVersion}=useCrm(); const org=membership?.organization_id;
   const [publisher,setPublisher]=useState(null); const [contacts,setContacts]=useState([]); const [interactions,setInteractions]=useState([]); const [tasks,setTasks]=useState([]); const [opps,setOpps]=useState([]); const [stages,setStages]=useState([]); const [cnpjVerification,setCnpjVerification]=useState(null); const [societaryLinks,setSocietaryLinks]=useState({related_count:0,shared_owner_count:0,related_publishers:[]});
   const [loading,setLoading]=useState(true); const [notice,setNotice]=useState(''); const [modal,setModal]=useState(''); const [actionsOpen,setActionsOpen]=useState(false); const [editingOpportunity,setEditingOpportunity]=useState(null); const [editingContact,setEditingContact]=useState(null); const [noteMentions,setNoteMentions]=useState([]); const [edit,setEdit]=useState({priority:'medium',stage_id:'',owner_user_id:'',next_action_at:'',notes:''}); const editHydratedFor=useRef(null); const actionMenuRef=useRef(null);
   async function load(){if(!org||!id)return;setLoading(true);const [p,c,i,t,o,s,v,sl]=await Promise.all([
@@ -115,7 +115,8 @@ export default function PublisherDetailPage(){
   const canCollaborate=Boolean(publisher&&(isManager||publisher.owner_user_id===user?.id||hasCommercialFunction('prospecting')));
   const canScheduleMeeting=Boolean(isManager||hasCommercialFunction('meeting_scheduling'));
   const canManageMaterials=Boolean(isManager||hasCommercialFunction('pre_meeting_materials')||hasCommercialFunction('negotiation_materials'));
-  const canCreateAnyAction=canCollaborate||canScheduleMeeting||canManageMaterials;
+  const canArchivePublisher=Boolean(isManager);
+  const canCreateAnyAction=canCollaborate||canScheduleMeeting||canManageMaterials||canArchivePublisher;
   const unassigned=Boolean(publisher&&!publisher.owner_user_id);
   const ownerName=publisher?.owner_user_id?(teamMap[publisher.owner_user_id]?.full_name||teamMap[publisher.owner_user_id]?.email||'Outra pessoa da equipe'):'Sem responsável';
   const editorialSources=Array.isArray(publisher?.editorial_profile_sources)?publisher.editorial_profile_sources:[];
@@ -148,9 +149,10 @@ export default function PublisherDetailPage(){
   if(loading&&!publisher)return <div className="page-wrap"><div className="table-empty">Carregando editora…</div></div>;
   if(!publisher)return <div className="page-wrap"><Link href="/app/editoras" className="text-link"><ArrowLeft size={15}/> Voltar</Link><div className="card panel" style={{marginTop:16}}><h2>Editora não encontrada</h2><p className="muted">Ela pode ter sido arquivada ou você não tem acesso a esse registro.</p></div></div>;
   return <div className="page-wrap">
-    <div className="page-head"><div><Link href="/app/editoras" className="text-link"><ArrowLeft size={15}/> Editoras</Link><div className="eyebrow" style={{marginTop:12}}>Ficha comercial</div><h1>{headName}</h1><div className="publisher-head-identity">{publisher.trade_name&&!sameText(publisher.trade_name,headName)&&<span><b>Nome fantasia (Receita):</b> {publisher.trade_name}</span>}{!publisher.trade_name&&<span className="publisher-head-missing">Sem nome fantasia na Receita</span>}{publisher.legal_name&&<span><b>Razão social:</b> {publisher.legal_name}</span>}{locationLabel&&<span>{locationLabel}</span>}</div></div><div className="publisher-head-actions"><div className="chips"><span className="badge dark">Score {publisher.score??0}</span><HelpTip text={HELP.score}/>{publisher.registration_status&&<span className={`badge ${String(publisher.registration_status).toUpperCase()==='BAIXADA'?'red':String(publisher.registration_status).toUpperCase()==='ATIVA'?'green':'amber'}`}>CNPJ {publisher.registration_status}</span>}{societaryLinks?.related_count>0&&<span className="badge amber">{societaryLinks.related_count} empresa{societaryLinks.related_count===1?'':'s'} relacionada{societaryLinks.related_count===1?'':'s'}</span>}<span className="badge">{stageMap[publisher.stage_id]?.name||'Sem etapa'}</span><HelpTip text={HELP.stageBadge}/></div>{canCreateAnyAction&&<div className="publisher-action-menu" ref={actionMenuRef}><button type="button" className="btn" aria-haspopup="menu" aria-expanded={actionsOpen} onClick={()=>setActionsOpen(value=>!value)}><Plus size={15}/> Nova ação</button>{actionsOpen&&<div className="publisher-action-popover" role="menu" aria-label="Nova ação">{canCollaborate&&<><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('interaction')}>Registrar interação</button><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('task')}>Criar tarefa</button><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('opportunity')}>Criar oportunidade</button><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('contact')}>Adicionar pessoa de contato</button></>}{canScheduleMeeting&&<button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('meeting')}>Agendar reunião</button>}{canManageMaterials&&<button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('material')}>Adicionar material</button>}</div>}</div>}</div></div>
+    <div className="page-head"><div><Link href="/app/editoras" className="text-link"><ArrowLeft size={15}/> Editoras</Link><div className="eyebrow" style={{marginTop:12}}>Ficha comercial</div><h1>{headName}</h1><div className="publisher-head-identity">{publisher.trade_name&&!sameText(publisher.trade_name,headName)&&<span><b>Nome fantasia (Receita):</b> {publisher.trade_name}</span>}{!publisher.trade_name&&<span className="publisher-head-missing">Sem nome fantasia na Receita</span>}{publisher.legal_name&&<span><b>Razão social:</b> {publisher.legal_name}</span>}{locationLabel&&<span>{locationLabel}</span>}</div></div><div className="publisher-head-actions"><div className="chips"><span className="badge dark">Score {publisher.score??0}</span><HelpTip text={HELP.score}/>{publisher.registration_status&&<span className={`badge ${String(publisher.registration_status).toUpperCase()==='BAIXADA'?'red':String(publisher.registration_status).toUpperCase()==='ATIVA'?'green':'amber'}`}>CNPJ {publisher.registration_status}</span>}{societaryLinks?.related_count>0&&<span className="badge amber">{societaryLinks.related_count} empresa{societaryLinks.related_count===1?'':'s'} relacionada{societaryLinks.related_count===1?'':'s'}</span>}<span className={publisherStageBadgeClass(stageMap[publisher.stage_id])}>{stageMap[publisher.stage_id]?.name||'Sem etapa'}</span><HelpTip text={HELP.stageBadge}/></div>{canCreateAnyAction&&<div className="publisher-action-menu" ref={actionMenuRef}><button type="button" className="btn" aria-haspopup="menu" aria-expanded={actionsOpen} onClick={()=>setActionsOpen(value=>!value)}><Plus size={15}/> Nova ação</button>{actionsOpen&&<div className="publisher-action-popover" role="menu" aria-label="Nova ação">{canCollaborate&&<><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('interaction')}>Registrar interação</button><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('task')}>Criar tarefa</button><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('opportunity')}>Criar oportunidade</button><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('contact')}>Adicionar pessoa de contato</button></>}{canScheduleMeeting&&<button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('meeting')}>Agendar reunião</button>}{canManageMaterials&&<button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('material')}>Adicionar material</button>}{canArchivePublisher&&<><div className="publisher-action-divider"/><button type="button" role="menuitem" className="publisher-action-danger" onClick={()=>{setActionsOpen(false);setModal('archive')}}>Arquivar editora</button></>}</div>}</div>}</div></div>
     {notice&&<div className="notice-bar"><span>{notice}</span><button onClick={()=>setNotice('')}><X size={15}/></button></div>}
     {String(publisher.registration_status||'').toUpperCase()==='BAIXADA'&&<div className="notice error" style={{marginBottom:16,display:'flex',alignItems:'flex-start',gap:10}}><AlertTriangle size={18} style={{marginTop:1,flex:'0 0 auto'}}/><div><strong>CNPJ baixado na Receita Federal</strong><div style={{fontSize:12,marginTop:3}}>Este cadastro consta como <b>BAIXADO</b>{publisher.cnpj_status_date?(' desde '+formatDate(publisher.cnpj_status_date)):''}{publisher.cnpj_status_reason?('. Motivo: '+publisher.cnpj_status_reason):''}.</div></div></div>}
+    {publisher.archived&&<div className="notice archive-notice" style={{marginBottom:16}}><strong>Editora arquivada</strong><span>{publisher.archive_reason_code?(PUBLISHER_ARCHIVE_REASON_LABELS[publisher.archive_reason_code]||publisher.archive_reason_code):'Arquivada automaticamente ou sem motivo registrado'}{publisher.archive_reason_note?` · ${publisher.archive_reason_note}`:''}</span></div>}
     {!canManageAccount&&<div className="notice-bar" style={{marginBottom:16}}><span>{unassigned?'Esta editora ainda está sem responsável atual. Você pode registrar ações permitidas pela sua função; assuma a conta se você for conduzir o próximo estágio.':`${ownerName} é o responsável atual. Você pode registrar ações permitidas pela sua função; etapa, prioridade e próxima ação principal ficam em modo leitura.`}</span>{unassigned&&hasCommercialFunction('prospecting')&&<button className="btn small" onClick={claimPublisher}>Assumir responsabilidade</button>}</div>}
     <PublisherRecordOverview publisher={publisher} tasks={tasks} opportunities={opps} interactions={interactions} stages={stages} teamMap={teamMap}/>
     <PublisherQuickContact publisher={publisher}/>
@@ -246,6 +248,7 @@ export default function PublisherDetailPage(){
     {canCollaborate&&modal==='interaction'&&<InteractionModal supabase={supabase} org={org} publisher={publisher} user={user} team={team} onClose={()=>setModal('')} onSaved={()=>{setModal('');setNotice('Interação registrada.');load()}}/>}
     {canCollaborate&&modal==='task'&&<TaskModal supabase={supabase} org={org} publisher={publisher} user={user} onClose={()=>setModal('')} onSaved={()=>{setModal('');setNotice('Tarefa criada.');load()}}/>}
     {canCollaborate&&modal==='opportunity'&&<OpportunityModal supabase={supabase} org={org} publisher={publisher} user={user} opportunity={editingOpportunity} onClose={closeOpportunity} onSaved={mode=>{closeOpportunity();setNotice(mode==='updated'?'Oportunidade atualizada.':'Oportunidade criada.');load()}}/>}
+    {canArchivePublisher&&modal==='archive'&&<ArchivePublisherModal supabase={supabase} org={org} publisher={publisher} onClose={()=>setModal('')} onArchived={()=>{setModal('');router.push('/app/editoras');router.refresh()}}/>}
   </div>;
 }
 
@@ -284,6 +287,30 @@ function SocietaryLinksCard({data}){
       <p className="publisher-societary-footnote">Detecção automática por coincidência exata do nome do sócio no quadro societário sincronizado da Receita Federal.</p>
     </div>
   </details>;
+}
+
+function ArchivePublisherModal({supabase,org,publisher,onClose,onArchived}){
+  const [reason,setReason]=useState('');
+  const [note,setNote]=useState('');
+  const [err,setErr]=useState('');
+  async function save(e){
+    e.preventDefault();setErr('');
+    if(!reason){setErr('Selecione o motivo do arquivamento.');return}
+    if(reason==='other'&&!note.trim()){setErr('Descreva o motivo do arquivamento.');return}
+    const {error}=await supabase.rpc('crm_archive_publisher',{
+      p_organization_id:org,
+      p_publisher_id:publisher.id,
+      p_reason_code:reason,
+      p_reason_note:note.trim()||null
+    });
+    if(error)setErr(error.message);else onArchived();
+  }
+  return <Modal title="Arquivar editora" onClose={onClose} onSubmit={save} err={err} submitLabel="Arquivar editora">
+    <div className="span-2 archive-modal-warning"><AlertTriangle size={18}/><div><strong>{publisher.commercial_name||publisher.trade_name||publisher.name}</strong><span>A editora sairá da lista ativa. O histórico comercial continuará preservado.</span></div></div>
+    <fieldset className="span-2 archive-reason-list"><legend>Motivo do arquivamento</legend>{Object.entries(PUBLISHER_ARCHIVE_REASON_LABELS).map(([value,label])=><label className={`archive-reason-option ${reason===value?'selected':''}`} key={value}><input type="radio" name="archive_reason" value={value} checked={reason===value} onChange={e=>setReason(e.target.value)}/><span>{label}</span></label>)}</fieldset>
+    <label className="span-2">Observação {reason==='other'?'(obrigatória)':'(opcional)'}<textarea rows={3} value={note} onChange={e=>setNote(e.target.value)} placeholder="Registre um contexto útil para a equipe caso necessário."/></label>
+    <p className="span-2 archive-modal-note">Tarefas abertas e cadências ativas desta editora serão canceladas. O histórico de interações, contatos e oportunidades será mantido.</p>
+  </Modal>;
 }
 
 function Info({label,value,help}){return <div className="info-item"><small>{help?<HelpLabel help={help}>{label}</HelpLabel>:label}</small><span>{value||'—'}</span></div>}

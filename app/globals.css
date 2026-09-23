@@ -51,3 +51,32 @@
 
 @media(max-width:1100px){.metric-grid{grid-template-columns:repeat(2,1fr)}.dashboard-grid{grid-template-columns:1fr 1fr}.dashboard-grid>.span-2{grid-column:span 2}.publisher-grid,.template-grid,.team-grid{grid-template-columns:repeat(2,1fr)}.detail-grid{grid-template-columns:1fr}.report-grid{grid-template-columns:1fr}}
 @media(max-width:820px){.crm-shell{grid-template-columns:1fr}.sidebar{position:relative;height:auto;padding:12px}.sidebar .brand{padding-bottom:10px}.sidebar nav{display:flex;overflow:auto}.sidebar nav a{white-space:nowrap}.sidebar-footer{display:none}.crm-main{padding:20px 14px}.hero{grid-template-columns:1fr;padding-top:54px}.feature-grid{grid-template-columns:1fr}.auth-page{grid-template-columns:1fr}.auth-visual{display:none}.page-head{flex-direction:column}.dashboard-grid,.metric-grid{grid-template-columns:1fr}.dashboard-grid>.span-2{grid-column:auto}.publisher-grid,.template-grid,.team-grid{grid-template-columns:1fr}.profile-card{grid-template-columns:1fr}.manual-layout{grid-template-columns:1fr}.manual-nav{position:static;display:flex;overflow:auto}.form-grid{grid-template-columns:1fr}.form-grid>.span-2{grid-column:auto}.report-bar-row,.pipeline-mini-row{grid-template-columns:100px 1fr 35px}.data-table{min-width:760px}.table-card{overflow:auto}}
+
+
+/* Commercial stage colors: semantic progression instead of a single neutral badge. */
+.stage-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  width:max-content;
+  max-width:100%;
+  border:1px solid transparent;
+  border-radius:999px;
+  padding:4px 8px;
+  font-size:11px;
+  font-weight:800;
+  line-height:1.2;
+  white-space:nowrap;
+}
+.stage-none{background:#f2f4f7!important;color:#667085!important;border-color:#eaecf0!important}
+.stage-prospect{background:#f5f7fa!important;color:#475467!important;border-color:#e4e7ec!important}
+.stage-attempt{background:#eff8ff!important;color:#175cd3!important;border-color:#d1e9ff!important}
+.stage-contact{background:#ecfdff!important;color:#0e7090!important;border-color:#cff9fe!important}
+.stage-conversation{background:#eef4ff!important;color:#3538cd!important;border-color:#d9e2ff!important}
+.stage-opportunity{background:#f4f3ff!important;color:#5925dc!important;border-color:#e9e5ff!important}
+.stage-proposal{background:#f9f5ff!important;color:#6941c6!important;border-color:#e9d7fe!important}
+.stage-negotiation{background:#fff6ed!important;color:#c4320a!important;border-color:#ffead5!important}
+.stage-won{background:#ecfdf3!important;color:#067647!important;border-color:#abefc6!important}
+.stage-nurture{background:#fffaeb!important;color:#b54708!important;border-color:#fedf89!important}
+.stage-lost{background:#fff1f2!important;color:#b42318!important;border-color:#fecdd6!important}
+.stage-open{background:#f2f4f7!important;color:#344054!important;border-color:#e4e7ec!important}

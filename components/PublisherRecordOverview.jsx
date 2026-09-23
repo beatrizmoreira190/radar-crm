@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, Clock3, Target, UserRound, Workflow } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
-import { OPPORTUNITY_SERVICE_LABELS, OPPORTUNITY_STAGE_LABELS, PRIORITY_LABELS, formatDate } from '@/lib/constants';
+import { OPPORTUNITY_SERVICE_LABELS, OPPORTUNITY_STAGE_LABELS, PRIORITY_LABELS, formatDate, publisherStageBadgeClass } from '@/lib/constants';
 import PublisherHelp from '@/components/PublisherHelp';
 
 const ACTIVE_OPPORTUNITY_STAGES=new Set(['identified','qualified','proposal','negotiation','on_hold']);
@@ -32,7 +32,7 @@ export default function PublisherRecordOverview({publisher,tasks=[],opportunitie
     return()=>{cancelled=true};
   },[org,publisher?.id,activityVersion,supabase]);
 
-  const stageMap=useMemo(()=>Object.fromEntries(stages.map(item=>[item.id,item.name])),[stages]);
+  const stageMap=useMemo(()=>Object.fromEntries(stages.map(item=>[item.id,item])),[stages]);
   const activeOpportunity=useMemo(()=>opportunities.find(item=>ACTIVE_OPPORTUNITY_STAGES.has(item.stage))||null,[opportunities]);
   const openTasks=useMemo(()=>tasks.filter(item=>['open','in_progress'].includes(item.status)).sort((a,b)=>{
     if(!a.due_at&&!b.due_at)return 0;if(!a.due_at)return 1;if(!b.due_at)return-1;return new Date(a.due_at)-new Date(b.due_at);
@@ -40,7 +40,8 @@ export default function PublisherRecordOverview({publisher,tasks=[],opportunitie
   const lastInteraction=interactions[0]||null;
   const ownerName=publisher?.owner_user_id?(teamMap[publisher.owner_user_id]?.full_name||teamMap[publisher.owner_user_id]?.email||'Equipe'):'Sem responsável atual';
   const prospectorName=publisher?.prospector_user_id?(teamMap[publisher.prospector_user_id]?.full_name||teamMap[publisher.prospector_user_id]?.email||'Equipe'):'Ainda não identificado';
-  const stageName=stageMap[publisher?.stage_id]||'Sem etapa';
+  const currentStage=stageMap[publisher?.stage_id]||null;
+  const stageName=currentStage?.name||'Sem etapa';
 
   if(!publisher)return null;
 
@@ -52,7 +53,7 @@ export default function PublisherRecordOverview({publisher,tasks=[],opportunitie
         <p>Principais informações para orientar o próximo passo comercial.</p>
       </div>
       <div className="publisher-record-state">
-        <span><Workflow size={13}/>{stageName}<PublisherHelp text="Etapa atual da editora no processo comercial."/></span>
+        <span className={publisherStageBadgeClass(currentStage)}><Workflow size={13}/>{stageName}<PublisherHelp text="Etapa atual da editora no processo comercial."/></span>
         <span>{PRIORITY_LABELS[publisher.priority]||publisher.priority||'Sem prioridade'}<PublisherHelp text="Prioridade geral da conta para organização da rotina comercial."/></span>
       </div>
     </div>
