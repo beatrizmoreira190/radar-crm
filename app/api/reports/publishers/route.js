@@ -84,7 +84,7 @@ export async function GET(request){
     const sheet={
       data:[
         [cell('RADAR — Base de editoras',titleStyle),...Array(headers.length-1).fill(null)],
-        [cell('Base ativa da operação',metaStyle),cell(\`\${publishers.length.toLocaleString('pt-BR')} editoras\`),...Array(headers.length-2).fill(null)],
+        [cell('Base ativa da operação',metaStyle),cell(publishers.length.toLocaleString('pt-BR')+' editoras'),...Array(headers.length-2).fill(null)],
         [cell('Gerado em',metaStyle),cell(new Date().toLocaleString('pt-BR')),...Array(headers.length-2).fill(null)],
         [],
         header(headers),
@@ -97,13 +97,13 @@ export async function GET(request){
     };
 
     const buffer=await writeExcelFile([sheet],{fontFamily:'Aptos',fontSize:10}).toBuffer();
-    const fileName=\`radar-base-editoras-\${new Date().toISOString().slice(0,10)}.xlsx\`;
+    const fileName='radar-base-editoras-'+new Date().toISOString().slice(0,10)+'.xlsx';
 
     return new Response(buffer,{
       status:200,
       headers:{
         'content-type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'content-disposition':\`attachment; filename="\${fileName}"\`,
+        'content-disposition':'attachment; filename="'+fileName+'"',
         'cache-control':'no-store',
         'x-radar-file-name':fileName
       }
