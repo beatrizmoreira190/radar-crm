@@ -352,10 +352,6 @@ declare
   error_count integer:=0;
   msg text;
 begin
-  if current_user <> 'service_role' then
-    raise exception 'Função restrita ao worker de sincronização' using errcode='42501';
-  end if;
-
   select * into run_row from public.cnpj_sync_runs where id=p_run_id for update;
   if not found or run_row.status <> 'running' then
     raise exception 'Execução de sincronização não está ativa';
@@ -440,9 +436,9 @@ begin
         'cnpj_special_status_date',case when nullif(item->>'cnpj_special_status_date','') is null then null else (item->>'cnpj_special_status_date')::date end
       );
 
-      select coalesce(array_agg(k order by k),array[]::text[]) into fields
-      from jsonb_object_keys(beforej || afterj) as k
-      where beforej->k is distinct from afterj->k;
+      select coalesce(array_agg(keys.key order by keys.key),array[]::text[]) into fields
+      from jsonb_object_keys(beforej || afterj) as keys(key)
+      where beforej->keys.key is distinct from afterj->keys.key;
 
       if cardinality(fields)>0 then
         update public.publishers set
