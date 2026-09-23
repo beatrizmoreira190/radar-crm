@@ -196,8 +196,6 @@ export default function PublisherDetailPage(){
         </details>}
       </section>
 
-      {societaryLinks?.related_count>0&&<SocietaryLinksCard data={societaryLinks}/>}
-      
       <section className="card panel publisher-editorial-card">
         <div className="section-title">
           <div><HelpHeading as="h2" help={HELP.editorialProfile}>Perfil editorial</HelpHeading><p className="muted">O que a editora publica e como está classificada editorialmente.</p></div>
@@ -208,6 +206,7 @@ export default function PublisherDetailPage(){
         {editorialSources.length>0&&<div className="publisher-meta publisher-editorial-sources">{editorialSources.map((src,index)=>src?.url?<a className="text-link" href={src.url} target="_blank" rel="noreferrer" key={`${src.url}-${index}`}><Globe2 size={13}/>{src.label||'Fonte do perfil'}</a>:null)}{publisher.editorial_profile_verified_at&&<span>Verificado em {formatDate(publisher.editorial_profile_verified_at)}</span>}</div>}
       </section>
       <PublisherRadarPanel publisher={publisher} contacts={contacts} interactions={interactions}/>
+      {societaryLinks?.related_count>0&&<SocietaryLinksCard data={societaryLinks}/>}
       <section className="card panel publisher-contacts-card"><div className="section-title"><div><HelpHeading as="h2" help={HELP.contacts}>Pessoas de contato</HelpHeading><p className="muted">Pessoas vinculadas à editora.</p></div></div>{contacts.length?contacts.map(c=><div className="contact-row" key={c.id}><strong>{c.full_name}{c.is_decision_maker?' · Decisor':''}</strong><span>{[c.job_title,c.department].filter(Boolean).join(' · ')||'Sem cargo informado'}</span><span>{[c.email,c.mobile||c.phone].filter(Boolean).join(' · ')}</span></div>):<p className="muted">Nenhum contato cadastrado.</p>}</section>
       <section className="card panel publisher-history-card"><div className="section-title"><div><HelpHeading as="h2" help={HELP.history}>Histórico de interações</HelpHeading><p className="muted">Interações mais recentes primeiro.</p></div></div>{interactions.length?<div className="timeline">{interactions.map(i=><div className="timeline-item" key={i.id}><div className="timeline-dot"/><div className="timeline-body"><strong>{CHANNEL_LABELS[i.channel]||i.channel} · {RESULT_LABELS[i.result]||i.result||'Interação'}</strong><p>{i.summary}</p>{i.next_step&&<p><b>Próximo passo:</b> {i.next_step}</p>}<small>{formatDate(i.occurred_at,true)} · {teamMap[i.user_id]?.full_name||teamMap[i.user_id]?.email||'Equipe'}</small></div></div>)}</div>:<p className="muted">Ainda não há interações registradas.</p>}</section>
       <section className="card panel publisher-opportunities-card"><div className="section-title"><div><HelpHeading as="h2" help={HELP.opportunities}>Oportunidades</HelpHeading><p className="muted">Negócios concretos em negociação com esta editora, sem registrar valores comerciais sensíveis.</p></div></div>{opps.length?opps.map(o=><div className="opportunity-row" key={o.id}><div style={{display:'flex',justifyContent:'space-between',gap:14,alignItems:'flex-start'}}><div style={{minWidth:0}}><strong>{o.title}</strong><div className="publisher-meta" style={{marginTop:4}}><span>{OPPORTUNITY_SERVICE_LABELS[o.service_key]||o.service_type||'Serviço não informado'}</span><span>{OPPORTUNITY_STAGE_LABELS[o.stage]||o.stage}</span>{o.expected_close_date&&<span>Previsão: {formatDate(o.expected_close_date)}</span>}</div><p className="muted" style={{fontSize:11,margin:'5px 0 0'}}>{opportunityServiceDetail(o)}</p>{o.next_step&&<p style={{fontSize:12,margin:'6px 0 0',color:'#475467'}}><b>Próximo passo:</b> {o.next_step}</p>}{o.stage==='lost'&&o.loss_reason&&<p style={{fontSize:12,margin:'6px 0 0',color:'#b42318'}}><b>Motivo da perda:</b> {o.loss_reason}</p>}</div>{(isManager||o.owner_user_id===user?.id||o.created_by===user?.id)&&<button className="btn secondary small" type="button" onClick={()=>editOpportunity(o)}>Editar</button>}</div></div>):<p className="muted">Nenhuma oportunidade cadastrada. Crie uma quando surgir uma possibilidade concreta de negócio.</p>}</section>
@@ -242,16 +241,24 @@ function SocietaryLinksCard({data}){
     </div>
     {item.registration_status&&<span className={`badge ${String(item.registration_status).toUpperCase()==='ATIVA'?'green':String(item.registration_status).toUpperCase()==='BAIXADA'?'red':'amber'}`}>{item.registration_status}</span>}
   </div>;
-  return <section className="card panel publisher-societary-card">
-    <div className="section-title">
-      <div><h2>Vínculos societários</h2><p className="muted">Outros CNPJs da base que compartilham sócios com esta empresa.</p></div>
-      <span className="badge amber">{data.related_count} empresa{data.related_count===1?'':'s'} relacionada{data.related_count===1?'':'s'}</span>
+  return <details className="card panel publisher-societary-card">
+    <summary className="publisher-societary-summary">
+      <div>
+        <h2>Vínculos societários</h2>
+        <p>{data.related_count} empresa{data.related_count===1?'':'s'} relacionada{data.related_count===1?'':'s'} por sócio em comum.</p>
+      </div>
+      <div className="publisher-societary-summary-actions">
+        <span className="badge amber">{data.related_count} relacionada{data.related_count===1?'':'s'}</span>
+        <span className="publisher-societary-chevron" aria-hidden="true">⌄</span>
+      </div>
+    </summary>
+    <div className="publisher-societary-body">
+      <div className="publisher-societary-warning"><AlertTriangle size={17}/><div><strong>Atenção comercial</strong><span>Antes de definir escopo ou preço, confira estes CNPJs. Eles podem integrar a mesma estrutura comercial, embora o vínculo societário não confirme sozinho um grupo econômico.</span></div></div>
+      <div className="publisher-related-list">{primary.map(row)}</div>
+      {extra.length>0&&<details className="publisher-related-more"><summary>Ver mais {extra.length} empresa{extra.length===1?'':'s'}</summary><div className="publisher-related-list extra">{extra.map(row)}</div></details>}
+      <p className="publisher-societary-footnote">Detecção automática por coincidência exata do nome do sócio no quadro societário sincronizado da Receita Federal.</p>
     </div>
-    <div className="publisher-societary-warning"><AlertTriangle size={17}/><div><strong>Atenção comercial</strong><span>Antes de definir escopo ou preço, confira estes CNPJs. Eles podem integrar a mesma estrutura comercial, embora o vínculo societário não confirme sozinho um grupo econômico.</span></div></div>
-    <div className="publisher-related-list">{primary.map(row)}</div>
-    {extra.length>0&&<details className="publisher-related-more"><summary>Ver mais {extra.length} empresa{extra.length===1?'':'s'}</summary><div className="publisher-related-list extra">{extra.map(row)}</div></details>}
-    <p className="publisher-societary-footnote">Detecção automática por coincidência exata do nome do sócio no quadro societário sincronizado da Receita Federal.</p>
-  </section>;
+  </details>;
 }
 
 function Info({label,value,help}){return <div className="info-item"><small>{help?<HelpLabel help={help}>{label}</HelpLabel>:label}</small><span>{value||'—'}</span></div>}

@@ -1143,3 +1143,72 @@
     gap:7px;
   }
 }
+
+
+/* Societary links: compact collapsed summary after Radar Score */
+.publisher-societary-card{
+  padding:0!important;
+  overflow:hidden;
+}
+.publisher-societary-card>summary{
+  list-style:none;
+}
+.publisher-societary-card>summary::-webkit-details-marker{
+  display:none;
+}
+.publisher-societary-summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  cursor:pointer;
+  padding:16px 18px;
+  user-select:none;
+}
+.publisher-societary-summary:hover{
+  background:#fafbfc;
+}
+.publisher-societary-summary h2{
+  margin:0;
+  color:#101828;
+  font-size:16px;
+  line-height:1.25;
+  letter-spacing:-.015em;
+}
+.publisher-societary-summary p{
+  margin:3px 0 0;
+  color:#667085;
+  font-size:10.5px;
+  line-height:1.4;
+}
+.publisher-societary-summary-actions{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  flex:0 0 auto;
+}
+.publisher-societary-chevron{
+  color:#667085;
+  font-size:18px;
+  line-height:1;
+  transition:transform .15s ease;
+}
+.publisher-societary-card[open] .publisher-societary-chevron{
+  transform:rotate(180deg);
+}
+.publisher-societary-body{
+  padding:0 18px 16px;
+  border-top:1px solid #eef0f3;
+}
+.publisher-societary-body .publisher-societary-warning{
+  margin-top:12px;
+}
+
+@media(max-width:650px){
+  .publisher-societary-summary{
+    align-items:flex-start;
+  }
+  .publisher-societary-summary-actions{
+    gap:6px;
+  }
+}
