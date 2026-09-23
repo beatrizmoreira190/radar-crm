@@ -36,7 +36,7 @@ async function authorizeWorker(req: Request) {
     throw new Error('Workflow não autorizado.');
   }
   const eventName = String(payload.event_name || '');
-  if (!['schedule', 'workflow_dispatch'].includes(eventName)) {
+  if (!['push', 'schedule', 'workflow_dispatch'].includes(eventName)) {
     throw new Error('Evento do workflow não autorizado.');
   }
   return payload;
