@@ -186,8 +186,8 @@ export default function PublisherDetailPage(){
           <div>
             <small><HelpLabel help={HELP.commercialProfile}>Perfil comercial Radar</HelpLabel></small>
             <strong>{PUBLISHER_COMMERCIAL_PROFILE_LABELS[publisher.commercial_profile_code]||'Editora / empresa editorial'}</strong>
-            <span>{publisher.commercial_profile_source==='manual'?'Classificação confirmada pela equipe':'Padrão inicial do sistema · ainda não revisado manualmente'}</span>
-            {publisher.commercial_profile_note&&<em>{publisher.commercial_profile_note}</em>}
+            <span>{publisher.commercial_profile_source==='manual'?'Classificação confirmada pela equipe':publisher.commercial_profile_source==='editorial_profile'?'Confirmada automaticamente a partir do perfil editorial':'Padrão inicial do sistema · ainda não revisado manualmente'}</span>
+            {publisher.commercial_profile_note&&publisher.commercial_profile_source!=='editorial_profile'&&<em>{publisher.commercial_profile_note}</em>}
           </div>
           {isManager&&<button type="button" className="btn secondary small" onClick={()=>setModal('commercial-profile')}>Editar perfil</button>}
         </div>
