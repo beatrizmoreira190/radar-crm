@@ -295,6 +295,7 @@ function contactOrigin(contact){
 }
 function EditContactModal({supabase,org,contact,user,onClose,onSaved}){
   const origin=contactOrigin(contact);
+  const sourcedRole=Boolean(String(contact?.source_ref||'').startsWith('receita:cnpj:')||/^https?:\/\//i.test(String(contact?.source_ref||'')));
   const [f,setF]=useState({
     job_title:contact.job_title||'',
     department:contact.department||'',
@@ -310,8 +311,8 @@ function EditContactModal({supabase,org,contact,user,onClose,onSaved}){
     e.preventDefault();
     setErr('');
     const payload={
-      job_title:f.job_title.trim()||null,
-      department:f.department.trim()||null,
+      job_title:sourcedRole?(contact.job_title||null):(f.job_title.trim()||null),
+      department:sourcedRole?(contact.department||null):(f.department.trim()||null),
       email:f.email.trim()||null,
       phone:f.phone.trim()||null,
       mobile:f.mobile.trim()||null,
@@ -327,15 +328,15 @@ function EditContactModal({supabase,org,contact,user,onClose,onSaved}){
   return <Modal title="Editar pessoa de contato" onClose={onClose} onSubmit={save} err={err} submitLabel="Salvar alterações">
     <label className="span-2"><HelpLabel help="O nome fica bloqueado para preservar o vínculo societário e o histórico do contato.">Nome</HelpLabel><input className="input contact-locked-field" value={contact.full_name||''} readOnly aria-readonly="true"/></label>
     <div className="span-2 contact-origin-box"><small>Origem do contato</small><strong>{origin.label}</strong>{origin.url&&<a className="text-link" href={origin.url} target="_blank" rel="noreferrer">Abrir fonte pública</a>}</div>
-    <label><HelpLabel help={HELP.contactRole}>Cargo / função</HelpLabel><input className="input" value={f.job_title} onChange={e=>setF(x=>({...x,job_title:e.target.value}))} placeholder="Ex.: Diretor editorial"/></label>
-    <label><HelpLabel help={HELP.contactArea}>Área / departamento</HelpLabel><input className="input" value={f.department} onChange={e=>setF(x=>({...x,department:e.target.value}))} placeholder="Ex.: Editorial"/></label>
+    <label><HelpLabel help={sourcedRole?'Campo bloqueado porque a função foi registrada a partir da fonte original do contato.':HELP.contactRole}>Cargo / função</HelpLabel><input className={`input ${sourcedRole?'contact-locked-field':''}`} value={f.job_title} onChange={e=>setF(x=>({...x,job_title:e.target.value}))} placeholder="Ex.: Diretor editorial" readOnly={sourcedRole} aria-readonly={sourcedRole}/></label>
+    <label><HelpLabel help={sourcedRole?'Campo bloqueado porque a área foi registrada a partir da fonte original do contato.':HELP.contactArea}>Área / departamento</HelpLabel><input className={`input ${sourcedRole?'contact-locked-field':''}`} value={f.department} onChange={e=>setF(x=>({...x,department:e.target.value}))} placeholder="Ex.: Editorial" readOnly={sourcedRole} aria-readonly={sourcedRole}/></label>
     <label><HelpLabel help={HELP.contactEmail}>E-mail profissional</HelpLabel><input type="email" className="input" value={f.email} onChange={e=>setF(x=>({...x,email:e.target.value}))} placeholder="nome@empresa.com.br"/></label>
     <label><HelpLabel help="Telefone profissional ou ramal desta pessoa.">Telefone</HelpLabel><input className="input" value={f.phone} onChange={e=>setF(x=>({...x,phone:e.target.value}))} placeholder="(11) 0000-0000"/></label>
     <label><HelpLabel help={HELP.contactMobile}>Celular / WhatsApp</HelpLabel><input className="input" value={f.mobile} onChange={e=>setF(x=>({...x,mobile:e.target.value}))} placeholder="(11) 90000-0000"/></label>
     <label><HelpLabel help="Perfil profissional público no LinkedIn.">LinkedIn</HelpLabel><input className="input" value={f.linkedin_url} onChange={e=>setF(x=>({...x,linkedin_url:e.target.value}))} placeholder="https://linkedin.com/in/..."/></label>
     <label className="span-2"><span className="help-label"><span><input type="checkbox" checked={f.is_decision_maker} onChange={e=>setF(x=>({...x,is_decision_maker:e.target.checked}))}/> É decisor(a)</span><HelpTip text={HELP.decisionMaker}/></span></label>
     <label className="span-2"><span>Observações</span><textarea rows={3} value={f.notes} onChange={e=>setF(x=>({...x,notes:e.target.value}))} placeholder="Ex.: Responsável por compras institucionais; prefere contato por WhatsApp."/></label>
-    <p className="span-2 contact-edit-note">O nome original não pode ser alterado aqui. Para contatos vindos da Receita, isso preserva o cruzamento societário entre CNPJs.</p>
+    <p className="span-2 contact-edit-note">{sourcedRole?'Nome, cargo/função e área ficam bloqueados porque vieram da fonte original do contato. E-mail, telefones, LinkedIn, decisor e observações podem ser complementados pela equipe.':'O nome original não pode ser alterado aqui. Os demais dados profissionais podem ser atualizados pela equipe.'}</p>
   </Modal>;
 }
 
