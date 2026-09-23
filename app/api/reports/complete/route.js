@@ -54,6 +54,7 @@ async function fetchPaged(makeQuery){
 }
 
 function tableSheet(name,description,headers,data,columnWidths){
+  const resolvedWidths=columnWidths||headers.map(label=>Math.max(10,Math.min(38,Math.ceil(String(label).length*.85)+5)));
   return {
     data:[
       [cell(name,titleStyle),...Array(Math.max(0,headers.length-1)).fill(null)],
@@ -63,7 +64,7 @@ function tableSheet(name,description,headers,data,columnWidths){
       ...data.map(row)
     ],
     sheet:name.slice(0,31),
-    columns:widths(columnWidths),
+    columns:widths(resolvedWidths),
     stickyRowsCount:4,
     showGridLines:true
   };
@@ -185,15 +186,65 @@ export async function GET(request){
       integer(item.radar_opportunities_titles),integer(item.pnld_works)
     ]);
 
+    const publisherMap=Object.fromEntries(publishers.map(p=>[p.id,p]));
+    const includedIds=new Set(publishers.map(p=>p.id));
+    const includedContacts=contacts.filter(contact=>includedIds.has(contact.publisher_id));
+
+    const publisherHeaders=[
+      'Nome principal','Nome comercial','Nome fantasia oficial','Razão social','CNPJ',
+      'Perfil comercial Radar','Origem perfil comercial','Observações perfil comercial',
+      'Perfis editoriais','Status perfil editorial','Confiança perfil editorial',
+      'Cidade','UF','Etapa','Prioridade','Temperatura','Radar Score','Aderência Radar','Potencial comercial','Qualidade dos dados',
+      'Melhor produto','PNLD Literário','PNLD Didático','PNLD Técnico-Metodológico','Radar de Licitações','Radar de Oportunidades',
+      'Responsável atual','Prospector de origem','Último contato','Próxima ação',
+      'E-mail principal','Outros e-mails','Telefone','Telefone secundário / WhatsApp','Site','Instagram','LinkedIn',
+      'Sócios / quadro societário','Status enriquecimento web','Enriquecimento verificado em'
+    ];
     const publisherRows=publishers.map(p=>[
-      text(p.name),text(p.trade_name),text(p.cnpj),text(p.city),text(p.state),
-      stageMap[p.stage_id]||'Sem etapa',PRIORITY_LABELS[p.priority]||text(p.priority),text(p.commercial_temperature),
+      displayName(p),text(p.commercial_name),text(p.trade_name),text(p.legal_name),text(p.cnpj),
+      PUBLISHER_COMMERCIAL_PROFILE_LABELS[p.commercial_profile_code]||text(p.commercial_profile_code),commercialProfileSource(p.commercial_profile_source),text(p.commercial_profile_note),
+      joinArray(p.editorial_profile),EDITORIAL_PROFILE_STATUS_LABELS[p.editorial_profile_status]||text(p.editorial_profile_status),EDITORIAL_PROFILE_CONFIDENCE_LABELS[p.editorial_profile_confidence]||text(p.editorial_profile_confidence),
+      text(p.city),text(p.state),stageMap[p.stage_id]||'Sem etapa',PRIORITY_LABELS[p.priority]||text(p.priority),text(p.commercial_temperature),
       integer(p.score),integer(p.radar_fit_score),integer(p.commercial_potential_score),integer(p.data_quality_score),
-      RADAR_PRODUCT_LABELS[p.best_product]||'',integer(p.fit_pnld_literario),integer(p.fit_pnld_didatico),
-      integer(p.fit_pnld_tecnico_metodologico),integer(p.fit_radar_licitacoes),integer(p.fit_radar_oportunidades),
-      teamMap[p.owner_user_id]?.full_name||teamMap[p.owner_user_id]?.email||'',
-      teamMap[p.prospector_user_id]?.full_name||teamMap[p.prospector_user_id]?.email||'',
-      date(p.last_contact_at,true),date(p.next_action_at,true),text(p.general_email),text(p.phone),text(p.website)
+      RADAR_PRODUCT_LABELS[p.best_product]||'',integer(p.fit_pnld_literario),integer(p.fit_pnld_didatico),integer(p.fit_pnld_tecnico_metodologico),integer(p.fit_radar_licitacoes),integer(p.fit_radar_oportunidades),
+      teamMap[p.owner_user_id]?.full_name||teamMap[p.owner_user_id]?.email||'',teamMap[p.prospector_user_id]?.full_name||teamMap[p.prospector_user_id]?.email||'',
+      date(p.last_contact_at,true),date(p.next_action_at,true),text(p.general_email),joinArray(p.alternate_emails,' | '),text(p.phone),text(p.secondary_phone),text(p.website),text(p.instagram),text(p.linkedin_url),
+      text(p.owners_names),text(p.web_enrichment_status),date(p.web_enrichment_verified_at,true)
+    ]);
+
+    const contactHeaders=['Editora','CNPJ','Pessoa','Cargo / função','Área / departamento','E-mail profissional','Telefone','Celular / WhatsApp','LinkedIn','Decisor','Canal preferido','Origem','Observações','Atualizado em'];
+    const contactRows=includedContacts.map(contact=>{
+      const p=publisherMap[contact.publisher_id]||{};
+      return [displayName(p),text(p.cnpj),text(contact.full_name),text(contact.job_title),text(contact.department),text(contact.email),text(contact.phone),text(contact.mobile),text(contact.linkedin_url),contact.is_decision_maker?'Sim':'Não',text(contact.preferred_channel),contactSource(contact.source_ref),text(contact.notes),date(contact.updated_at,true)];
+    });
+
+    const ownerGroups=new Map();
+    for(const contact of includedContacts){
+      if(!String(contact.source_ref||'').startsWith('receita:cnpj:'))continue;
+      const p=publisherMap[contact.publisher_id];if(!p)continue;
+      const key=normalizedName(contact.full_name);if(!key)continue;
+      const base=cnpjBase(p.cnpj)||p.id;
+      if(!ownerGroups.has(key))ownerGroups.set(key,{owner:contact.full_name,entities:new Map()});
+      const group=ownerGroups.get(key);
+      if(!group.entities.has(base))group.entities.set(base,{names:new Set(),cnpjs:new Set()});
+      const entity=group.entities.get(base);
+      entity.names.add(displayName(p));
+      if(p.cnpj)entity.cnpjs.add(p.cnpj);
+    }
+    const societaryRows=[];
+    for(const group of ownerGroups.values()){
+      if(group.entities.size<2)continue;
+      const entities=[...group.entities.values()];
+      societaryRows.push([group.owner,group.entities.size,entities.map(e=>[...e.names].join(' / ')).join(' | '),entities.map(e=>[...e.cnpjs].join(' / ')).join(' | ')]);
+    }
+    societaryRows.sort((a,b)=>Number(b[1])-Number(a[1])||String(a[0]).localeCompare(String(b[0]),'pt-BR'));
+
+    const archivedHeaders=['Nome principal','Nome comercial','Nome fantasia','Razão social','CNPJ','Cidade','UF','Situação CNPJ','Perfil comercial','Perfil editorial','Motivo do arquivamento','Observação do arquivamento','Arquivada em','Arquivada por'];
+    const archivedRows=(archivedPublishers||[]).map(p=>[
+      displayName(p),text(p.commercial_name),text(p.trade_name),text(p.legal_name),text(p.cnpj),text(p.city),text(p.state),text(p.registration_status),
+      PUBLISHER_COMMERCIAL_PROFILE_LABELS[p.commercial_profile_code]||text(p.commercial_profile_code),joinArray(p.editorial_profile),
+      PUBLISHER_ARCHIVE_REASON_LABELS[p.archive_reason_code]||text(p.archive_reason_code),text(p.archive_reason_note),date(p.archived_at,true),
+      teamMap[p.archived_by]?.full_name||teamMap[p.archived_by]?.email||''
     ]);
 
     const interactionRows=interactions.map(i=>[
