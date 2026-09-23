@@ -352,6 +352,19 @@ where a.entity_type='meetings'
       - array['updated_at','google_event_id','google_event_url','google_meet_url','google_last_synced_at','google_sync_error','calendar_sync_status']
   );
 
+-- Avanço automático para "Conversando" disparado pelo agendamento não é uma edição manual da editora.
+delete from public.audit_events a
+using public.meetings m
+where a.entity_type='publishers'
+  and a.action='update'
+  and a.entity_id=m.publisher_id::text
+  and a.actor_user_id=m.scheduled_by
+  and a.before_data ? 'stage_id'
+  and a.after_data ? 'stage_id'
+  and jsonb_object_length(coalesce(a.before_data,'{}'::jsonb))=1
+  and jsonb_object_length(coalesce(a.after_data,'{}'::jsonb))=1
+  and abs(extract(epoch from (a.created_at-m.created_at)))<1;
+
 delete from public.audit_events a
 using public.cnpj_sync_runs r
 where a.organization_id=r.organization_id
@@ -411,6 +424,21 @@ set label=(
   ||coalesce(' · '||(select coalesce(nullif(btrim(p.commercial_name),''),nullif(btrim(p.trade_name),''),nullif(btrim(p.name),''),nullif(btrim(p.legal_name),'')) from public.interactions i join public.publishers p on p.id=i.publisher_id where i.id::text=a.entity_id),'')
 )
 where a.entity_type='interactions';
+
+update public.audit_events a
+set label=(
+  case when coalesce(a.before_data->>'role','') is distinct from coalesce(a.after_data->>'role','')
+          or coalesce(a.before_data->>'active','') is distinct from coalesce(a.after_data->>'active','')
+       then 'Alterou acesso de membro'
+       else 'Atualizou perfil de membro'
+  end
+  ||coalesce(' · '||(
+    select coalesce(nullif(btrim(m.full_name),''),nullif(btrim(m.email),''))
+    from public.org_members m
+    where m.organization_id=a.organization_id and m.user_id::text=a.entity_id
+  ),'')
+)
+where a.entity_type='org_members';
 
 -- Deixa reuniões humanas antigas explícitas e compacta apenas os campos alterados.
 update public.audit_events a
