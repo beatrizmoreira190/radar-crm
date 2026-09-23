@@ -2,12 +2,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Activity, BarChart3, Building2, CalendarDays, Clock3, Download, Gauge, Lightbulb, MapPin, MessageSquareText, Target, TrendingDown, TrendingUp, Users, Workflow, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
-import { CHANNEL_LABELS, INTEREST_LABELS, MEETING_STATUS_LABELS, OPPORTUNITY_SERVICE_LABELS, OPPORTUNITY_STAGE_LABELS, PRIORITY_LABELS, RADAR_PRODUCT_LABELS, RESULT_LABELS, TASK_TYPE_LABELS } from '@/lib/constants';
+import { CHANNEL_LABELS, EDITORIAL_PROFILE_CONFIDENCE_LABELS, EDITORIAL_PROFILE_STATUS_LABELS, INTEREST_LABELS, MEETING_STATUS_LABELS, OPPORTUNITY_SERVICE_LABELS, OPPORTUNITY_STAGE_LABELS, PRIORITY_LABELS, PUBLISHER_COMMERCIAL_PROFILE_LABELS, RADAR_PRODUCT_LABELS, RESULT_LABELS, TASK_TYPE_LABELS } from '@/lib/constants';
 import { XLSX_STYLE, downloadXlsx, xcell } from '@/lib/xlsxExport';
 
 const TASK_STATUS_LABELS={open:'Aberta',in_progress:'Em andamento',done:'Concluída',cancelled:'Cancelada'};
 const DIRECTION_LABELS={outbound:'Saída',inbound:'Entrada'};
 const PIPELINE_TYPE_LABELS={open:'Em aberto',won:'Cliente',nurture:'Nutrição',lost:'Encerrada'};
+const commercialProfileSource=value=>value==='manual'?'Confirmado manualmente':value==='editorial_profile'?'Confirmado pelo perfil editorial':'Padrão do sistema';
+const displayPublisherName=p=>p?.commercial_name||p?.trade_name||p?.name||'';
 const EXPORT_OPTIONS=[
   {key:'complete',label:'Completo — gestão + base'},
   {key:'executive',label:'Executivo — visão gerencial'},
