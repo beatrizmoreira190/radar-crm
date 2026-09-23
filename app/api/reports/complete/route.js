@@ -1,9 +1,10 @@
 import writeExcelFile from 'write-excel-file/node';
 import { authenticateRequest } from '@/lib/server/googleCalendar';
 import {
-  CHANNEL_LABELS, INTEREST_LABELS, MEETING_STATUS_LABELS,
-  OPPORTUNITY_SERVICE_LABELS, OPPORTUNITY_STAGE_LABELS,
-  PRIORITY_LABELS, RADAR_PRODUCT_LABELS, RESULT_LABELS, TASK_TYPE_LABELS
+  CHANNEL_LABELS, EDITORIAL_PROFILE_CONFIDENCE_LABELS, EDITORIAL_PROFILE_STATUS_LABELS,
+  INTEREST_LABELS, MEETING_STATUS_LABELS, OPPORTUNITY_SERVICE_LABELS, OPPORTUNITY_STAGE_LABELS,
+  PRIORITY_LABELS, PUBLISHER_ARCHIVE_REASON_LABELS, PUBLISHER_COMMERCIAL_PROFILE_LABELS,
+  RADAR_PRODUCT_LABELS, RESULT_LABELS, TASK_TYPE_LABELS
 } from '@/lib/constants';
 
 export const runtime='nodejs';
@@ -31,6 +32,15 @@ function date(value,withTime=false){
 function stageLabel(value){return OPPORTUNITY_STAGE_LABELS[value]||value||''}
 function serviceLabel(value){return OPPORTUNITY_SERVICE_LABELS[value]||'Outro serviço / projeto'}
 
+function joinArray(value,separator=' · '){return Array.isArray(value)?value.filter(Boolean).join(separator):text(value)}
+function yesNo(value){if(value==null||value==='')return'';const v=String(value).toLowerCase();return ['true','1','sim','s','yes'].includes(v)?'Sim':['false','0','não','nao','n','no'].includes(v)?'Não':String(value)}
+function sourceUrls(value){const rows=Array.isArray(value)?value:[];return rows.map(item=>item?.url).filter(Boolean).join(' | ')}
+function commercialProfileSource(value){return value==='manual'?'Confirmado manualmente':value==='editorial_profile'?'Confirmado pelo perfil editorial':'Padrão do sistema'}
+function contactSource(value){const ref=String(value||'');if(ref.startsWith('receita:cnpj:'))return'Receita Federal — quadro societário';if(/^https?:\/\//i.test(ref))return'Fonte pública';return ref?'Importação / referência externa':'Cadastro Radar'}
+function displayName(p){return p?.commercial_name||p?.trade_name||p?.name||p?.legal_name||''}
+function cnpjBase(value){const d=String(value||'').replace(/\D/g,'');return d.length>=8?d.slice(0,8):''}
+function normalizedName(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]/g,'').toLowerCase()}
+
 async function fetchPaged(makeQuery){
   const all=[];const chunk=1000;let from=0;
   while(true){
@@ -44,6 +54,7 @@ async function fetchPaged(makeQuery){
 }
 
 function tableSheet(name,description,headers,data,columnWidths){
+  const resolvedWidths=columnWidths||headers.map(label=>Math.max(10,Math.min(38,Math.ceil(String(label).length*.85)+5)));
   return {
     data:[
       [cell(name,titleStyle),...Array(Math.max(0,headers.length-1)).fill(null)],
@@ -53,7 +64,7 @@ function tableSheet(name,description,headers,data,columnWidths){
       ...data.map(row)
     ],
     sheet:name.slice(0,31),
-    columns:widths(columnWidths),
+    columns:widths(resolvedWidths),
     stickyRowsCount:4,
     showGridLines:true
   };
@@ -91,37 +102,45 @@ export async function GET(request){
     const teamMap=Object.fromEntries(team.map(member=>[member.user_id,member]));
     const stageMap=Object.fromEntries(stages.map(stage=>[stage.id,stage.name]));
 
-    const [publishers,interactions,opportunities,tasks,meetings,cadenceEnrollments]=await Promise.all([
+    const [publishers,interactions,opportunities,tasks,meetings,cadenceEnrollments,contacts,archivedPublishers]=await Promise.all([
       fetchPaged(()=>{
-        let query=supabase.from('publishers').select('id,name,trade_name,cnpj,city,state,priority,score,radar_fit_score,commercial_potential_score,data_quality_score,best_product,fit_pnld_literario,fit_pnld_didatico,fit_pnld_tecnico_metodologico,fit_radar_licitacoes,fit_radar_oportunidades,stage_id,owner_user_id,prospector_user_id,last_contact_at,next_action_at,commercial_temperature,general_email,phone,website').eq('organization_id',org).eq('archived',false);
+        let query=supabase.from('publishers').select(
+          'id,name,legal_name,trade_name,commercial_name,commercial_name_confidence,commercial_name_sources,commercial_name_verified_at,cnpj,registration_status,cnpj_status_date,cnpj_status_reason,cnpj_start_date,cnpj_special_status,cnpj_special_status_date,simples_nacional,mei,city,state,postal_code,address_type,address_street,address_number,address_complement,neighborhood,company_size,legal_nature,cnae_primary,cnae_description,cnae_secondary,matrix_branch,market_segments,owners_names,commercial_profile_code,commercial_profile_source,commercial_profile_note,commercial_profile_reviewed_at,commercial_profile_reviewed_by,editorial_profile,editorial_profile_status,editorial_profile_confidence,editorial_profile_verified_at,editorial_profile_notes,web_enrichment_status,web_enrichment_sources,web_enrichment_verified_at,web_enrichment_notes,priority,score,radar_fit_score,commercial_potential_score,data_quality_score,best_product,fit_pnld_literario,fit_pnld_didatico,fit_pnld_tecnico_metodologico,fit_radar_licitacoes,fit_radar_oportunidades,stage_id,owner_user_id,prospector_user_id,last_contact_at,next_action_at,commercial_temperature,general_email,alternate_emails,phone,secondary_phone,website,instagram,linkedin_url'
+        ).eq('organization_id',org).eq('archived',false);
         if(!isManager)query=query.eq('owner_user_id',user.id);
         return query.order('name');
       }),
       fetchPaged(()=>{
-        let query=supabase.from('interactions').select('id,publisher_id,user_id,occurred_at,channel,direction,result,subject,summary,response_summary,opportunity_signal,next_step,next_action_at,interest_level,priority,contact_name_snapshot,duration_minutes,publishers(name)').eq('organization_id',org).gte('occurred_at',since);
+        let query=supabase.from('interactions').select('id,publisher_id,user_id,occurred_at,channel,direction,result,subject,summary,response_summary,opportunity_signal,next_step,next_action_at,interest_level,priority,contact_name_snapshot,duration_minutes,publishers(name,trade_name,commercial_name)').eq('organization_id',org).gte('occurred_at',since);
         if(!isManager)query=query.eq('user_id',user.id);
         return query.order('occurred_at',{ascending:false});
       }),
       fetchPaged(()=>{
-        let query=supabase.from('opportunities').select('id,publisher_id,owner_user_id,created_by,title,service_key,service_type,radar_opportunities_title_count,pnld_notice,pnld_category,pnld_works_count,licitacoes_scope,description,stage,expected_close_date,loss_reason,next_step,next_action_at,created_at,updated_at,publishers(name)').eq('organization_id',org);
+        let query=supabase.from('opportunities').select('id,publisher_id,owner_user_id,created_by,title,service_key,service_type,radar_opportunities_title_count,pnld_notice,pnld_category,pnld_works_count,licitacoes_scope,description,stage,expected_close_date,loss_reason,next_step,next_action_at,created_at,updated_at,publishers(name,trade_name,commercial_name)').eq('organization_id',org);
         if(!isManager)query=query.or(`owner_user_id.eq.${user.id},created_by.eq.${user.id}`);
         return query.order('updated_at',{ascending:false});
       }),
       fetchPaged(()=>{
-        let query=supabase.from('tasks').select('id,publisher_id,assigned_to,created_by,title,description,task_type,due_at,status,priority,completed_at,created_at,cadence_enrollment_id,automation_key,result_code,result_note,publishers(name)').eq('organization_id',org).or(`status.eq.open,status.eq.in_progress,completed_at.gte.${since}`);
+        let query=supabase.from('tasks').select('id,publisher_id,assigned_to,created_by,title,description,task_type,due_at,status,priority,completed_at,created_at,cadence_enrollment_id,automation_key,result_code,result_note,publishers(name,trade_name,commercial_name)').eq('organization_id',org).or(`status.eq.open,status.eq.in_progress,completed_at.gte.${since}`);
         if(!isManager)query=query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
         return query.order('due_at',{ascending:true,nullsFirst:false});
       }),
       fetchPaged(()=>{
-        let query=supabase.from('meetings').select('id,publisher_id,title,meeting_type,scheduled_start,duration_minutes,status,scheduled_by,presenter_user_id,outcome_interest,next_step,follow_up_at,created_at,outcome_notes,publishers(name)').eq('organization_id',org).gte('scheduled_start',since);
+        let query=supabase.from('meetings').select('id,publisher_id,title,meeting_type,scheduled_start,duration_minutes,status,scheduled_by,presenter_user_id,outcome_interest,next_step,follow_up_at,created_at,outcome_notes,publishers(name,trade_name,commercial_name)').eq('organization_id',org).gte('scheduled_start',since);
         if(!isManager)query=query.or(`presenter_user_id.eq.${user.id},scheduled_by.eq.${user.id}`);
         return query.order('scheduled_start',{ascending:false});
       }),
       fetchPaged(()=>{
-        let query=supabase.from('cadence_enrollments').select('id,cadence_id,publisher_id,user_id,status,started_at,completed_at,paused_until,pause_reason,last_result_code,cadences(name,cadence_key),publishers(name)').eq('organization_id',org).gte('started_at',since);
+        let query=supabase.from('cadence_enrollments').select('id,cadence_id,publisher_id,user_id,status,started_at,completed_at,paused_until,pause_reason,last_result_code,cadences(name,cadence_key),publishers(name,trade_name,commercial_name)').eq('organization_id',org).gte('started_at',since);
         if(!isManager)query=query.eq('user_id',user.id);
         return query.order('started_at',{ascending:false});
-      })
+      }),
+      fetchPaged(()=>supabase.from('contacts').select(
+        'id,publisher_id,full_name,job_title,department,email,phone,mobile,linkedin_url,is_decision_maker,preferred_channel,notes,source_ref,active,created_at,updated_at'
+      ).eq('organization_id',org).eq('active',true).order('full_name')),
+      isManager?fetchPaged(()=>supabase.from('publishers').select(
+        'id,name,legal_name,trade_name,commercial_name,cnpj,registration_status,archive_reason_code,archive_reason_note,archived_at,archived_by,commercial_profile_code,commercial_profile_source,editorial_profile,editorial_profile_status,city,state'
+      ).eq('organization_id',org).eq('archived',true).order('archived_at',{ascending:false,nullsFirst:false})):Promise.resolve([])
     ]);
 
     const current=analytics.current||{};
@@ -167,19 +186,69 @@ export async function GET(request){
       integer(item.radar_opportunities_titles),integer(item.pnld_works)
     ]);
 
+    const publisherMap=Object.fromEntries(publishers.map(p=>[p.id,p]));
+    const includedIds=new Set(publishers.map(p=>p.id));
+    const includedContacts=contacts.filter(contact=>includedIds.has(contact.publisher_id));
+
+    const publisherHeaders=[
+      'Nome principal','Nome comercial','Nome fantasia oficial','Razão social','CNPJ',
+      'Perfil comercial Radar','Origem perfil comercial','Observações perfil comercial',
+      'Perfis editoriais','Status perfil editorial','Confiança perfil editorial',
+      'Cidade','UF','Etapa','Prioridade','Temperatura','Radar Score','Aderência Radar','Potencial comercial','Qualidade dos dados',
+      'Melhor produto','PNLD Literário','PNLD Didático','PNLD Técnico-Metodológico','Radar de Licitações','Radar de Oportunidades',
+      'Responsável atual','Prospector de origem','Último contato','Próxima ação',
+      'E-mail principal','Outros e-mails','Telefone','Telefone secundário / WhatsApp','Site','Instagram','LinkedIn',
+      'Sócios / quadro societário','Status enriquecimento web','Enriquecimento verificado em'
+    ];
     const publisherRows=publishers.map(p=>[
-      text(p.name),text(p.trade_name),text(p.cnpj),text(p.city),text(p.state),
-      stageMap[p.stage_id]||'Sem etapa',PRIORITY_LABELS[p.priority]||text(p.priority),text(p.commercial_temperature),
+      displayName(p),text(p.commercial_name),text(p.trade_name),text(p.legal_name),text(p.cnpj),
+      PUBLISHER_COMMERCIAL_PROFILE_LABELS[p.commercial_profile_code]||text(p.commercial_profile_code),commercialProfileSource(p.commercial_profile_source),text(p.commercial_profile_note),
+      joinArray(p.editorial_profile),EDITORIAL_PROFILE_STATUS_LABELS[p.editorial_profile_status]||text(p.editorial_profile_status),EDITORIAL_PROFILE_CONFIDENCE_LABELS[p.editorial_profile_confidence]||text(p.editorial_profile_confidence),
+      text(p.city),text(p.state),stageMap[p.stage_id]||'Sem etapa',PRIORITY_LABELS[p.priority]||text(p.priority),text(p.commercial_temperature),
       integer(p.score),integer(p.radar_fit_score),integer(p.commercial_potential_score),integer(p.data_quality_score),
-      RADAR_PRODUCT_LABELS[p.best_product]||'',integer(p.fit_pnld_literario),integer(p.fit_pnld_didatico),
-      integer(p.fit_pnld_tecnico_metodologico),integer(p.fit_radar_licitacoes),integer(p.fit_radar_oportunidades),
-      teamMap[p.owner_user_id]?.full_name||teamMap[p.owner_user_id]?.email||'',
-      teamMap[p.prospector_user_id]?.full_name||teamMap[p.prospector_user_id]?.email||'',
-      date(p.last_contact_at,true),date(p.next_action_at,true),text(p.general_email),text(p.phone),text(p.website)
+      RADAR_PRODUCT_LABELS[p.best_product]||'',integer(p.fit_pnld_literario),integer(p.fit_pnld_didatico),integer(p.fit_pnld_tecnico_metodologico),integer(p.fit_radar_licitacoes),integer(p.fit_radar_oportunidades),
+      teamMap[p.owner_user_id]?.full_name||teamMap[p.owner_user_id]?.email||'',teamMap[p.prospector_user_id]?.full_name||teamMap[p.prospector_user_id]?.email||'',
+      date(p.last_contact_at,true),date(p.next_action_at,true),text(p.general_email),joinArray(p.alternate_emails,' | '),text(p.phone),text(p.secondary_phone),text(p.website),text(p.instagram),text(p.linkedin_url),
+      text(p.owners_names),text(p.web_enrichment_status),date(p.web_enrichment_verified_at,true)
+    ]);
+
+    const contactHeaders=['Editora','CNPJ','Pessoa','Cargo / função','Área / departamento','E-mail profissional','Telefone','Celular / WhatsApp','LinkedIn','Decisor','Canal preferido','Origem','Observações','Atualizado em'];
+    const contactRows=includedContacts.map(contact=>{
+      const p=publisherMap[contact.publisher_id]||{};
+      return [displayName(p),text(p.cnpj),text(contact.full_name),text(contact.job_title),text(contact.department),text(contact.email),text(contact.phone),text(contact.mobile),text(contact.linkedin_url),contact.is_decision_maker?'Sim':'Não',text(contact.preferred_channel),contactSource(contact.source_ref),text(contact.notes),date(contact.updated_at,true)];
+    });
+
+    const ownerGroups=new Map();
+    for(const contact of includedContacts){
+      if(!String(contact.source_ref||'').startsWith('receita:cnpj:'))continue;
+      const p=publisherMap[contact.publisher_id];if(!p)continue;
+      const key=normalizedName(contact.full_name);if(!key)continue;
+      const base=cnpjBase(p.cnpj)||p.id;
+      if(!ownerGroups.has(key))ownerGroups.set(key,{owner:contact.full_name,entities:new Map()});
+      const group=ownerGroups.get(key);
+      if(!group.entities.has(base))group.entities.set(base,{names:new Set(),cnpjs:new Set()});
+      const entity=group.entities.get(base);
+      entity.names.add(displayName(p));
+      if(p.cnpj)entity.cnpjs.add(p.cnpj);
+    }
+    const societaryRows=[];
+    for(const group of ownerGroups.values()){
+      if(group.entities.size<2)continue;
+      const entities=[...group.entities.values()];
+      societaryRows.push([group.owner,group.entities.size,entities.map(e=>[...e.names].join(' / ')).join(' | '),entities.map(e=>[...e.cnpjs].join(' / ')).join(' | ')]);
+    }
+    societaryRows.sort((a,b)=>Number(b[1])-Number(a[1])||String(a[0]).localeCompare(String(b[0]),'pt-BR'));
+
+    const archivedHeaders=['Nome principal','Nome comercial','Nome fantasia','Razão social','CNPJ','Cidade','UF','Situação CNPJ','Perfil comercial','Perfil editorial','Motivo do arquivamento','Observação do arquivamento','Arquivada em','Arquivada por'];
+    const archivedRows=(archivedPublishers||[]).map(p=>[
+      displayName(p),text(p.commercial_name),text(p.trade_name),text(p.legal_name),text(p.cnpj),text(p.city),text(p.state),text(p.registration_status),
+      PUBLISHER_COMMERCIAL_PROFILE_LABELS[p.commercial_profile_code]||text(p.commercial_profile_code),joinArray(p.editorial_profile),
+      PUBLISHER_ARCHIVE_REASON_LABELS[p.archive_reason_code]||text(p.archive_reason_code),text(p.archive_reason_note),date(p.archived_at,true),
+      teamMap[p.archived_by]?.full_name||teamMap[p.archived_by]?.email||''
     ]);
 
     const interactionRows=interactions.map(i=>[
-      date(i.occurred_at,true),text(i.publishers?.name),
+      date(i.occurred_at,true),displayName(i.publishers),
       teamMap[i.user_id]?.full_name||teamMap[i.user_id]?.email||'',
       text(i.contact_name_snapshot),CHANNEL_LABELS[i.channel]||text(i.channel),
       DIRECTION_LABELS[i.direction]||text(i.direction),RESULT_LABELS[i.result]||text(i.result),
@@ -189,7 +258,7 @@ export async function GET(request){
     ]);
 
     const opportunityRows=opportunities.map(o=>[
-      text(o.publishers?.name),text(o.title),serviceLabel(o.service_key),stageLabel(o.stage),
+      displayName(o.publishers),text(o.title),serviceLabel(o.service_key),stageLabel(o.stage),
       integer(o.radar_opportunities_title_count),text(o.pnld_notice),text(o.pnld_category),integer(o.pnld_works_count),
       text(o.licitacoes_scope),text(o.service_type),
       teamMap[o.owner_user_id]?.full_name||teamMap[o.owner_user_id]?.email||'',
@@ -198,7 +267,7 @@ export async function GET(request){
     ]);
 
     const taskRows=tasks.map(t=>[
-      text(t.publishers?.name),text(t.title),TASK_TYPE_LABELS[t.task_type]||text(t.task_type),
+      displayName(t.publishers),text(t.title),TASK_TYPE_LABELS[t.task_type]||text(t.task_type),
       TASK_STATUS_LABELS[t.status]||text(t.status),PRIORITY_LABELS[t.priority]||text(t.priority),
       teamMap[t.assigned_to]?.full_name||teamMap[t.assigned_to]?.email||'',
       date(t.due_at,true),date(t.completed_at,true),RESULT_LABELS[t.result_code]||text(t.result_code),
@@ -207,7 +276,7 @@ export async function GET(request){
     ]);
 
     const meetingRows=meetings.map(m=>[
-      date(m.scheduled_start,true),text(m.publishers?.name),text(m.title),text(m.meeting_type),
+      date(m.scheduled_start,true),displayName(m.publishers),text(m.title),text(m.meeting_type),
       MEETING_STATUS_LABELS[m.status]||text(m.status),integer(m.duration_minutes),
       teamMap[m.presenter_user_id]?.full_name||teamMap[m.presenter_user_id]?.email||'',
       teamMap[m.scheduled_by]?.full_name||teamMap[m.scheduled_by]?.email||'',
@@ -216,7 +285,7 @@ export async function GET(request){
     ]);
 
     const cadenceRows=cadenceEnrollments.map(e=>[
-      text(e.publishers?.name),text(e.cadences?.name),
+      displayName(e.publishers),text(e.cadences?.name),
       teamMap[e.user_id]?.full_name||teamMap[e.user_id]?.email||'',
       text(e.status),date(e.started_at,true),date(e.completed_at,true),date(e.paused_until,true),
       text(e.pause_reason),RESULT_LABELS[e.last_result_code]||text(e.last_result_code)
@@ -231,9 +300,11 @@ export async function GET(request){
       ...(isManager?[tableSheet('Equipe','Origem das contas, responsabilidade atual e atividade comercial.',
         ['Pessoa','E-mail','Originadas','Responsabilidade atual','Contatadas','Interações','Reuniões','Oportunidades','Tarefas atrasadas'],
         teamRows,[28,30,12,18,12,14,12,16,18])]:[]),
-      tableSheet('Editoras','Base ativa incluída no relatório.',
-        ['Editora','Nome fantasia','CNPJ','Cidade','UF','Etapa','Prioridade','Temperatura','Radar Score','Aderência Radar','Potencial comercial','Qualidade dos dados','Melhor produto','PNLD Literário','PNLD Didático','PNLD Técnico-Metodológico','Radar de Licitações','Radar de Oportunidades','Responsável atual','Prospector de origem','Último contato','Próxima ação','E-mail','Telefone','Site'],
-        publisherRows,[30,26,18,22,8,24,14,14,12,15,18,17,25,14,14,22,18,20,24,24,20,20,28,18,32]),
+      tableSheet('Editoras','Base ativa incluída no relatório, com perfil comercial, perfil editorial e canais públicos.',publisherHeaders,publisherRows),
+      tableSheet('Contatos','Pessoas de contato ativas vinculadas às editoras incluídas no relatório.',contactHeaders,contactRows),
+      ...(societaryRows.length?[tableSheet('Vínculos societários','Sócios que aparecem em duas ou mais empresas/CNPJs-base da seleção. Filiais do mesmo CNPJ-base são consolidadas.',
+        ['Sócio em comum','Empresas relacionadas','Empresas / marcas relacionadas','CNPJs relacionados'],societaryRows,[28,18,48,48])]:[]),
+      ...(isManager&&archivedRows.length?[tableSheet('Editoras arquivadas','Editoras fora da base ativa, com motivo e responsável pelo arquivamento.',archivedHeaders,archivedRows)]:[]),
       tableSheet('Interações',`Interações registradas nos últimos ${days} dias.`,
         ['Data/hora','Editora','Responsável','Contato','Canal','Direção','Resultado','Assunto','Resumo','Resposta / retorno','Interesse','Sinal de oportunidade','Próximo passo','Próxima ação','Duração (min)','Prioridade'],
         interactionRows,[19,28,24,22,14,12,22,28,42,42,14,20,40,19,14,14]),

@@ -2,12 +2,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Activity, BarChart3, Building2, CalendarDays, Clock3, Download, Gauge, Lightbulb, MapPin, MessageSquareText, Target, TrendingDown, TrendingUp, Users, Workflow, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
-import { CHANNEL_LABELS, INTEREST_LABELS, MEETING_STATUS_LABELS, OPPORTUNITY_SERVICE_LABELS, OPPORTUNITY_STAGE_LABELS, PRIORITY_LABELS, RADAR_PRODUCT_LABELS, RESULT_LABELS, TASK_TYPE_LABELS } from '@/lib/constants';
+import { CHANNEL_LABELS, EDITORIAL_PROFILE_CONFIDENCE_LABELS, EDITORIAL_PROFILE_STATUS_LABELS, INTEREST_LABELS, MEETING_STATUS_LABELS, OPPORTUNITY_SERVICE_LABELS, OPPORTUNITY_STAGE_LABELS, PRIORITY_LABELS, PUBLISHER_COMMERCIAL_PROFILE_LABELS, RADAR_PRODUCT_LABELS, RESULT_LABELS, TASK_TYPE_LABELS } from '@/lib/constants';
 import { XLSX_STYLE, downloadXlsx, xcell } from '@/lib/xlsxExport';
 
 const TASK_STATUS_LABELS={open:'Aberta',in_progress:'Em andamento',done:'Concluída',cancelled:'Cancelada'};
 const DIRECTION_LABELS={outbound:'Saída',inbound:'Entrada'};
 const PIPELINE_TYPE_LABELS={open:'Em aberto',won:'Cliente',nurture:'Nutrição',lost:'Encerrada'};
+const commercialProfileSource=value=>value==='manual'?'Confirmado manualmente':value==='editorial_profile'?'Confirmado pelo perfil editorial':'Padrão do sistema';
+const displayPublisherName=p=>p?.commercial_name||p?.trade_name||p?.name||'';
 const EXPORT_OPTIONS=[
   {key:'complete',label:'Completo — gestão + base'},
   {key:'executive',label:'Executivo — visão gerencial'},
@@ -21,7 +23,7 @@ const EXPORT_OPTIONS=[
 const REPORT_SHEET_KEYS={
   complete:['dashboard','executive','comparison','trend','funnel','aging','cadences','channels','meetings','opportunityPipeline','opportunityServices','team','score','products','geography','publishers','interactions','opportunities','tasks','meetingDetails','cadenceDetails'],
   executive:['dashboard','executive','comparison','trend','funnel','aging','meetings','opportunityPipeline','opportunityServices','score','products','geography'],
-  commercial:['executive','comparison','opportunityPipeline','opportunityServices','opportunities','score','products','publishers','interactions','tasks'],
+  commercial:['executive','comparison','opportunityPipeline','opportunityServices','opportunities','score','products','publishers','contacts','interactions','tasks'],
   pipeline:['executive','funnel','aging','opportunityPipeline','opportunityServices','opportunities','meetingDetails'],
   team:['executive','comparison','team','interactions','meetingDetails','tasks'],
   cadences:['executive','cadences','channels','cadenceDetails','tasks'],
@@ -77,16 +79,20 @@ export default function ReportsPage(){
 
   async function fetchAllPublishers(){
     return fetchPaged(()=>{
-      let query=supabase.from('publishers').select('id,name,trade_name,cnpj,city,state,priority,score,radar_fit_score,commercial_potential_score,data_quality_score,best_product,fit_pnld_literario,fit_pnld_didatico,fit_pnld_tecnico_metodologico,fit_radar_licitacoes,fit_radar_oportunidades,stage_id,owner_user_id,prospector_user_id,last_contact_at,next_action_at,commercial_temperature,general_email,phone,website').eq('organization_id',org).eq('archived',false);
+      let query=supabase.from('publishers').select('id,name,legal_name,trade_name,commercial_name,commercial_profile_code,commercial_profile_source,commercial_profile_note,editorial_profile,editorial_profile_status,editorial_profile_confidence,cnpj,city,state,priority,score,radar_fit_score,commercial_potential_score,data_quality_score,best_product,fit_pnld_literario,fit_pnld_didatico,fit_pnld_tecnico_metodologico,fit_radar_licitacoes,fit_radar_oportunidades,stage_id,owner_user_id,prospector_user_id,last_contact_at,next_action_at,commercial_temperature,general_email,alternate_emails,phone,secondary_phone,website,instagram,linkedin_url,owners_names,web_enrichment_status,web_enrichment_verified_at').eq('organization_id',org).eq('archived',false);
       if(!isManager)query=query.eq('owner_user_id',user?.id);
       return query.order('name');
     });
   }
 
+  async function fetchContacts(){
+    return fetchPaged(()=>supabase.from('contacts').select('id,publisher_id,full_name,job_title,department,email,phone,mobile,linkedin_url,is_decision_maker,preferred_channel,notes,source_ref,updated_at').eq('organization_id',org).eq('active',true).order('full_name'));
+  }
+
   async function fetchInteractions(){
     const since=new Date(Date.now()-days*86400000).toISOString();
     return fetchPaged(()=>{
-      let query=supabase.from('interactions').select('id,publisher_id,user_id,occurred_at,channel,direction,result,subject,summary,response_summary,opportunity_signal,next_step,next_action_at,interest_level,priority,contact_name_snapshot,duration_minutes,publishers(name)').eq('organization_id',org).gte('occurred_at',since);
+      let query=supabase.from('interactions').select('id,publisher_id,user_id,occurred_at,channel,direction,result,subject,summary,response_summary,opportunity_signal,next_step,next_action_at,interest_level,priority,contact_name_snapshot,duration_minutes,publishers(name,trade_name,commercial_name)').eq('organization_id',org).gte('occurred_at',since);
       if(!isManager)query=query.eq('user_id',user?.id);
       return query.order('occurred_at',{ascending:false});
     });
@@ -94,7 +100,7 @@ export default function ReportsPage(){
 
   async function fetchOpportunities(){
     return fetchPaged(()=>{
-      let query=supabase.from('opportunities').select('id,publisher_id,owner_user_id,created_by,title,service_key,service_type,radar_opportunities_title_count,pnld_notice,pnld_category,pnld_works_count,licitacoes_scope,description,stage,expected_close_date,loss_reason,next_step,next_action_at,created_at,updated_at,publishers(name)').eq('organization_id',org);
+      let query=supabase.from('opportunities').select('id,publisher_id,owner_user_id,created_by,title,service_key,service_type,radar_opportunities_title_count,pnld_notice,pnld_category,pnld_works_count,licitacoes_scope,description,stage,expected_close_date,loss_reason,next_step,next_action_at,created_at,updated_at,publishers(name,trade_name,commercial_name)').eq('organization_id',org);
       if(!isManager)query=query.or(`owner_user_id.eq.${user?.id},created_by.eq.${user?.id}`);
       return query.order('updated_at',{ascending:false});
     });
@@ -103,7 +109,7 @@ export default function ReportsPage(){
   async function fetchTasks(){
     const since=new Date(Date.now()-days*86400000).toISOString();
     return fetchPaged(()=>{
-      let query=supabase.from('tasks').select('id,publisher_id,assigned_to,created_by,title,description,task_type,due_at,status,priority,completed_at,created_at,cadence_enrollment_id,automation_key,result_code,result_note,publishers(name)').eq('organization_id',org).or(`status.eq.open,status.eq.in_progress,completed_at.gte.${since}`);
+      let query=supabase.from('tasks').select('id,publisher_id,assigned_to,created_by,title,description,task_type,due_at,status,priority,completed_at,created_at,cadence_enrollment_id,automation_key,result_code,result_note,publishers(name,trade_name,commercial_name)').eq('organization_id',org).or(`status.eq.open,status.eq.in_progress,completed_at.gte.${since}`);
       if(!isManager)query=query.or(`assigned_to.eq.${user?.id},created_by.eq.${user?.id}`);
       return query.order('due_at',{ascending:true,nullsFirst:false});
     });
@@ -112,7 +118,7 @@ export default function ReportsPage(){
   async function fetchMeetings(){
     const since=new Date(Date.now()-days*86400000).toISOString();
     return fetchPaged(()=>{
-      let query=supabase.from('meetings').select('id,publisher_id,title,meeting_type,scheduled_start,duration_minutes,status,scheduled_by,presenter_user_id,outcome_interest,next_step,follow_up_at,created_at,outcome_notes,publishers(name)').eq('organization_id',org).gte('scheduled_start',since);
+      let query=supabase.from('meetings').select('id,publisher_id,title,meeting_type,scheduled_start,duration_minutes,status,scheduled_by,presenter_user_id,outcome_interest,next_step,follow_up_at,created_at,outcome_notes,publishers(name,trade_name,commercial_name)').eq('organization_id',org).gte('scheduled_start',since);
       if(!isManager)query=query.or('presenter_user_id.eq.'+user?.id+',scheduled_by.eq.'+user?.id);
       return query.order('scheduled_start',{ascending:false});
     });
@@ -121,7 +127,7 @@ export default function ReportsPage(){
   async function fetchCadenceEnrollments(){
     const since=new Date(Date.now()-days*86400000).toISOString();
     return fetchPaged(()=>{
-      let query=supabase.from('cadence_enrollments').select('id,cadence_id,publisher_id,user_id,status,started_at,completed_at,paused_until,pause_reason,last_result_code,cadences(name,cadence_key),publishers(name)').eq('organization_id',org).gte('started_at',since);
+      let query=supabase.from('cadence_enrollments').select('id,cadence_id,publisher_id,user_id,status,started_at,completed_at,paused_until,pause_reason,last_result_code,cadences(name,cadence_key),publishers(name,trade_name,commercial_name)').eq('organization_id',org).gte('started_at',since);
       if(!isManager)query=query.eq('user_id',user?.id);
       return query.order('started_at',{ascending:false});
     });
@@ -196,14 +202,16 @@ export default function ReportsPage(){
       }
       const keys=REPORT_SHEET_KEYS[exportType]||REPORT_SHEET_KEYS.complete;
       const needsPublishers=keys.includes('publishers');
+      const needsContacts=keys.includes('contacts');
       const needsInteractions=keys.includes('interactions');
       const needsOpportunities=keys.includes('opportunities');
       const needsTasks=keys.includes('tasks');
       const needsMeetingDetails=keys.includes('meetingDetails');
       const needsCadenceDetails=keys.includes('cadenceDetails');
 
-      const [publishers,interactions,opportunities,tasks,meetings,cadenceEnrollments]=await Promise.all([
+      const [publishers,contacts,interactions,opportunities,tasks,meetings,cadenceEnrollments]=await Promise.all([
         needsPublishers?fetchAllPublishers():Promise.resolve([]),
+        needsContacts?fetchContacts():Promise.resolve([]),
         needsInteractions?fetchInteractions():Promise.resolve([]),
         needsOpportunities?fetchOpportunities():Promise.resolve([]),
         needsTasks?fetchTasks():Promise.resolve([]),
@@ -350,17 +358,41 @@ export default function ReportsPage(){
         percent(Number(row.base_count)?Number(row.contacted)/Number(row.base_count):0),int(row.interactions)
       ]);
 
-      const publisherHeaders=['Editora','Nome fantasia','CNPJ','Cidade','UF','Etapa','Prioridade','Temperatura','Radar Score','Aderência Radar','Potencial comercial','Qualidade dos dados','Melhor produto','PNLD Literário','PNLD Didático','PNLD Técnico-Metodológico','Radar de Licitações','Radar de Oportunidades','Responsável atual','Prospector de origem','Último contato','Próxima ação','E-mail','Telefone','Site'];
+      const publisherHeaders=[
+        'Nome principal','Nome comercial','Nome fantasia oficial','Razão social','CNPJ',
+        'Perfil comercial Radar','Origem perfil comercial','Observações perfil comercial',
+        'Perfis editoriais','Status perfil editorial','Confiança perfil editorial',
+        'Cidade','UF','Etapa','Prioridade','Temperatura','Radar Score','Aderência Radar','Potencial comercial','Qualidade dos dados',
+        'Melhor produto','PNLD Literário','PNLD Didático','PNLD Técnico-Metodológico','Radar de Licitações','Radar de Oportunidades',
+        'Responsável atual','Prospector de origem','Último contato','Próxima ação',
+        'E-mail principal','Outros e-mails','Telefone','Telefone secundário / WhatsApp','Site','Instagram','LinkedIn',
+        'Sócios / quadro societário','Status enriquecimento web','Enriquecimento verificado em'
+      ];
       const publisherData=publishers.map(p=>[
-        p.name||'',p.trade_name||'',p.cnpj||'',p.city||'',p.state||'',stageMap[p.stage_id]||'Sem etapa',
-        PRIORITY_LABELS[p.priority]||p.priority||'',p.commercial_temperature||'',int(p.score),int(p.radar_fit_score),int(p.commercial_potential_score),int(p.data_quality_score),
+        displayPublisherName(p),p.commercial_name||'',p.trade_name||'',p.legal_name||'',p.cnpj||'',
+        PUBLISHER_COMMERCIAL_PROFILE_LABELS[p.commercial_profile_code]||p.commercial_profile_code||'',commercialProfileSource(p.commercial_profile_source),wrap(p.commercial_profile_note),
+        Array.isArray(p.editorial_profile)?p.editorial_profile.join(' · '):'',EDITORIAL_PROFILE_STATUS_LABELS[p.editorial_profile_status]||p.editorial_profile_status||'',EDITORIAL_PROFILE_CONFIDENCE_LABELS[p.editorial_profile_confidence]||p.editorial_profile_confidence||'',
+        p.city||'',p.state||'',stageMap[p.stage_id]||'Sem etapa',PRIORITY_LABELS[p.priority]||p.priority||'',p.commercial_temperature||'',
+        int(p.score),int(p.radar_fit_score),int(p.commercial_potential_score),int(p.data_quality_score),
         RADAR_PRODUCT_LABELS[p.best_product]||'',int(p.fit_pnld_literario),int(p.fit_pnld_didatico),int(p.fit_pnld_tecnico_metodologico),int(p.fit_radar_licitacoes),int(p.fit_radar_oportunidades),
-        teamMap[p.owner_user_id]?.full_name||teamMap[p.owner_user_id]?.email||'',teamMap[p.prospector_user_id]?.full_name||teamMap[p.prospector_user_id]?.email||'',dt(p.last_contact_at),dt(p.next_action_at),p.general_email||'',p.phone||'',p.website||''
+        teamMap[p.owner_user_id]?.full_name||teamMap[p.owner_user_id]?.email||'',teamMap[p.prospector_user_id]?.full_name||teamMap[p.prospector_user_id]?.email||'',
+        dt(p.last_contact_at),dt(p.next_action_at),p.general_email||'',Array.isArray(p.alternate_emails)?p.alternate_emails.join(' | '):'',p.phone||'',p.secondary_phone||'',p.website||'',p.instagram||'',p.linkedin_url||'',
+        p.owners_names||'',p.web_enrichment_status||'',dt(p.web_enrichment_verified_at)
       ]);
+
+      const publisherExportMap=Object.fromEntries(publishers.map(p=>[p.id,p]));
+      const publisherExportIds=new Set(publishers.map(p=>p.id));
+      const contactHeaders=['Editora','CNPJ','Pessoa','Cargo / função','Área / departamento','E-mail profissional','Telefone','Celular / WhatsApp','LinkedIn','Decisor','Canal preferido','Origem','Observações','Atualizado em'];
+      const contactData=contacts.filter(contact=>!needsPublishers||publisherExportIds.has(contact.publisher_id)).map(contact=>{
+        const p=publisherExportMap[contact.publisher_id]||{};
+        const ref=String(contact.source_ref||'');
+        const origin=ref.startsWith('receita:cnpj:')?'Receita Federal — quadro societário':/^https?:\/\//i.test(ref)?'Fonte pública':ref?'Importação / referência externa':'Cadastro Radar';
+        return [displayPublisherName(p),p.cnpj||'',contact.full_name||'',contact.job_title||'',contact.department||'',contact.email||'',contact.phone||'',contact.mobile||'',contact.linkedin_url||'',contact.is_decision_maker?'Sim':'Não',contact.preferred_channel||'',origin,wrap(contact.notes),dt(contact.updated_at)];
+      });
 
       const interactionHeaders=['Data/hora','Editora','Responsável','Contato','Canal','Direção','Resultado','Assunto','Resumo','Resposta / retorno','Interesse','Sinal de oportunidade','Próximo passo','Próxima ação','Duração (min)','Prioridade'];
       const interactionData=interactions.map(i=>[
-        dt(i.occurred_at),i.publishers?.name||'',teamMap[i.user_id]?.full_name||teamMap[i.user_id]?.email||'',i.contact_name_snapshot||'',
+        dt(i.occurred_at),displayPublisherName(i.publishers),teamMap[i.user_id]?.full_name||teamMap[i.user_id]?.email||'',i.contact_name_snapshot||'',
         CHANNEL_LABELS[i.channel]||i.channel||'',DIRECTION_LABELS[i.direction]||i.direction||'',RESULT_LABELS[i.result]||i.result||'',
         i.subject||'',wrap(i.summary),wrap(i.response_summary),INTEREST_LABELS[i.interest_level]||i.interest_level||'',i.opportunity_signal||'',
         wrap(i.next_step),dt(i.next_action_at),int(i.duration_minutes),PRIORITY_LABELS[i.priority]||i.priority||''
@@ -368,28 +400,28 @@ export default function ReportsPage(){
 
       const opportunityHeaders=['Editora','Oportunidade','Serviço Radar','Etapa','Títulos — Radar de Oportunidades','Edital / programa PNLD','Categoria / objeto PNLD','Obras PNLD','Escopo — Radar de Licitações','Outro serviço / projeto','Responsável atual','Previsão de conclusão','Próxima ação','Próximo passo','Motivo da perda','Criada em','Atualizada em','Descrição'];
       const opportunityData=opportunities.map(o=>[
-        o.publishers?.name||'',o.title||'',OPPORTUNITY_SERVICE_LABELS[o.service_key]||'Outro serviço / projeto',OPPORTUNITY_STAGE_LABELS[o.stage]||o.stage||'',
+        displayPublisherName(o.publishers),o.title||'',OPPORTUNITY_SERVICE_LABELS[o.service_key]||'Outro serviço / projeto',OPPORTUNITY_STAGE_LABELS[o.stage]||o.stage||'',
         int(o.radar_opportunities_title_count),o.pnld_notice||'',o.pnld_category||'',int(o.pnld_works_count),wrap(o.licitacoes_scope),o.service_type||'',
         teamMap[o.owner_user_id]?.full_name||teamMap[o.owner_user_id]?.email||'',date(o.expected_close_date),dt(o.next_action_at),wrap(o.next_step),wrap(o.loss_reason),dt(o.created_at),dt(o.updated_at),wrap(o.description)
       ]);
 
       const taskHeaders=['Editora','Tarefa','Tipo','Status','Prioridade','Responsável','Prazo','Concluída em','Resultado','Observação do resultado','Origem','Criada em','Descrição'];
       const taskData=tasks.map(t=>[
-        t.publishers?.name||'',t.title||'',TASK_TYPE_LABELS[t.task_type]||t.task_type||'',TASK_STATUS_LABELS[t.status]||t.status||'',
+        displayPublisherName(t.publishers),t.title||'',TASK_TYPE_LABELS[t.task_type]||t.task_type||'',TASK_STATUS_LABELS[t.status]||t.status||'',
         PRIORITY_LABELS[t.priority]||t.priority||'',teamMap[t.assigned_to]?.full_name||teamMap[t.assigned_to]?.email||'',dt(t.due_at),dt(t.completed_at),
         RESULT_LABELS[t.result_code]||t.result_code||'',wrap(t.result_note),t.cadence_enrollment_id?'Cadência':t.automation_key?'Automação de reunião':'Manual',dt(t.created_at),wrap(t.description)
       ]);
 
       const meetingHeaders=['Data/hora','Editora','Reunião','Tipo','Status','Duração (min)','Apresentador','Agendada por','Interesse','Próximo passo','Follow-up','Observações de resultado'];
       const meetingData=meetings.map(m=>[
-        dt(m.scheduled_start),m.publishers?.name||'',m.title||'',m.meeting_type||'',MEETING_STATUS_LABELS[m.status]||m.status||'',int(m.duration_minutes),
+        dt(m.scheduled_start),displayPublisherName(m.publishers),m.title||'',m.meeting_type||'',MEETING_STATUS_LABELS[m.status]||m.status||'',int(m.duration_minutes),
         teamMap[m.presenter_user_id]?.full_name||teamMap[m.presenter_user_id]?.email||'',teamMap[m.scheduled_by]?.full_name||teamMap[m.scheduled_by]?.email||'',
         INTEREST_LABELS[m.outcome_interest]||m.outcome_interest||'',wrap(m.next_step),dt(m.follow_up_at),wrap(m.outcome_notes)
       ]);
 
       const cadenceDetailHeaders=['Editora','Cadência','Responsável','Status','Início','Conclusão','Pausada até','Motivo da pausa','Último resultado'];
       const cadenceDetailData=cadenceEnrollments.map(e=>[
-        e.publishers?.name||'',e.cadences?.name||'',teamMap[e.user_id]?.full_name||teamMap[e.user_id]?.email||'',e.status||'',
+        displayPublisherName(e.publishers),e.cadences?.name||'',teamMap[e.user_id]?.full_name||teamMap[e.user_id]?.email||'',e.status||'',
         dt(e.started_at),dt(e.completed_at),dt(e.paused_until),wrap(e.pause_reason),RESULT_LABELS[e.last_result_code]||e.last_result_code||''
       ]);
 
@@ -414,7 +446,8 @@ export default function ReportsPage(){
         score:makeTable('Radar Score','Distribuição da base por faixa de Radar Score e alertas de alta prioridade.',['Faixa / alerta','Editoras'],scoreRows,[34,16]),
         products:makeTable('Aderência por produto','Editoras com aderência alta (≥70) em cada produto Radar.',['Produto','Alta aderência','Ainda sem contato','% sem contato'],productRows,[34,18,18,16]),
         geography:makeTable('Geografia','Cobertura e atividade comercial por estado.',['UF','Base','Contatadas','Cobertura','Interações no período'],geoRows,[10,14,14,14,20]),
-        publishers:makeTable('Editoras',personal?'Editoras sob responsabilidade atual do usuário.':'Base ativa da operação.',publisherHeaders,publisherData,[30,26,18,22,8,24,14,14,12,15,18,17,25,14,14,22,18,20,24,24,20,20,28,18,32]),
+        publishers:makeTable('Editoras',personal?'Editoras sob responsabilidade atual do usuário.':'Base ativa da operação.',publisherHeaders,publisherData,publisherHeaders.map(label=>Math.max(10,Math.min(36,Math.ceil(String(label).length*.8)+5)))),
+        contacts:makeTable('Contatos','Pessoas de contato ativas vinculadas às editoras da seleção.',contactHeaders,contactData,[28,18,28,24,22,30,18,18,34,12,16,28,42,19]),
         interactions:makeTable('Interações','Contatos registrados nos últimos '+days+' dias.',interactionHeaders,interactionData,[19,28,24,22,14,12,22,28,42,42,14,20,40,19,14,14]),
         opportunities:makeTable('Oportunidades','Negociações registradas no CRM sem valores comerciais sensíveis.',opportunityHeaders,opportunityData,[28,30,26,18,22,24,28,14,36,28,24,18,19,38,32,19,19,42]),
         tasks:makeTable('Tarefas','Tarefas abertas e tarefas concluídas nos últimos '+days+' dias.',taskHeaders,taskData,[28,38,16,16,14,24,19,19,22,36,20,19,42]),
