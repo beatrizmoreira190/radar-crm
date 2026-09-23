@@ -22,7 +22,7 @@ export default function CadastroReceitaPage(){
   const router=useRouter();
   const {supabase,membership,isAdmin}=useCrm();
   const org=membership?.organization_id;
-  const [stats,setStats]=useState({loading:true,total:0,withCnpj:0,withoutCnpj:0});
+  const [stats,setStats]=useState({loading:true,total:0,withCnpj:0,withoutCnpj:0,archivedBaixadas:0});
   const [runs,setRuns]=useState([]);
   const [changes,setChanges]=useState([]);
   const [loadingRuns,setLoadingRuns]=useState(true);
@@ -35,14 +35,15 @@ export default function CadastroReceitaPage(){
 
   const loadStats=useCallback(async()=>{
     if(!org||!isAdmin)return;
-    const [all,withCnpj]=await Promise.all([
+    const [all,withCnpj,archivedBaixadas]=await Promise.all([
       supabase.from('publishers').select('id',{count:'exact',head:true}).eq('organization_id',org),
-      supabase.from('publishers').select('id',{count:'exact',head:true}).eq('organization_id',org).not('cnpj','is',null).neq('cnpj','')
+      supabase.from('publishers').select('id',{count:'exact',head:true}).eq('organization_id',org).not('cnpj','is',null).neq('cnpj',''),
+      supabase.from('publishers').select('id',{count:'exact',head:true}).eq('organization_id',org).eq('archived',true).eq('registration_status','BAIXADA')
     ]);
     const total=all.count||0;
     const cnpj=withCnpj.count||0;
-    setStats({loading:false,total,withCnpj:cnpj,withoutCnpj:Math.max(0,total-cnpj)});
-    if(all.error||withCnpj.error)setNotice(all.error?.message||withCnpj.error?.message||'Não foi possível carregar os indicadores.');
+    setStats({loading:false,total,withCnpj:cnpj,withoutCnpj:Math.max(0,total-cnpj),archivedBaixadas:archivedBaixadas.count||0});
+    if(all.error||withCnpj.error||archivedBaixadas.error)setNotice(all.error?.message||withCnpj.error?.message||archivedBaixadas.error?.message||'Não foi possível carregar os indicadores.');
   },[org,isAdmin,supabase]);
 
   const loadRuns=useCallback(async()=>{
@@ -125,6 +126,7 @@ export default function CadastroReceitaPage(){
         <div className="info-item"><small>Editoras cadastradas</small><span>{stats.loading?'—':stats.total.toLocaleString('pt-BR')}</span></div>
         <div className="info-item"><small>Com CNPJ</small><span>{stats.loading?'—':stats.withCnpj.toLocaleString('pt-BR')}</span></div>
         <div className="info-item"><small>Sem CNPJ</small><span>{stats.loading?'—':stats.withoutCnpj.toLocaleString('pt-BR')}</span></div>
+        <div className="info-item"><small>CNPJs baixados arquivados</small><span>{stats.loading?'—':stats.archivedBaixadas.toLocaleString('pt-BR')}</span></div>
         <div className="info-item"><small>Última sincronização</small><span>{lastCompleted?dateTime(lastCompleted.finished_at):'Ainda não executada'}</span></div>
       </div>
     </section>
@@ -145,6 +147,9 @@ export default function CadastroReceitaPage(){
 
       <div className="notice" style={{marginTop:10}}>
         <span><b>Dados protegidos:</b> nome de exibição do CRM, perfil editorial, segmentos, score, prioridade, responsável, histórico, observações, site, redes sociais e demais informações internas da Radar não são sobrescritos.</span>
+      </div>
+      <div className="notice" style={{marginTop:10}}>
+        <span><b>CNPJ baixado:</b> quando a Receita informar situação <b>BAIXADA</b>, a editora é arquivada automaticamente e deixa de aparecer na base ativa do CRM. O registro não é apagado, para preservar histórico e auditoria.</span>
       </div>
 
       {activeRun&&<div className="card" style={{padding:14,marginTop:14,boxShadow:'none'}}>
