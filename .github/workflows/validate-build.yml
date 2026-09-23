@@ -30,6 +30,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-fund
 
+      - name: Validate CNPJ worker syntax
+        run: python3 -m py_compile scripts/cnpj_sync.py
+
       - name: Fail on high/critical dependency vulnerabilities
         run: |
           set +e
