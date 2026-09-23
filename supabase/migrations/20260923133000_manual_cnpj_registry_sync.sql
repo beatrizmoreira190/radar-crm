@@ -561,10 +561,6 @@ declare
   error_count integer;
   not_found_count integer;
 begin
-  if current_user <> 'service_role' then
-    raise exception 'Função restrita ao worker de sincronização' using errcode='42501';
-  end if;
-
   select * into run_row from public.cnpj_sync_runs where id=p_run_id for update;
   if not found or run_row.status <> 'running' then
     raise exception 'Execução de sincronização não está ativa';
