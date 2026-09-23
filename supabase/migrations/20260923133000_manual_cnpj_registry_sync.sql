@@ -365,6 +365,8 @@ begin
   perform set_config('app.crm_actor_user_id',run_row.requested_by::text,true);
 
   for item in select value from jsonb_array_elements(p_rows) loop
+    publisher_uuid := null;
+    target_cnpj := null;
     begin
       publisher_uuid := (item->>'publisher_id')::uuid;
 
@@ -623,6 +625,11 @@ revoke all on table public.cnpj_sync_runs from anon, authenticated;
 revoke all on table public.cnpj_sync_targets from anon, authenticated;
 revoke all on table public.cnpj_sync_changes from anon, authenticated;
 revoke all on table public.publisher_cnpj_verifications from anon, authenticated;
+
+grant select,insert,update,delete on public.cnpj_sync_runs to service_role;
+grant select,insert,update,delete on public.cnpj_sync_targets to service_role;
+grant select,insert,update,delete on public.cnpj_sync_changes to service_role;
+grant select,insert,update,delete on public.publisher_cnpj_verifications to service_role;
 
 grant select on public.cnpj_sync_runs to authenticated;
 grant select on public.cnpj_sync_changes to authenticated;
