@@ -101,9 +101,11 @@ export async function GET(request){
     const teamMap=Object.fromEntries(team.map(member=>[member.user_id,member]));
     const stageMap=Object.fromEntries(stages.map(stage=>[stage.id,stage.name]));
 
-    const [publishers,interactions,opportunities,tasks,meetings,cadenceEnrollments]=await Promise.all([
+    const [publishers,interactions,opportunities,tasks,meetings,cadenceEnrollments,contacts,archivedPublishers]=await Promise.all([
       fetchPaged(()=>{
-        let query=supabase.from('publishers').select('id,name,trade_name,cnpj,city,state,priority,score,radar_fit_score,commercial_potential_score,data_quality_score,best_product,fit_pnld_literario,fit_pnld_didatico,fit_pnld_tecnico_metodologico,fit_radar_licitacoes,fit_radar_oportunidades,stage_id,owner_user_id,prospector_user_id,last_contact_at,next_action_at,commercial_temperature,general_email,phone,website').eq('organization_id',org).eq('archived',false);
+        let query=supabase.from('publishers').select(
+          'id,name,legal_name,trade_name,commercial_name,commercial_name_confidence,commercial_name_sources,commercial_name_verified_at,cnpj,registration_status,cnpj_status_date,cnpj_status_reason,cnpj_start_date,cnpj_special_status,cnpj_special_status_date,simples_nacional,mei,city,state,postal_code,address_type,address_street,address_number,address_complement,neighborhood,company_size,legal_nature,cnae_primary,cnae_description,cnae_secondary,matrix_branch,market_segments,owners_names,commercial_profile_code,commercial_profile_source,commercial_profile_note,commercial_profile_reviewed_at,commercial_profile_reviewed_by,editorial_profile,editorial_profile_status,editorial_profile_confidence,editorial_profile_verified_at,editorial_profile_notes,web_enrichment_status,web_enrichment_sources,web_enrichment_verified_at,web_enrichment_notes,priority,score,radar_fit_score,commercial_potential_score,data_quality_score,best_product,fit_pnld_literario,fit_pnld_didatico,fit_pnld_tecnico_metodologico,fit_radar_licitacoes,fit_radar_oportunidades,stage_id,owner_user_id,prospector_user_id,last_contact_at,next_action_at,commercial_temperature,general_email,alternate_emails,phone,secondary_phone,website,instagram,linkedin_url'
+        ).eq('organization_id',org).eq('archived',false);
         if(!isManager)query=query.eq('owner_user_id',user.id);
         return query.order('name');
       }),
@@ -131,7 +133,13 @@ export async function GET(request){
         let query=supabase.from('cadence_enrollments').select('id,cadence_id,publisher_id,user_id,status,started_at,completed_at,paused_until,pause_reason,last_result_code,cadences(name,cadence_key),publishers(name)').eq('organization_id',org).gte('started_at',since);
         if(!isManager)query=query.eq('user_id',user.id);
         return query.order('started_at',{ascending:false});
-      })
+      }),
+      fetchPaged(()=>supabase.from('contacts').select(
+        'id,publisher_id,full_name,job_title,department,email,phone,mobile,linkedin_url,is_decision_maker,preferred_channel,notes,source_ref,active,created_at,updated_at'
+      ).eq('organization_id',org).eq('active',true).order('full_name')),
+      isManager?fetchPaged(()=>supabase.from('publishers').select(
+        'id,name,legal_name,trade_name,commercial_name,cnpj,registration_status,archive_reason_code,archive_reason_note,archived_at,archived_by,commercial_profile_code,commercial_profile_source,editorial_profile,editorial_profile_status,city,state'
+      ).eq('organization_id',org).eq('archived',true).order('archived_at',{ascending:false,nullsFirst:false})):Promise.resolve([])
     ]);
 
     const current=analytics.current||{};
