@@ -659,3 +659,350 @@
 @media(max-width:480px){
   .quick-contact-items{grid-template-columns:1fr!important}
 }
+
+
+/* Publisher record v5 — cleaner editorial CRM language
+   Fewer nested boxes, stronger hierarchy, larger readable type, calmer neutrals. */
+
+.publisher-record-overview,
+.publisher-quick-contact,
+.publisher-record-main .card.panel,
+.publisher-record-aside .card.panel,
+.radar-intelligence-collapsible,
+.publisher-meetings-card,
+.publisher-materials-card{
+  border:1px solid #e6e9ee!important;
+  border-radius:12px!important;
+  background:#fff!important;
+  box-shadow:none!important;
+}
+
+.publisher-record-main{gap:16px!important}
+.publisher-record-grid{gap:18px!important}
+.publisher-record-aside{gap:14px!important}
+
+.publisher-record-main .card.panel{padding:20px 22px!important}
+.publisher-record-aside .card.panel{padding:17px 18px!important}
+
+.publisher-record-main .section-title{
+  min-height:0!important;
+  margin-bottom:16px!important;
+  padding-bottom:12px!important;
+  border-bottom:1px solid #eef0f3!important;
+}
+.publisher-record-main .section-title h2,
+.publisher-record-main .section-title .help-heading h2{
+  font-size:17px!important;
+  line-height:1.25!important;
+  font-weight:750!important;
+  letter-spacing:-.02em!important;
+}
+.publisher-record-main .section-title p{
+  font-size:11.5px!important;
+  line-height:1.45!important;
+  color:#667085!important;
+}
+
+.publisher-record-overview{
+  margin-bottom:14px!important;
+}
+.publisher-record-overview-head{
+  padding:17px 19px 14px!important;
+  border-bottom:1px solid #eef0f3!important;
+}
+.publisher-record-overview-head strong{
+  font-size:16px!important;
+}
+.publisher-record-overview-head p{
+  font-size:11px!important;
+}
+.publisher-record-overview-grid article{
+  padding:14px 16px!important;
+}
+.publisher-overview-label{
+  font-size:9.5px!important;
+  letter-spacing:.045em!important;
+}
+.publisher-record-overview-grid strong{
+  font-size:12px!important;
+}
+.publisher-record-overview-grid small{
+  font-size:10px!important;
+}
+
+/* Quick contact: one clean strip, not six cards inside another card. */
+.publisher-quick-contact{
+  padding:0!important;
+  display:block!important;
+  overflow:hidden;
+  margin-bottom:16px!important;
+}
+.quick-contact-heading{
+  padding:14px 18px 11px!important;
+  border-bottom:1px solid #eef0f3;
+}
+.quick-contact-heading>div>small{
+  font-size:9px!important;
+  color:#98a2b3!important;
+}
+.quick-contact-heading>div>strong{
+  font-size:13px!important;
+}
+.quick-contact-items{
+  display:grid!important;
+  grid-template-columns:repeat(6,minmax(0,1fr))!important;
+  gap:0!important;
+  background:#fff;
+}
+.quick-contact-items>a,
+.quick-contact-empty,
+.quick-contact-location{
+  min-height:74px!important;
+  padding:13px 14px!important;
+  border:0!important;
+  border-right:1px solid #eef0f3!important;
+  border-radius:0!important;
+  background:#fff!important;
+  box-shadow:none!important;
+  transform:none!important;
+}
+.quick-contact-items>*:last-child{
+  border-right:0!important;
+}
+.quick-contact-items>a:hover{
+  background:#fafbfc!important;
+  border-color:#eef0f3!important;
+  box-shadow:none!important;
+  transform:none!important;
+}
+.quick-contact-items svg{
+  color:#7b8494!important;
+  width:15px!important;
+  height:15px!important;
+}
+.quick-contact-items small{
+  font-size:9px!important;
+  letter-spacing:.035em!important;
+  color:#98a2b3!important;
+}
+.quick-contact-items strong{
+  font-size:11.5px!important;
+  line-height:1.4!important;
+  color:#344054!important;
+}
+.quick-contact-items em{
+  font-size:9.5px!important;
+  margin-top:2px;
+}
+.quick-contact-empty{
+  opacity:1!important;
+}
+.quick-contact-empty strong{
+  color:#98a2b3!important;
+  font-weight:550!important;
+}
+
+/* Identity: no card-within-card look. */
+.publisher-name-summary{
+  grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr)!important;
+  gap:26px!important;
+  padding:2px 0 15px!important;
+  border:0!important;
+  border-bottom:1px solid #eef0f3!important;
+  border-radius:0!important;
+  background:transparent!important;
+}
+.publisher-name-primary{
+  padding:2px 26px 2px 0!important;
+  border-right:1px solid #eef0f3!important;
+}
+.publisher-name-primary>small{
+  font-size:9.5px!important;
+  color:#667085!important;
+  letter-spacing:.035em!important;
+}
+.publisher-name-primary>strong{
+  margin-top:7px!important;
+  font-size:21px!important;
+  line-height:1.2!important;
+  font-weight:760!important;
+  color:#101828!important;
+}
+.publisher-name-meta{
+  margin-top:8px!important;
+  font-size:10px!important;
+}
+.publisher-name-official .info-item{
+  padding:8px 0!important;
+}
+.publisher-name-official .info-item small{
+  font-size:9px!important;
+}
+.publisher-name-official .info-item span{
+  font-size:12px!important;
+  line-height:1.4!important;
+}
+
+/* Registration fields: clean two-column definition list. */
+.publisher-registration-grid{
+  margin-top:6px!important;
+  padding-top:4px!important;
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:0 32px!important;
+  border-top:0!important;
+}
+.publisher-data-card .publisher-registration-grid .info-item{
+  min-height:58px;
+  padding:12px 0!important;
+  border-bottom:1px solid #f0f2f5!important;
+}
+.publisher-data-card .publisher-registration-grid .info-item:nth-last-child(-n+2){
+  border-bottom:0!important;
+}
+.publisher-data-card .info-item small{
+  font-size:9px!important;
+  letter-spacing:.035em!important;
+  color:#98a2b3!important;
+}
+.publisher-data-card .info-item span{
+  font-size:12px!important;
+  line-height:1.45!important;
+  color:#344054!important;
+}
+
+/* Verification details stay available but quiet. */
+.publisher-source-details{
+  margin-top:10px!important;
+  padding-top:10px!important;
+  border-top:1px solid #eef0f3!important;
+}
+.publisher-source-details summary{
+  font-size:10.5px!important;
+  color:#667085!important;
+  font-weight:650!important;
+}
+.publisher-source-details-body{
+  margin-top:10px!important;
+  padding:11px 13px!important;
+  border:1px solid #eef0f3;
+  border-radius:8px!important;
+  background:#fafbfc!important;
+}
+.publisher-source-detail-row strong{
+  font-size:10.5px!important;
+}
+.publisher-source-detail-row span{
+  font-size:9.5px!important;
+}
+
+/* Editorial profile gets breathing room instead of another dense data table. */
+.publisher-editorial-card .chips{
+  gap:6px!important;
+}
+.publisher-editorial-card .badge.blue{
+  padding:5px 9px!important;
+  border-radius:999px!important;
+  font-size:10px!important;
+  font-weight:650!important;
+}
+.publisher-editorial-notes{
+  margin-top:12px!important;
+  font-size:11.5px!important;
+  line-height:1.55!important;
+  color:#667085!important;
+}
+.publisher-editorial-sources{
+  font-size:10px!important;
+}
+
+/* Sidebar: quieter, less form-heavy. */
+.publisher-record-aside .section-title{
+  margin-bottom:13px!important;
+}
+.publisher-record-aside .section-title h2,
+.publisher-record-aside .section-title h3,
+.publisher-record-aside .help-heading h2,
+.publisher-record-aside .help-heading h3{
+  font-size:15px!important;
+}
+.publisher-record-aside label,
+.publisher-record-aside .help-label{
+  font-size:10.5px!important;
+}
+.publisher-record-aside select,
+.publisher-record-aside input,
+.publisher-record-aside textarea{
+  border-color:#e2e6ec!important;
+  border-radius:9px!important;
+  background:#fff!important;
+}
+.publisher-record-aside .stat-row{
+  min-height:40px!important;
+  padding:10px 0!important;
+}
+.publisher-record-aside .stat-row span,
+.publisher-record-aside .stat-row strong{
+  font-size:11px!important;
+}
+
+/* Header metadata should read as metadata, not a row of pills. */
+.publisher-head-identity{
+  gap:4px 14px!important;
+  margin-top:8px!important;
+  font-size:11.5px!important;
+}
+.publisher-head-missing{
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  color:#9a6700!important;
+  font-weight:650!important;
+}
+
+/* Keep the page visually calm: red belongs to actions, status colors to status only. */
+.publisher-data-card .text-link,
+.publisher-editorial-card .text-link,
+.publisher-source-details .text-link{
+  color:#475467!important;
+  font-weight:650!important;
+  text-decoration:none!important;
+}
+.publisher-data-card .text-link:hover,
+.publisher-editorial-card .text-link:hover,
+.publisher-source-details .text-link:hover{
+  color:#101828!important;
+  text-decoration:underline!important;
+}
+
+@media(max-width:1320px){
+  .quick-contact-items{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+  .quick-contact-items>*:nth-child(3n){border-right:0!important}
+  .quick-contact-items>*:nth-child(n+4){border-top:1px solid #eef0f3!important}
+}
+@media(max-width:760px){
+  .publisher-record-main .card.panel{padding:17px!important}
+  .quick-contact-items{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .quick-contact-items>*{border-right:1px solid #eef0f3!important;border-top:0!important}
+  .quick-contact-items>*:nth-child(2n){border-right:0!important}
+  .quick-contact-items>*:nth-child(n+3){border-top:1px solid #eef0f3!important}
+  .publisher-name-summary{grid-template-columns:1fr!important;gap:10px!important}
+  .publisher-name-primary{
+    padding:0 0 14px!important;
+    border-right:0!important;
+    border-bottom:1px solid #eef0f3!important;
+  }
+  .publisher-registration-grid{grid-template-columns:1fr!important;gap:0!important}
+  .publisher-data-card .publisher-registration-grid .info-item{
+    border-bottom:1px solid #f0f2f5!important;
+  }
+}
+@media(max-width:480px){
+  .quick-contact-items{grid-template-columns:1fr!important}
+  .quick-contact-items>*{
+    border-right:0!important;
+    border-top:1px solid #eef0f3!important;
+  }
+  .quick-contact-items>*:first-child{border-top:0!important}
+}
