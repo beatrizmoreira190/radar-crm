@@ -1,9 +1,10 @@
 import writeExcelFile from 'write-excel-file/node';
 import { authenticateRequest } from '@/lib/server/googleCalendar';
 import {
-  CHANNEL_LABELS, INTEREST_LABELS, MEETING_STATUS_LABELS,
-  OPPORTUNITY_SERVICE_LABELS, OPPORTUNITY_STAGE_LABELS,
-  PRIORITY_LABELS, RADAR_PRODUCT_LABELS, RESULT_LABELS, TASK_TYPE_LABELS
+  CHANNEL_LABELS, EDITORIAL_PROFILE_CONFIDENCE_LABELS, EDITORIAL_PROFILE_STATUS_LABELS,
+  INTEREST_LABELS, MEETING_STATUS_LABELS, OPPORTUNITY_SERVICE_LABELS, OPPORTUNITY_STAGE_LABELS,
+  PRIORITY_LABELS, PUBLISHER_ARCHIVE_REASON_LABELS, PUBLISHER_COMMERCIAL_PROFILE_LABELS,
+  RADAR_PRODUCT_LABELS, RESULT_LABELS, TASK_TYPE_LABELS
 } from '@/lib/constants';
 
 export const runtime='nodejs';
@@ -30,6 +31,15 @@ function date(value,withTime=false){
 }
 function stageLabel(value){return OPPORTUNITY_STAGE_LABELS[value]||value||''}
 function serviceLabel(value){return OPPORTUNITY_SERVICE_LABELS[value]||'Outro serviço / projeto'}
+
+function joinArray(value,separator=' · '){return Array.isArray(value)?value.filter(Boolean).join(separator):text(value)}
+function yesNo(value){if(value==null||value==='')return'';const v=String(value).toLowerCase();return ['true','1','sim','s','yes'].includes(v)?'Sim':['false','0','não','nao','n','no'].includes(v)?'Não':String(value)}
+function sourceUrls(value){const rows=Array.isArray(value)?value:[];return rows.map(item=>item?.url).filter(Boolean).join(' | ')}
+function commercialProfileSource(value){return value==='manual'?'Confirmado manualmente':value==='editorial_profile'?'Confirmado pelo perfil editorial':'Padrão do sistema'}
+function contactSource(value){const ref=String(value||'');if(ref.startsWith('receita:cnpj:'))return'Receita Federal — quadro societário';if(/^https?:\/\//i.test(ref))return'Fonte pública';return ref?'Importação / referência externa':'Cadastro Radar'}
+function displayName(p){return p?.commercial_name||p?.trade_name||p?.name||p?.legal_name||''}
+function cnpjBase(value){const d=String(value||'').replace(/\D/g,'');return d.length>=8?d.slice(0,8):''}
+function normalizedName(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]/g,'').toLowerCase()}
 
 async function fetchPaged(makeQuery){
   const all=[];const chunk=1000;let from=0;
