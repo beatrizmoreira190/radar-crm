@@ -98,7 +98,7 @@ function opportunityServiceDetail(opportunity){
 export default function PublisherDetailPage(){
   const {id}=useParams(); const {supabase,membership,user,teamMap,team,isManager,hasCommercialFunction,activityVersion}=useCrm(); const org=membership?.organization_id;
   const [publisher,setPublisher]=useState(null); const [contacts,setContacts]=useState([]); const [interactions,setInteractions]=useState([]); const [tasks,setTasks]=useState([]); const [opps,setOpps]=useState([]); const [stages,setStages]=useState([]); const [cnpjVerification,setCnpjVerification]=useState(null); const [societaryLinks,setSocietaryLinks]=useState({related_count:0,shared_owner_count:0,related_publishers:[]});
-  const [loading,setLoading]=useState(true); const [notice,setNotice]=useState(''); const [modal,setModal]=useState(''); const [actionsOpen,setActionsOpen]=useState(false); const [editingOpportunity,setEditingOpportunity]=useState(null); const [noteMentions,setNoteMentions]=useState([]); const [edit,setEdit]=useState({priority:'medium',stage_id:'',owner_user_id:'',next_action_at:'',notes:''}); const editHydratedFor=useRef(null); const actionMenuRef=useRef(null);
+  const [loading,setLoading]=useState(true); const [notice,setNotice]=useState(''); const [modal,setModal]=useState(''); const [actionsOpen,setActionsOpen]=useState(false); const [editingOpportunity,setEditingOpportunity]=useState(null); const [editingContact,setEditingContact]=useState(null); const [noteMentions,setNoteMentions]=useState([]); const [edit,setEdit]=useState({priority:'medium',stage_id:'',owner_user_id:'',next_action_at:'',notes:''}); const editHydratedFor=useRef(null); const actionMenuRef=useRef(null);
   async function load(){if(!org||!id)return;setLoading(true);const [p,c,i,t,o,s,v,sl]=await Promise.all([
     supabase.from('publishers').select('*').eq('organization_id',org).eq('id',id).maybeSingle(),
     supabase.from('contacts').select('*').eq('organization_id',org).eq('publisher_id',id).eq('active',true).order('is_decision_maker',{ascending:false}).order('full_name'),
@@ -143,6 +143,8 @@ export default function PublisherDetailPage(){
   function newOpportunity(){setEditingOpportunity(null);setModal('opportunity')}
   function editOpportunity(opportunity){setEditingOpportunity(opportunity);setModal('opportunity')}
   function closeOpportunity(){setModal('');setEditingOpportunity(null)}
+  function editContact(contact){if(!canCollaborate)return;setEditingContact(contact);setModal('contact-edit')}
+  function closeContactEdit(){setModal('');setEditingContact(null)}
   if(loading&&!publisher)return <div className="page-wrap"><div className="table-empty">Carregando editora…</div></div>;
   if(!publisher)return <div className="page-wrap"><Link href="/app/editoras" className="text-link"><ArrowLeft size={15}/> Voltar</Link><div className="card panel" style={{marginTop:16}}><h2>Editora não encontrada</h2><p className="muted">Ela pode ter sido arquivada ou você não tem acesso a esse registro.</p></div></div>;
   return <div className="page-wrap">
@@ -207,7 +209,29 @@ export default function PublisherDetailPage(){
       </section>
       <PublisherRadarPanel publisher={publisher} contacts={contacts} interactions={interactions}/>
       {societaryLinks?.related_count>0&&<SocietaryLinksCard data={societaryLinks}/>}
-      <section className="card panel publisher-contacts-card"><div className="section-title"><div><HelpHeading as="h2" help={HELP.contacts}>Pessoas de contato</HelpHeading><p className="muted">Pessoas vinculadas à editora.</p></div></div>{contacts.length?contacts.map(c=><div className="contact-row" key={c.id}><strong>{c.full_name}{c.is_decision_maker?' · Decisor':''}</strong><span>{[c.job_title,c.department].filter(Boolean).join(' · ')||'Sem cargo informado'}</span><span>{[c.email,c.mobile||c.phone].filter(Boolean).join(' · ')}</span></div>):<p className="muted">Nenhum contato cadastrado.</p>}</section>
+      <section className="card panel publisher-contacts-card">
+        <div className="section-title">
+          <div><HelpHeading as="h2" help={HELP.contacts}>Pessoas de contato</HelpHeading><p className="muted">Clique em uma pessoa para completar telefone, e-mail, LinkedIn e outros dados profissionais.</p></div>
+        </div>
+        {contacts.length?contacts.map(contact=>{
+          const channels=[contact.email,contact.mobile||contact.phone,contact.linkedin_url?'LinkedIn':null].filter(Boolean);
+          const societary=String(contact.source_ref||'').startsWith('receita:cnpj:');
+          const content=<>
+            <div className="contact-row-main">
+              <strong>{contact.full_name}{contact.is_decision_maker?' · Decisor':''}</strong>
+              <span>{[contact.job_title,contact.department].filter(Boolean).join(' · ')||'Sem cargo informado'}</span>
+              <span>{channels.join(' · ')||'Sem dados de contato profissional'}</span>
+            </div>
+            <div className="contact-row-side">
+              {societary&&<span className="badge">Receita</span>}
+              {canCollaborate&&<span className="contact-edit-label">{channels.length?'Editar dados':'Adicionar dados'} →</span>}
+            </div>
+          </>;
+          return canCollaborate
+            ?<button type="button" className="contact-row contact-row-button" key={contact.id} onClick={()=>editContact(contact)}>{content}</button>
+            :<div className="contact-row" key={contact.id}>{content}</div>
+        }):<p className="muted">Nenhum contato cadastrado.</p>}
+      </section>
       <section className="card panel publisher-history-card"><div className="section-title"><div><HelpHeading as="h2" help={HELP.history}>Histórico de interações</HelpHeading><p className="muted">Interações mais recentes primeiro.</p></div></div>{interactions.length?<div className="timeline">{interactions.map(i=><div className="timeline-item" key={i.id}><div className="timeline-dot"/><div className="timeline-body"><strong>{CHANNEL_LABELS[i.channel]||i.channel} · {RESULT_LABELS[i.result]||i.result||'Interação'}</strong><p>{i.summary}</p>{i.next_step&&<p><b>Próximo passo:</b> {i.next_step}</p>}<small>{formatDate(i.occurred_at,true)} · {teamMap[i.user_id]?.full_name||teamMap[i.user_id]?.email||'Equipe'}</small></div></div>)}</div>:<p className="muted">Ainda não há interações registradas.</p>}</section>
       <section className="card panel publisher-opportunities-card"><div className="section-title"><div><HelpHeading as="h2" help={HELP.opportunities}>Oportunidades</HelpHeading><p className="muted">Negócios concretos em negociação com esta editora, sem registrar valores comerciais sensíveis.</p></div></div>{opps.length?opps.map(o=><div className="opportunity-row" key={o.id}><div style={{display:'flex',justifyContent:'space-between',gap:14,alignItems:'flex-start'}}><div style={{minWidth:0}}><strong>{o.title}</strong><div className="publisher-meta" style={{marginTop:4}}><span>{OPPORTUNITY_SERVICE_LABELS[o.service_key]||o.service_type||'Serviço não informado'}</span><span>{OPPORTUNITY_STAGE_LABELS[o.stage]||o.stage}</span>{o.expected_close_date&&<span>Previsão: {formatDate(o.expected_close_date)}</span>}</div><p className="muted" style={{fontSize:11,margin:'5px 0 0'}}>{opportunityServiceDetail(o)}</p>{o.next_step&&<p style={{fontSize:12,margin:'6px 0 0',color:'#475467'}}><b>Próximo passo:</b> {o.next_step}</p>}{o.stage==='lost'&&o.loss_reason&&<p style={{fontSize:12,margin:'6px 0 0',color:'#b42318'}}><b>Motivo da perda:</b> {o.loss_reason}</p>}</div>{(isManager||o.owner_user_id===user?.id||o.created_by===user?.id)&&<button className="btn secondary small" type="button" onClick={()=>editOpportunity(o)}>Editar</button>}</div></div>):<p className="muted">Nenhuma oportunidade cadastrada. Crie uma quando surgir uma possibilidade concreta de negócio.</p>}</section>
       <div className="publisher-meetings-section"><PublisherMeetingsMount/></div>
@@ -218,6 +242,7 @@ export default function PublisherDetailPage(){
       <section className="card panel publisher-sidebar-summary"><div className="section-title"><HelpHeading help={HELP.summary}>Resumo</HelpHeading></div><div className="stat-list"><div className="stat-row"><HelpLabel help={HELP.lastContact}>Último contato</HelpLabel><strong>{formatDate(publisher.last_contact_at,true)}</strong></div><div className="stat-row"><HelpLabel help={HELP.nextAction}>Próxima ação</HelpLabel><strong>{formatDate(publisher.next_action_at,true)}</strong></div><div className="stat-row"><HelpLabel help={HELP.temperature}>Temperatura</HelpLabel><strong>{publisher.commercial_temperature||'—'}</strong></div><div className="stat-row"><HelpLabel help={HELP.contactCount}>Contatos</HelpLabel><strong>{contacts.length}</strong></div></div></section>
     </aside></div>
     {canCollaborate&&modal==='contact'&&<ContactModal supabase={supabase} org={org} publisher={publisher} user={user} onClose={()=>setModal('')} onSaved={()=>{setModal('');setNotice('Pessoa de contato adicionada.');load()}}/>}
+    {canCollaborate&&modal==='contact-edit'&&editingContact&&<EditContactModal supabase={supabase} org={org} contact={editingContact} user={user} onClose={closeContactEdit} onSaved={()=>{closeContactEdit();setNotice('Dados do contato atualizados.');load()}}/>}
     {canCollaborate&&modal==='interaction'&&<InteractionModal supabase={supabase} org={org} publisher={publisher} user={user} team={team} onClose={()=>setModal('')} onSaved={()=>{setModal('');setNotice('Interação registrada.');load()}}/>}
     {canCollaborate&&modal==='task'&&<TaskModal supabase={supabase} org={org} publisher={publisher} user={user} onClose={()=>setModal('')} onSaved={()=>{setModal('');setNotice('Tarefa criada.');load()}}/>}
     {canCollaborate&&modal==='opportunity'&&<OpportunityModal supabase={supabase} org={org} publisher={publisher} user={user} opportunity={editingOpportunity} onClose={closeOpportunity} onSaved={mode=>{closeOpportunity();setNotice(mode==='updated'?'Oportunidade atualizada.':'Oportunidade criada.');load()}}/>}
@@ -262,6 +287,58 @@ function SocietaryLinksCard({data}){
 }
 
 function Info({label,value,help}){return <div className="info-item"><small>{help?<HelpLabel help={help}>{label}</HelpLabel>:label}</small><span>{value||'—'}</span></div>}
+function contactOrigin(contact){
+  const ref=String(contact?.source_ref||'');
+  if(ref.startsWith('receita:cnpj:'))return {label:'Receita Federal — quadro societário',url:''};
+  if(/^https?:\/\//i.test(ref))return {label:'Fonte pública',url:ref.replace(/#[a-f0-9]{32}$/i,'')};
+  return {label:'Cadastro Radar',url:''};
+}
+function EditContactModal({supabase,org,contact,user,onClose,onSaved}){
+  const origin=contactOrigin(contact);
+  const [f,setF]=useState({
+    job_title:contact.job_title||'',
+    department:contact.department||'',
+    email:contact.email||'',
+    phone:contact.phone||'',
+    mobile:contact.mobile||'',
+    linkedin_url:contact.linkedin_url||'',
+    notes:contact.notes||'',
+    is_decision_maker:Boolean(contact.is_decision_maker)
+  });
+  const [err,setErr]=useState('');
+  async function save(e){
+    e.preventDefault();
+    setErr('');
+    const payload={
+      job_title:f.job_title.trim()||null,
+      department:f.department.trim()||null,
+      email:f.email.trim()||null,
+      phone:f.phone.trim()||null,
+      mobile:f.mobile.trim()||null,
+      linkedin_url:f.linkedin_url.trim()||null,
+      notes:f.notes.trim()||null,
+      is_decision_maker:f.is_decision_maker,
+      updated_by:user?.id||null,
+      updated_at:new Date().toISOString()
+    };
+    const {error}=await supabase.from('contacts').update(payload).eq('organization_id',org).eq('id',contact.id);
+    if(error)setErr(error.message);else onSaved();
+  }
+  return <Modal title="Editar pessoa de contato" onClose={onClose} onSubmit={save} err={err} submitLabel="Salvar alterações">
+    <label className="span-2"><HelpLabel help="O nome fica bloqueado para preservar o vínculo societário e o histórico do contato.">Nome</HelpLabel><input className="input contact-locked-field" value={contact.full_name||''} readOnly aria-readonly="true"/></label>
+    <div className="span-2 contact-origin-box"><small>Origem do contato</small><strong>{origin.label}</strong>{origin.url&&<a className="text-link" href={origin.url} target="_blank" rel="noreferrer">Abrir fonte pública</a>}</div>
+    <label><HelpLabel help={HELP.contactRole}>Cargo / função</HelpLabel><input className="input" value={f.job_title} onChange={e=>setF(x=>({...x,job_title:e.target.value}))} placeholder="Ex.: Diretor editorial"/></label>
+    <label><HelpLabel help={HELP.contactArea}>Área / departamento</HelpLabel><input className="input" value={f.department} onChange={e=>setF(x=>({...x,department:e.target.value}))} placeholder="Ex.: Editorial"/></label>
+    <label><HelpLabel help={HELP.contactEmail}>E-mail profissional</HelpLabel><input type="email" className="input" value={f.email} onChange={e=>setF(x=>({...x,email:e.target.value}))} placeholder="nome@empresa.com.br"/></label>
+    <label><HelpLabel help="Telefone profissional ou ramal desta pessoa.">Telefone</HelpLabel><input className="input" value={f.phone} onChange={e=>setF(x=>({...x,phone:e.target.value}))} placeholder="(11) 0000-0000"/></label>
+    <label><HelpLabel help={HELP.contactMobile}>Celular / WhatsApp</HelpLabel><input className="input" value={f.mobile} onChange={e=>setF(x=>({...x,mobile:e.target.value}))} placeholder="(11) 90000-0000"/></label>
+    <label><HelpLabel help="Perfil profissional público no LinkedIn.">LinkedIn</HelpLabel><input className="input" value={f.linkedin_url} onChange={e=>setF(x=>({...x,linkedin_url:e.target.value}))} placeholder="https://linkedin.com/in/..."/></label>
+    <label className="span-2"><span className="help-label"><span><input type="checkbox" checked={f.is_decision_maker} onChange={e=>setF(x=>({...x,is_decision_maker:e.target.checked}))}/> É decisor(a)</span><HelpTip text={HELP.decisionMaker}/></span></label>
+    <label className="span-2"><span>Observações</span><textarea rows={3} value={f.notes} onChange={e=>setF(x=>({...x,notes:e.target.value}))} placeholder="Ex.: Responsável por compras institucionais; prefere contato por WhatsApp."/></label>
+    <p className="span-2 contact-edit-note">O nome original não pode ser alterado aqui. Para contatos vindos da Receita, isso preserva o cruzamento societário entre CNPJs.</p>
+  </Modal>;
+}
+
 function ContactModal({supabase,org,publisher,user,onClose,onSaved}){const [f,setF]=useState({full_name:'',job_title:'',department:'',email:'',phone:'',mobile:'',is_decision_maker:false});const [err,setErr]=useState('');async function save(e){e.preventDefault();const {error}=await supabase.from('contacts').insert({organization_id:org,publisher_id:publisher.id,...f,active:true,created_by:user?.id||null,updated_by:user?.id||null});if(error)setErr(error.message);else onSaved()}return <Modal title="Adicionar pessoa de contato" onClose={onClose} onSubmit={save} err={err}><label className="span-2"><HelpLabel help={HELP.contactName}>Nome</HelpLabel><input required className="input" value={f.full_name} onChange={e=>setF(x=>({...x,full_name:e.target.value}))}/></label><label><HelpLabel help={HELP.contactRole}>Cargo</HelpLabel><input className="input" value={f.job_title} onChange={e=>setF(x=>({...x,job_title:e.target.value}))}/></label><label><HelpLabel help={HELP.contactArea}>Área</HelpLabel><input className="input" value={f.department} onChange={e=>setF(x=>({...x,department:e.target.value}))}/></label><label><HelpLabel help={HELP.contactEmail}>E-mail</HelpLabel><input type="email" className="input" value={f.email} onChange={e=>setF(x=>({...x,email:e.target.value}))}/></label><label><HelpLabel help={HELP.contactMobile}>Celular</HelpLabel><input className="input" value={f.mobile} onChange={e=>setF(x=>({...x,mobile:e.target.value}))}/></label><label className="span-2"><span className="help-label"><span><input type="checkbox" checked={f.is_decision_maker} onChange={e=>setF(x=>({...x,is_decision_maker:e.target.checked}))}/> É decisor(a)</span><HelpTip text={HELP.decisionMaker}/></span></label></Modal>}
 function InteractionModal({supabase,org,publisher,user,team,onClose,onSaved}){const [f,setF]=useState({channel:'phone',result:'connected',summary:'',interest_level:'',next_step:'',next_action_at:''});const [mentions,setMentions]=useState([]);const [err,setErr]=useState('');async function save(e){e.preventDefault();const payload={organization_id:org,publisher_id:publisher.id,user_id:user?.id||null,occurred_at:new Date().toISOString(),channel:f.channel,direction:'outbound',result:f.result||null,summary:f.summary,interest_level:f.interest_level||null,next_step:f.next_step||null,next_action_at:f.next_action_at?new Date(f.next_action_at).toISOString():null};const {data,error}=await supabase.from('interactions').insert(payload).select('id').single();if(error)setErr(error.message);else{if(mentions.length){await supabase.rpc('crm_notify_mentions',{p_organization_id:org,p_user_ids:mentions,p_title:'Você foi mencionado em uma interação',p_body:`${publisher.name} · ${f.summary}`.slice(0,900),p_href:`/app/editoras/${publisher.id}`,p_source_type:'interaction',p_source_id:data?.id||publisher.id,p_dedupe_prefix:`mention:interaction:${data?.id||Date.now()}`});window.dispatchEvent(new Event('crm-notifications-changed'))}onSaved()}}return <Modal title="Registrar interação" onClose={onClose} onSubmit={save} err={err}><label><HelpLabel help={HELP.channel}>Canal</HelpLabel><select value={f.channel} onChange={e=>setF(x=>({...x,channel:e.target.value}))}>{Object.entries(CHANNEL_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label><label><HelpLabel help={HELP.result}>Resultado</HelpLabel><select value={f.result} onChange={e=>setF(x=>({...x,result:e.target.value}))}>{Object.entries(RESULT_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label><label className="span-2"><HelpLabel help={HELP.interactionSummary}>Resumo</HelpLabel><textarea required rows={4} value={f.summary} onChange={e=>setF(x=>({...x,summary:e.target.value}))}/></label><label><HelpLabel help={HELP.interest}>Interesse</HelpLabel><select value={f.interest_level} onChange={e=>setF(x=>({...x,interest_level:e.target.value}))}><option value="">Não informado</option>{Object.entries(INTEREST_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label><label><HelpLabel help={HELP.interactionNextAction}>Próxima ação</HelpLabel><PtBrDateTimeField value={f.next_action_at} onChange={value=>setF(x=>({...x,next_action_at:value}))} ariaLabel="Próxima ação"/></label><label className="span-2"><HelpLabel help={HELP.nextStep}>Próximo passo</HelpLabel><input className="input" value={f.next_step} onChange={e=>setF(x=>({...x,next_step:e.target.value}))}/></label></Modal>}
 function TaskModal({supabase,org,publisher,user,onClose,onSaved}){const [f,setF]=useState({title:'',task_type:'follow_up',priority:'medium',due_at:''});const [err,setErr]=useState('');async function save(e){e.preventDefault();const {error}=await supabase.from('tasks').insert({organization_id:org,publisher_id:publisher.id,assigned_to:user?.id||null,created_by:user?.id||null,title:f.title,task_type:f.task_type,priority:f.priority,status:'open',due_at:f.due_at?new Date(f.due_at).toISOString():null});if(error)setErr(error.message);else onSaved()}return <Modal title="Criar tarefa" onClose={onClose} onSubmit={save} err={err}><label className="span-2"><HelpLabel help={HELP.taskTitle}>Título</HelpLabel><input required className="input" value={f.title} onChange={e=>setF(x=>({...x,title:e.target.value}))}/></label><label><HelpLabel help={HELP.taskType}>Tipo</HelpLabel><select value={f.task_type} onChange={e=>setF(x=>({...x,task_type:e.target.value}))}>{Object.entries(TASK_TYPE_LABELS).map(([k,v])=><option value={k} key={k}>{v}</option>)}</select></label><label><HelpLabel help={HELP.taskPriority}>Prioridade</HelpLabel><select value={f.priority} onChange={e=>setF(x=>({...x,priority:e.target.value}))}>{Object.entries(PRIORITY_LABELS).map(([k,v])=><option value={k} key={k}>{v}</option>)}</select></label><label className="span-2"><HelpLabel help={HELP.taskDue}>Prazo</HelpLabel><PtBrDateTimeField value={f.due_at} onChange={value=>setF(x=>({...x,due_at:value}))} ariaLabel="Prazo"/></label></Modal>}
