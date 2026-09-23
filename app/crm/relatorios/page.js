@@ -23,7 +23,7 @@ const EXPORT_OPTIONS=[
 const REPORT_SHEET_KEYS={
   complete:['dashboard','executive','comparison','trend','funnel','aging','cadences','channels','meetings','opportunityPipeline','opportunityServices','team','score','products','geography','publishers','interactions','opportunities','tasks','meetingDetails','cadenceDetails'],
   executive:['dashboard','executive','comparison','trend','funnel','aging','meetings','opportunityPipeline','opportunityServices','score','products','geography'],
-  commercial:['executive','comparison','opportunityPipeline','opportunityServices','opportunities','score','products','publishers','interactions','tasks'],
+  commercial:['executive','comparison','opportunityPipeline','opportunityServices','opportunities','score','products','publishers','contacts','interactions','tasks'],
   pipeline:['executive','funnel','aging','opportunityPipeline','opportunityServices','opportunities','meetingDetails'],
   team:['executive','comparison','team','interactions','meetingDetails','tasks'],
   cadences:['executive','cadences','channels','cadenceDetails','tasks'],
@@ -83,6 +83,10 @@ export default function ReportsPage(){
       if(!isManager)query=query.eq('owner_user_id',user?.id);
       return query.order('name');
     });
+  }
+
+  async function fetchContacts(){
+    return fetchPaged(()=>supabase.from('contacts').select('id,publisher_id,full_name,job_title,department,email,phone,mobile,linkedin_url,is_decision_maker,preferred_channel,notes,source_ref,updated_at').eq('organization_id',org).eq('active',true).order('full_name'));
   }
 
   async function fetchInteractions(){
@@ -198,14 +202,16 @@ export default function ReportsPage(){
       }
       const keys=REPORT_SHEET_KEYS[exportType]||REPORT_SHEET_KEYS.complete;
       const needsPublishers=keys.includes('publishers');
+      const needsContacts=keys.includes('contacts');
       const needsInteractions=keys.includes('interactions');
       const needsOpportunities=keys.includes('opportunities');
       const needsTasks=keys.includes('tasks');
       const needsMeetingDetails=keys.includes('meetingDetails');
       const needsCadenceDetails=keys.includes('cadenceDetails');
 
-      const [publishers,interactions,opportunities,tasks,meetings,cadenceEnrollments]=await Promise.all([
+      const [publishers,contacts,interactions,opportunities,tasks,meetings,cadenceEnrollments]=await Promise.all([
         needsPublishers?fetchAllPublishers():Promise.resolve([]),
+        needsContacts?fetchContacts():Promise.resolve([]),
         needsInteractions?fetchInteractions():Promise.resolve([]),
         needsOpportunities?fetchOpportunities():Promise.resolve([]),
         needsTasks?fetchTasks():Promise.resolve([]),
@@ -374,6 +380,16 @@ export default function ReportsPage(){
         p.owners_names||'',p.web_enrichment_status||'',dt(p.web_enrichment_verified_at)
       ]);
 
+      const publisherExportMap=Object.fromEntries(publishers.map(p=>[p.id,p]));
+      const publisherExportIds=new Set(publishers.map(p=>p.id));
+      const contactHeaders=['Editora','CNPJ','Pessoa','Cargo / função','Área / departamento','E-mail profissional','Telefone','Celular / WhatsApp','LinkedIn','Decisor','Canal preferido','Origem','Observações','Atualizado em'];
+      const contactData=contacts.filter(contact=>!needsPublishers||publisherExportIds.has(contact.publisher_id)).map(contact=>{
+        const p=publisherExportMap[contact.publisher_id]||{};
+        const ref=String(contact.source_ref||'');
+        const origin=ref.startsWith('receita:cnpj:')?'Receita Federal — quadro societário':/^https?:\/\//i.test(ref)?'Fonte pública':ref?'Importação / referência externa':'Cadastro Radar';
+        return [displayPublisherName(p),p.cnpj||'',contact.full_name||'',contact.job_title||'',contact.department||'',contact.email||'',contact.phone||'',contact.mobile||'',contact.linkedin_url||'',contact.is_decision_maker?'Sim':'Não',contact.preferred_channel||'',origin,wrap(contact.notes),dt(contact.updated_at)];
+      });
+
       const interactionHeaders=['Data/hora','Editora','Responsável','Contato','Canal','Direção','Resultado','Assunto','Resumo','Resposta / retorno','Interesse','Sinal de oportunidade','Próximo passo','Próxima ação','Duração (min)','Prioridade'];
       const interactionData=interactions.map(i=>[
         dt(i.occurred_at),displayPublisherName(i.publishers),teamMap[i.user_id]?.full_name||teamMap[i.user_id]?.email||'',i.contact_name_snapshot||'',
@@ -431,6 +447,7 @@ export default function ReportsPage(){
         products:makeTable('Aderência por produto','Editoras com aderência alta (≥70) em cada produto Radar.',['Produto','Alta aderência','Ainda sem contato','% sem contato'],productRows,[34,18,18,16]),
         geography:makeTable('Geografia','Cobertura e atividade comercial por estado.',['UF','Base','Contatadas','Cobertura','Interações no período'],geoRows,[10,14,14,14,20]),
         publishers:makeTable('Editoras',personal?'Editoras sob responsabilidade atual do usuário.':'Base ativa da operação.',publisherHeaders,publisherData,publisherHeaders.map(label=>Math.max(10,Math.min(36,Math.ceil(String(label).length*.8)+5)))),
+        contacts:makeTable('Contatos','Pessoas de contato ativas vinculadas às editoras da seleção.',contactHeaders,contactData,[28,18,28,24,22,30,18,18,34,12,16,28,42,19]),
         interactions:makeTable('Interações','Contatos registrados nos últimos '+days+' dias.',interactionHeaders,interactionData,[19,28,24,22,14,12,22,28,42,42,14,20,40,19,14,14]),
         opportunities:makeTable('Oportunidades','Negociações registradas no CRM sem valores comerciais sensíveis.',opportunityHeaders,opportunityData,[28,30,26,18,22,24,28,14,36,28,24,18,19,38,32,19,19,42]),
         tasks:makeTable('Tarefas','Tarefas abertas e tarefas concluídas nos últimos '+days+' dias.',taskHeaders,taskData,[28,38,16,16,14,24,19,19,22,36,20,19,42]),
