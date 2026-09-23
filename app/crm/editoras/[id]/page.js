@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowLeft, CheckCircle2, CircleHelp, Clock3, DatabaseZap, Globe2, Mail, Phone, Plus, Save, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, CircleHelp, Clock3, DatabaseZap, Globe2, Plus, Save, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 import { PtBrDateField, PtBrDateTimeField } from '@/components/PtBrDateFields';
 import MentionTextarea from '@/components/MentionTextarea';
@@ -78,24 +78,6 @@ const WEB_ENRICHMENT_STATUS_LABELS={
 };
 
 function sameText(a,b){return Boolean(a&&b&&String(a).trim().toLocaleLowerCase('pt-BR')===String(b).trim().toLocaleLowerCase('pt-BR'))}
-function externalHref(value,network='website'){
-  if(!value)return'';
-  const v=String(value).trim();
-  if(/^https?:\/\//i.test(v))return v;
-  if(network==='instagram'){
-    const handle=v.replace(/^@/,'').replace(/^instagram\.com\//i,'').replace(/^www\.instagram\.com\//i,'');
-    return `https://www.instagram.com/${handle.replace(/^\/+|\/+$/g,'')}`;
-  }
-  if(network==='linkedin'){
-    if(/^linkedin\.com\//i.test(v)||/^www\.linkedin\.com\//i.test(v))return `https://${v}`;
-    if(/^(company|in)\//i.test(v))return `https://www.linkedin.com/${v}`;
-  }
-  return `https://${v.replace(/^\/+/, '')}`;
-}
-function compactExternalLabel(value){
-  if(!value)return'';
-  return String(value).trim().replace(/^https?:\/\//i,'').replace(/^www\./i,'').replace(/\/$/,'');
-}
 
 function HelpTip({text}){return <button type="button" className="help-tip" aria-label={`Ajuda: ${text}`}><CircleHelp size={14}/><span className="help-tip-popover" role="tooltip">{text}</span></button>}
 function HelpHeading({as='h3',children,help}){const Tag=as;return <div className="help-heading"><Tag>{children}</Tag><HelpTip text={help}/></div>}
@@ -135,7 +117,6 @@ export default function PublisherDetailPage(){
   const unassigned=Boolean(publisher&&!publisher.owner_user_id);
   const ownerName=publisher?.owner_user_id?(teamMap[publisher.owner_user_id]?.full_name||teamMap[publisher.owner_user_id]?.email||'Outra pessoa da equipe'):'Sem responsável';
   const editorialSources=Array.isArray(publisher?.editorial_profile_sources)?publisher.editorial_profile_sources:[];
-  const alternateEmails=Array.isArray(publisher?.alternate_emails)?publisher.alternate_emails.filter(Boolean):[];
   const commercialSources=Array.isArray(publisher?.commercial_name_sources)?publisher.commercial_name_sources.filter(Boolean):[];
   const publicSources=Array.isArray(publisher?.web_enrichment_sources)?publisher.web_enrichment_sources.filter(Boolean):[];
   const headName=publisher?.commercial_name||publisher?.trade_name||publisher?.name;
@@ -163,7 +144,7 @@ export default function PublisherDetailPage(){
   if(loading&&!publisher)return <div className="page-wrap"><div className="table-empty">Carregando editora…</div></div>;
   if(!publisher)return <div className="page-wrap"><Link href="/app/editoras" className="text-link"><ArrowLeft size={15}/> Voltar</Link><div className="card panel" style={{marginTop:16}}><h2>Editora não encontrada</h2><p className="muted">Ela pode ter sido arquivada ou você não tem acesso a esse registro.</p></div></div>;
   return <div className="page-wrap">
-    <div className="page-head"><div><Link href="/app/editoras" className="text-link"><ArrowLeft size={15}/> Editoras</Link><div className="eyebrow" style={{marginTop:12}}>Ficha comercial</div><h1>{headName}</h1><div className="publisher-head-identity">{publisher.commercial_name&&<span><b>Nome comercial:</b> {publisher.commercial_name}</span>}{publisher.trade_name&&!sameText(publisher.trade_name,publisher.commercial_name)&&<span><b>Nome fantasia (Receita):</b> {publisher.trade_name}</span>}{!publisher.trade_name&&<span className="publisher-head-missing">Nome fantasia não informado pela Receita Federal</span>}{publisher.legal_name&&<span><b>Razão social:</b> {publisher.legal_name}</span>}{locationLabel&&<span>{locationLabel}</span>}</div></div><div className="publisher-head-actions"><div className="chips"><span className="badge dark">Score {publisher.score??0}</span><HelpTip text={HELP.score}/>{publisher.registration_status&&<span className={`badge ${String(publisher.registration_status).toUpperCase()==='BAIXADA'?'red':String(publisher.registration_status).toUpperCase()==='ATIVA'?'green':'amber'}`}>CNPJ {publisher.registration_status}</span>}<span className="badge">{stageMap[publisher.stage_id]?.name||'Sem etapa'}</span><HelpTip text={HELP.stageBadge}/></div>{canCreateAnyAction&&<div className="publisher-action-menu" ref={actionMenuRef}><button type="button" className="btn" aria-haspopup="menu" aria-expanded={actionsOpen} onClick={()=>setActionsOpen(value=>!value)}><Plus size={15}/> Nova ação</button>{actionsOpen&&<div className="publisher-action-popover" role="menu" aria-label="Nova ação">{canCollaborate&&<><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('interaction')}>Registrar interação</button><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('task')}>Criar tarefa</button><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('opportunity')}>Criar oportunidade</button><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('contact')}>Adicionar pessoa de contato</button></>}{canScheduleMeeting&&<button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('meeting')}>Agendar reunião</button>}{canManageMaterials&&<button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('material')}>Adicionar material</button>}</div>}</div>}</div></div>
+    <div className="page-head"><div><Link href="/app/editoras" className="text-link"><ArrowLeft size={15}/> Editoras</Link><div className="eyebrow" style={{marginTop:12}}>Ficha comercial</div><h1>{headName}</h1><div className="publisher-head-identity">{publisher.trade_name&&!sameText(publisher.trade_name,headName)&&<span><b>Nome fantasia (Receita):</b> {publisher.trade_name}</span>}{!publisher.trade_name&&<span className="publisher-head-missing">Sem nome fantasia na Receita</span>}{publisher.legal_name&&<span><b>Razão social:</b> {publisher.legal_name}</span>}{locationLabel&&<span>{locationLabel}</span>}</div></div><div className="publisher-head-actions"><div className="chips"><span className="badge dark">Score {publisher.score??0}</span><HelpTip text={HELP.score}/>{publisher.registration_status&&<span className={`badge ${String(publisher.registration_status).toUpperCase()==='BAIXADA'?'red':String(publisher.registration_status).toUpperCase()==='ATIVA'?'green':'amber'}`}>CNPJ {publisher.registration_status}</span>}<span className="badge">{stageMap[publisher.stage_id]?.name||'Sem etapa'}</span><HelpTip text={HELP.stageBadge}/></div>{canCreateAnyAction&&<div className="publisher-action-menu" ref={actionMenuRef}><button type="button" className="btn" aria-haspopup="menu" aria-expanded={actionsOpen} onClick={()=>setActionsOpen(value=>!value)}><Plus size={15}/> Nova ação</button>{actionsOpen&&<div className="publisher-action-popover" role="menu" aria-label="Nova ação">{canCollaborate&&<><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('interaction')}>Registrar interação</button><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('task')}>Criar tarefa</button><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('opportunity')}>Criar oportunidade</button><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('contact')}>Adicionar pessoa de contato</button></>}{canScheduleMeeting&&<button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('meeting')}>Agendar reunião</button>}{canManageMaterials&&<button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('material')}>Adicionar material</button>}</div>}</div>}</div></div>
     {notice&&<div className="notice-bar"><span>{notice}</span><button onClick={()=>setNotice('')}><X size={15}/></button></div>}
     {String(publisher.registration_status||'').toUpperCase()==='BAIXADA'&&<div className="notice error" style={{marginBottom:16,display:'flex',alignItems:'flex-start',gap:10}}><AlertTriangle size={18} style={{marginTop:1,flex:'0 0 auto'}}/><div><strong>CNPJ baixado na Receita Federal</strong><div style={{fontSize:12,marginTop:3}}>Este cadastro consta como <b>BAIXADO</b>{publisher.cnpj_status_date?(' desde '+formatDate(publisher.cnpj_status_date)):''}{publisher.cnpj_status_reason?('. Motivo: '+publisher.cnpj_status_reason):''}.</div></div></div>}
     {!canManageAccount&&<div className="notice-bar" style={{marginBottom:16}}><span>{unassigned?'Esta editora ainda está sem responsável atual. Você pode registrar ações permitidas pela sua função; assuma a conta se você for conduzir o próximo estágio.':`${ownerName} é o responsável atual. Você pode registrar ações permitidas pela sua função; etapa, prioridade e próxima ação principal ficam em modo leitura.`}</span>{unassigned&&hasCommercialFunction('prospecting')&&<button className="btn small" onClick={claimPublisher}>Assumir responsabilidade</button>}</div>}
@@ -173,26 +154,24 @@ export default function PublisherDetailPage(){
       <section className="card panel publisher-data-card">
         <div className="section-title publisher-data-title">
           <div>
-            <h2>Identidade e dados da editora</h2>
-            <p className="muted">Nomes oficiais, marca pública, cadastro e canais de contato em um só lugar.</p>
+            <h2>Dados da editora</h2>
+            <p className="muted">Identidade oficial e informações cadastrais.</p>
           </div>
-          {publisher.web_enrichment_status&&<span className={`badge ${publisher.web_enrichment_status==='enriched'?'green':publisher.web_enrichment_status==='review'?'amber':''}`}>Dados públicos: {WEB_ENRICHMENT_STATUS_LABELS[publisher.web_enrichment_status]||publisher.web_enrichment_status}</span>}
+          {publisher.web_enrichment_status&&<span className={`badge ${publisher.web_enrichment_status==='enriched'?'green':publisher.web_enrichment_status==='review'?'amber':''}`}>{WEB_ENRICHMENT_STATUS_LABELS[publisher.web_enrichment_status]||publisher.web_enrichment_status}</span>}
         </div>
 
-        <div className="publisher-identity-block">
-          <div className={`publisher-commercial-identity ${publisher.commercial_name?'has-value':'is-empty'}`}>
-            <div className="publisher-identity-label"><Globe2 size={15}/><span>Nome comercial / marca</span><HelpTip text={HELP.commercialName}/></div>
-            <strong>{publisher.commercial_name||'Não identificado em fonte pública'}</strong>
-            {publisher.commercial_name&&<div className="publisher-identity-meta">
+        <div className="publisher-name-summary">
+          <div className="publisher-name-primary">
+            <small>Nome comercial / marca <HelpTip text={HELP.commercialName}/></small>
+            <strong>{publisher.commercial_name||publisher.trade_name||publisher.name||'—'}</strong>
+            {publisher.commercial_name&&<div className="publisher-name-meta">
               {publisher.commercial_name_confidence&&<span>Confiança {publisher.commercial_name_confidence==='high'?'alta':publisher.commercial_name_confidence==='medium'?'média':'baixa'}</span>}
               {publisher.commercial_name_verified_at&&<span>Verificado em {dateTimeLabel(publisher.commercial_name_verified_at)}</span>}
-              {commercialSources.map((src,index)=>src?.url?<a href={src.url} target="_blank" rel="noreferrer" className="text-link" key={(src.url||'comercial')+'-'+index}>Fonte {index+1}</a>:null)}
             </div>}
           </div>
-          <div className="publisher-official-identities">
-            <Info label="Nome fantasia oficial (Receita)" value={publisher.trade_name||'Não informado pela Receita Federal'} help={HELP.tradeName}/>
+          <div className="publisher-name-official">
+            <Info label="Nome fantasia oficial (Receita)" value={publisher.trade_name||'Não informado'} help={HELP.tradeName}/>
             <Info label="Razão social" value={publisher.legal_name} help={HELP.legalName}/>
-            {publisher.name&&!sameText(publisher.name,publisher.trade_name)&&!sameText(publisher.name,publisher.commercial_name)&&<Info label="Nome no cadastro Radar" value={publisher.name}/>}
           </div>
         </div>
 
@@ -200,43 +179,29 @@ export default function PublisherDetailPage(){
           <Info label="CNPJ" value={publisher.cnpj} help={HELP.cnpj}/>
           <Info label="Situação cadastral" value={publisher.registration_status} help="Situação atual do CNPJ informada pela Receita Federal."/>
           <Info label="Data da situação cadastral" value={publisher.cnpj_status_date?formatDate(publisher.cnpj_status_date):null} help="Data associada à situação cadastral atual na base do CNPJ."/>
-          <Info label="Localização" value={[publisher.address_street,publisher.address_number,publisher.city,publisher.state].filter(Boolean).join(', ')} help={HELP.location}/>
-          <Info label="Perfil cadastral" value={publisher.profile} help={HELP.registeredProfile}/>
-          <Info label="Segmentos de atuação" value={(publisher.market_segments||[]).join(', ')} help={HELP.marketSegments}/>
           <Info label="Porte" value={publisher.company_size||publisher.size_label} help={HELP.companySize}/>
+          <Info label="Localização" value={[publisher.address_street,publisher.address_number,publisher.city,publisher.state].filter(Boolean).join(', ')} help={HELP.location}/>
+          <Info label="Segmentos de atuação" value={(publisher.market_segments||[]).join(', ')} help={HELP.marketSegments}/>
+          <Info label="Perfil cadastral" value={publisher.profile} help={HELP.registeredProfile}/>
         </div>
 
-        {cnpjVerification&&<div className="publisher-source-strip">
-          <DatabaseZap size={18}/>
-          <div><strong>Dados cadastrais conferidos com a Receita Federal</strong><p>Última verificação: <b>{dateTimeLabel(cnpjVerification.last_verified_at)}</b>{cnpjVerification.source_period?<><span> · Base </span><b>{cnpjVerification.source_period}</b></>:null}{cnpjVerification.status==='matched'?' · CNPJ localizado':cnpjVerification.status==='not_found'?' · CNPJ não localizado':' · Verificação com ocorrência'}</p></div>
-        </div>}
-
-        {publisher.web_enrichment_status&&<div className="publisher-source-strip public">
-          <Globe2 size={18}/>
-          <div><strong>Enriquecimento por fontes públicas</strong><p>Status: <b>{WEB_ENRICHMENT_STATUS_LABELS[publisher.web_enrichment_status]||publisher.web_enrichment_status}</b>{publisher.web_enrichment_verified_at?<><span> · Verificado em </span><b>{dateTimeLabel(publisher.web_enrichment_verified_at)}</b></>:null}</p>{publicSources.length>0&&<div className="publisher-source-links">{publicSources.map((src,index)=>src?.url?<a className="text-link" href={src.url} target="_blank" rel="noreferrer" key={(src.url||'fonte')+'-'+index}>{src.label||`Fonte pública ${index+1}`}</a>:null)}</div>}</div>
-        </div>}
-
-        <div className="publisher-digital-presence">
-          <div className="publisher-subsection-title"><div><h3>Contato e presença digital</h3><p>Dados institucionais e canais públicos disponíveis para contato.</p></div></div>
-          <div className="publisher-channel-grid">
-            <ContactChannel icon={Globe2} label="Site oficial" value={publisher.website?compactExternalLabel(publisher.website):null} href={publisher.website?externalHref(publisher.website):null}/>
-            <ContactChannel icon={Mail} label="E-mail principal" value={publisher.general_email} href={publisher.general_email?`mailto:${publisher.general_email}`:null}/>
-            <ContactChannel icon={Phone} label="Telefone" value={publisher.phone} href={publisher.phone?`tel:${publisher.phone}`:null}/>
-            <ContactChannel icon={Globe2} label="Instagram" value={publisher.instagram?compactExternalLabel(publisher.instagram):null} href={publisher.instagram?externalHref(publisher.instagram,'instagram'):null}/>
-            <ContactChannel icon={Globe2} label="LinkedIn" value={publisher.linkedin_url?compactExternalLabel(publisher.linkedin_url):null} href={publisher.linkedin_url?externalHref(publisher.linkedin_url,'linkedin'):null}/>
+        {(cnpjVerification||publisher.web_enrichment_status||commercialSources.length>0||publicSources.length>0)&&<details className="publisher-source-details">
+          <summary>Fontes e verificações</summary>
+          <div className="publisher-source-details-body">
+            {cnpjVerification&&<div className="publisher-source-detail-row"><DatabaseZap size={16}/><div><strong>Receita Federal</strong><span>Última verificação: {dateTimeLabel(cnpjVerification.last_verified_at)}{cnpjVerification.source_period?` · Base ${cnpjVerification.source_period}`:''}{cnpjVerification.status==='matched'?' · CNPJ localizado':cnpjVerification.status==='not_found'?' · CNPJ não localizado':' · Verificação com ocorrência'}</span></div></div>}
+            {publisher.web_enrichment_status&&<div className="publisher-source-detail-row"><Globe2 size={16}/><div><strong>Fontes públicas</strong><span>{WEB_ENRICHMENT_STATUS_LABELS[publisher.web_enrichment_status]||publisher.web_enrichment_status}{publisher.web_enrichment_verified_at?` · Verificado em ${dateTimeLabel(publisher.web_enrichment_verified_at)}`:''}</span><div className="publisher-source-links">{[...commercialSources,...publicSources].map((src,index)=>src?.url?<a className="text-link" href={src.url} target="_blank" rel="noreferrer" key={(src.url||'fonte')+'-'+index}>{src.label||`Fonte ${index+1}`}</a>:null)}</div></div></div>}
           </div>
-          {(alternateEmails.length>0||publisher.secondary_phone)&&<div className="publisher-extra-channels">
-            {alternateEmails.length>0&&<div><small>Outros e-mails</small><div>{alternateEmails.map(email=><a className="text-link" href={`mailto:${email}`} key={email}>{email}</a>)}</div></div>}
-            {publisher.secondary_phone&&<div><small>Telefone secundário / WhatsApp</small><div><a className="text-link" href={`tel:${publisher.secondary_phone}`}>{publisher.secondary_phone}</a></div></div>}
-          </div>}
-        </div>
+        </details>}
+      </section>
 
-        <div className="publisher-editorial-subsection">
-          <div className="section-title" style={{marginBottom:9}}><HelpHeading help={HELP.editorialProfile}>Perfil editorial</HelpHeading><div className="chips"><span className={`badge ${publisher.editorial_profile_status==='confirmed'?'green':publisher.editorial_profile_status==='review'?'red':publisher.editorial_profile_status==='partial'?'amber':''}`}>{EDITORIAL_PROFILE_STATUS_LABELS[publisher.editorial_profile_status]||publisher.editorial_profile_status||'Pendente'}</span>{publisher.editorial_profile_confidence&&<span className="badge">Confiança {EDITORIAL_PROFILE_CONFIDENCE_LABELS[publisher.editorial_profile_confidence]||publisher.editorial_profile_confidence}</span>}</div></div>
-          {publisher.editorial_profile?.length?<div className="chips">{publisher.editorial_profile.map(item=><span className="badge blue" key={item}>{item}</span>)}</div>:<p className="muted" style={{fontSize:12,margin:'4px 0'}}>{publisher.editorial_profile_status==='review'?'Cadastro marcado para revisão antes de classificar o perfil editorial.':publisher.editorial_profile_status==='not_identified'?'Não foi possível identificar o perfil editorial com segurança.':'Perfil editorial ainda não enriquecido.'}</p>}
-          {publisher.editorial_profile_notes&&<p className="muted" style={{fontSize:11,margin:'10px 0 0'}}>{publisher.editorial_profile_notes}</p>}
-          {editorialSources.length>0&&<div className="publisher-meta" style={{marginTop:9}}>{editorialSources.map((src,index)=>src?.url?<a className="text-link" href={src.url} target="_blank" rel="noreferrer" key={`${src.url}-${index}`}><Globe2 size={13}/>{src.label||'Fonte do perfil'}</a>:null)}{publisher.editorial_profile_verified_at&&<span>Verificado em {formatDate(publisher.editorial_profile_verified_at)}</span>}</div>}
+      <section className="card panel publisher-editorial-card">
+        <div className="section-title">
+          <div><HelpHeading as="h2" help={HELP.editorialProfile}>Perfil editorial</HelpHeading><p className="muted">O que a editora publica e como está classificada editorialmente.</p></div>
+          <div className="chips"><span className={`badge ${publisher.editorial_profile_status==='confirmed'?'green':publisher.editorial_profile_status==='review'?'red':publisher.editorial_profile_status==='partial'?'amber':''}`}>{EDITORIAL_PROFILE_STATUS_LABELS[publisher.editorial_profile_status]||publisher.editorial_profile_status||'Pendente'}</span>{publisher.editorial_profile_confidence&&<span className="badge">Confiança {EDITORIAL_PROFILE_CONFIDENCE_LABELS[publisher.editorial_profile_confidence]||publisher.editorial_profile_confidence}</span>}</div>
         </div>
+        {publisher.editorial_profile?.length?<div className="chips">{publisher.editorial_profile.map(item=><span className="badge blue" key={item}>{item}</span>)}</div>:<p className="muted" style={{fontSize:12,margin:'4px 0'}}>{publisher.editorial_profile_status==='review'?'Cadastro marcado para revisão antes de classificar o perfil editorial.':publisher.editorial_profile_status==='not_identified'?'Não foi possível identificar o perfil editorial com segurança.':'Perfil editorial ainda não enriquecido.'}</p>}
+        {publisher.editorial_profile_notes&&<p className="muted publisher-editorial-notes">{publisher.editorial_profile_notes}</p>}
+        {editorialSources.length>0&&<div className="publisher-meta publisher-editorial-sources">{editorialSources.map((src,index)=>src?.url?<a className="text-link" href={src.url} target="_blank" rel="noreferrer" key={`${src.url}-${index}`}><Globe2 size={13}/>{src.label||'Fonte do perfil'}</a>:null)}{publisher.editorial_profile_verified_at&&<span>Verificado em {formatDate(publisher.editorial_profile_verified_at)}</span>}</div>}
       </section>
       <PublisherRadarPanel publisher={publisher} contacts={contacts} interactions={interactions}/>
       <section className="card panel publisher-contacts-card"><div className="section-title"><div><HelpHeading as="h2" help={HELP.contacts}>Pessoas de contato</HelpHeading><p className="muted">Pessoas vinculadas à editora.</p></div></div>{contacts.length?contacts.map(c=><div className="contact-row" key={c.id}><strong>{c.full_name}{c.is_decision_maker?' · Decisor':''}</strong><span>{[c.job_title,c.department].filter(Boolean).join(' · ')||'Sem cargo informado'}</span><span>{[c.email,c.mobile||c.phone].filter(Boolean).join(' · ')}</span></div>):<p className="muted">Nenhum contato cadastrado.</p>}</section>
@@ -257,7 +222,6 @@ export default function PublisherDetailPage(){
 }
 
 function Info({label,value,help}){return <div className="info-item"><small>{help?<HelpLabel help={help}>{label}</HelpLabel>:label}</small><span>{value||'—'}</span></div>}
-function ContactChannel({icon:Icon,label,value,href}){return <div className={`publisher-channel-card ${value?'has-value':'is-empty'}`}><div className="publisher-channel-icon"><Icon size={16}/></div><div className="publisher-channel-copy"><small>{label}</small>{value?(href?<a className="text-link" href={href} target={href.startsWith('http')?'_blank':undefined} rel={href.startsWith('http')?'noreferrer':undefined}>{value}</a>:<strong>{value}</strong>):<span>Não identificado</span>}</div></div>}
 function ContactModal({supabase,org,publisher,user,onClose,onSaved}){const [f,setF]=useState({full_name:'',job_title:'',department:'',email:'',phone:'',mobile:'',is_decision_maker:false});const [err,setErr]=useState('');async function save(e){e.preventDefault();const {error}=await supabase.from('contacts').insert({organization_id:org,publisher_id:publisher.id,...f,active:true,created_by:user?.id||null,updated_by:user?.id||null});if(error)setErr(error.message);else onSaved()}return <Modal title="Adicionar pessoa de contato" onClose={onClose} onSubmit={save} err={err}><label className="span-2"><HelpLabel help={HELP.contactName}>Nome</HelpLabel><input required className="input" value={f.full_name} onChange={e=>setF(x=>({...x,full_name:e.target.value}))}/></label><label><HelpLabel help={HELP.contactRole}>Cargo</HelpLabel><input className="input" value={f.job_title} onChange={e=>setF(x=>({...x,job_title:e.target.value}))}/></label><label><HelpLabel help={HELP.contactArea}>Área</HelpLabel><input className="input" value={f.department} onChange={e=>setF(x=>({...x,department:e.target.value}))}/></label><label><HelpLabel help={HELP.contactEmail}>E-mail</HelpLabel><input type="email" className="input" value={f.email} onChange={e=>setF(x=>({...x,email:e.target.value}))}/></label><label><HelpLabel help={HELP.contactMobile}>Celular</HelpLabel><input className="input" value={f.mobile} onChange={e=>setF(x=>({...x,mobile:e.target.value}))}/></label><label className="span-2"><span className="help-label"><span><input type="checkbox" checked={f.is_decision_maker} onChange={e=>setF(x=>({...x,is_decision_maker:e.target.checked}))}/> É decisor(a)</span><HelpTip text={HELP.decisionMaker}/></span></label></Modal>}
 function InteractionModal({supabase,org,publisher,user,team,onClose,onSaved}){const [f,setF]=useState({channel:'phone',result:'connected',summary:'',interest_level:'',next_step:'',next_action_at:''});const [mentions,setMentions]=useState([]);const [err,setErr]=useState('');async function save(e){e.preventDefault();const payload={organization_id:org,publisher_id:publisher.id,user_id:user?.id||null,occurred_at:new Date().toISOString(),channel:f.channel,direction:'outbound',result:f.result||null,summary:f.summary,interest_level:f.interest_level||null,next_step:f.next_step||null,next_action_at:f.next_action_at?new Date(f.next_action_at).toISOString():null};const {data,error}=await supabase.from('interactions').insert(payload).select('id').single();if(error)setErr(error.message);else{if(mentions.length){await supabase.rpc('crm_notify_mentions',{p_organization_id:org,p_user_ids:mentions,p_title:'Você foi mencionado em uma interação',p_body:`${publisher.name} · ${f.summary}`.slice(0,900),p_href:`/app/editoras/${publisher.id}`,p_source_type:'interaction',p_source_id:data?.id||publisher.id,p_dedupe_prefix:`mention:interaction:${data?.id||Date.now()}`});window.dispatchEvent(new Event('crm-notifications-changed'))}onSaved()}}return <Modal title="Registrar interação" onClose={onClose} onSubmit={save} err={err}><label><HelpLabel help={HELP.channel}>Canal</HelpLabel><select value={f.channel} onChange={e=>setF(x=>({...x,channel:e.target.value}))}>{Object.entries(CHANNEL_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label><label><HelpLabel help={HELP.result}>Resultado</HelpLabel><select value={f.result} onChange={e=>setF(x=>({...x,result:e.target.value}))}>{Object.entries(RESULT_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label><label className="span-2"><HelpLabel help={HELP.interactionSummary}>Resumo</HelpLabel><textarea required rows={4} value={f.summary} onChange={e=>setF(x=>({...x,summary:e.target.value}))}/></label><label><HelpLabel help={HELP.interest}>Interesse</HelpLabel><select value={f.interest_level} onChange={e=>setF(x=>({...x,interest_level:e.target.value}))}><option value="">Não informado</option>{Object.entries(INTEREST_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label><label><HelpLabel help={HELP.interactionNextAction}>Próxima ação</HelpLabel><PtBrDateTimeField value={f.next_action_at} onChange={value=>setF(x=>({...x,next_action_at:value}))} ariaLabel="Próxima ação"/></label><label className="span-2"><HelpLabel help={HELP.nextStep}>Próximo passo</HelpLabel><input className="input" value={f.next_step} onChange={e=>setF(x=>({...x,next_step:e.target.value}))}/></label></Modal>}
 function TaskModal({supabase,org,publisher,user,onClose,onSaved}){const [f,setF]=useState({title:'',task_type:'follow_up',priority:'medium',due_at:''});const [err,setErr]=useState('');async function save(e){e.preventDefault();const {error}=await supabase.from('tasks').insert({organization_id:org,publisher_id:publisher.id,assigned_to:user?.id||null,created_by:user?.id||null,title:f.title,task_type:f.task_type,priority:f.priority,status:'open',due_at:f.due_at?new Date(f.due_at).toISOString():null});if(error)setErr(error.message);else onSaved()}return <Modal title="Criar tarefa" onClose={onClose} onSubmit={save} err={err}><label className="span-2"><HelpLabel help={HELP.taskTitle}>Título</HelpLabel><input required className="input" value={f.title} onChange={e=>setF(x=>({...x,title:e.target.value}))}/></label><label><HelpLabel help={HELP.taskType}>Tipo</HelpLabel><select value={f.task_type} onChange={e=>setF(x=>({...x,task_type:e.target.value}))}>{Object.entries(TASK_TYPE_LABELS).map(([k,v])=><option value={k} key={k}>{v}</option>)}</select></label><label><HelpLabel help={HELP.taskPriority}>Prioridade</HelpLabel><select value={f.priority} onChange={e=>setF(x=>({...x,priority:e.target.value}))}>{Object.entries(PRIORITY_LABELS).map(([k,v])=><option value={k} key={k}>{v}</option>)}</select></label><label className="span-2"><HelpLabel help={HELP.taskDue}>Prazo</HelpLabel><PtBrDateTimeField value={f.due_at} onChange={value=>setF(x=>({...x,due_at:value}))} ariaLabel="Prazo"/></label></Modal>}
