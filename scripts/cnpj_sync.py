@@ -24,7 +24,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, unquote, urljoin
 from urllib.request import Request, urlopen
 
-BASE_URL = "https://arquivos.receitafederal.gov.br/dados/cnpj/dados_abertos_cnpj/"
+OFFICIAL_BASE_URL = "https://arquivos.receitafederal.gov.br/dados/cnpj/dados_abertos_cnpj/"
+MIRROR_INDEX_URL = "https://dados-abertos-rf-cnpj.casadosdados.com.br/arquivos/"
 EDGE_URL = os.environ.get(
     "CNPJ_SYNC_EDGE_URL",
     "https://xogfqpeubtcqehaadywm.supabase.co/functions/v1/cnpj-sync-worker",
@@ -121,29 +122,22 @@ def progress(run_id: str, stage: str, pct: int, message: str | None = None,
     )
 
 
-def month_candidates(limit: int = 8) -> list[str]:
-    now = datetime.now(timezone.utc)
-    year, month = now.year, now.month
-    out = []
-    for _ in range(limit):
-        out.append(f"{year:04d}-{month:02d}")
-        month -= 1
-        if month == 0:
-            month = 12
-            year -= 1
-    return out
-
-
-def directory_files(period: str) -> tuple[str, list[str]]:
-    directory = urljoin(BASE_URL, f"{period}/")
-    html = request_bytes(directory, timeout=60, retries=2).decode("latin1", "ignore")
+def directory_zip_files(directory: str) -> list[str]:
+    html = request_bytes(directory, timeout=60, retries=4).decode("latin1", "ignore")
     hrefs = re.findall(r'href=["\']([^"\']+\.zip)["\']', html, flags=re.I)
     names = []
     for href in hrefs:
         name = unquote(href.rsplit("/", 1)[-1])
         if name.lower().endswith(".zip"):
             names.append(name)
-    return directory, sorted(set(names))
+    return sorted(set(names))
+
+
+def mirror_snapshots() -> list[str]:
+    html = request_bytes(MIRROR_INDEX_URL, timeout=60, retries=4).decode("latin1", "ignore")
+    stamps = re.findall(r'href=["\'](20\d{2}-\d{2}-\d{2})/["\']', html, flags=re.I)
+    today = datetime.now(timezone.utc).date().isoformat()
+    return sorted({stamp for stamp in stamps if stamp <= today}, reverse=True)
 
 
 def has_required_files(files: list[str]) -> bool:
@@ -159,16 +153,28 @@ def has_required_files(files: list[str]) -> bool:
 
 
 def discover_latest_period() -> tuple[str, str, list[str]]:
+    """Localiza a cópia mensal mais recente dos Dados Abertos do CNPJ.
+
+    O host de arquivos da RFB tem encerrado conexões vindas de alguns ranges de
+    cloud/CI. Para tornar a rotina confiável, usamos o espelho público da Casa
+    dos Dados, que declara copiar mensalmente os arquivos originais da Receita.
+    """
     errors: list[str] = []
-    for period in month_candidates():
+    snapshots = mirror_snapshots()
+    if not snapshots:
+        raise RuntimeError("O espelho dos Dados Abertos do CNPJ não listou competências disponíveis.")
+
+    for stamp in snapshots[:8]:
+        directory = urljoin(MIRROR_INDEX_URL, f"{stamp}/")
         try:
-            directory, files = directory_files(period)
+            files = directory_zip_files(directory)
             if has_required_files(files):
-                return period, directory, files
-            errors.append(f"{period}: diretório incompleto")
+                return stamp[:7], directory, files
+            errors.append(f"{stamp}: diretório incompleto")
         except Exception as exc:
-            errors.append(f"{period}: {exc}")
-    raise RuntimeError("Não encontrei uma competência completa da base CNPJ. " + " | ".join(errors[-4:]))
+            errors.append(f"{stamp}: {exc}")
+
+    raise RuntimeError("Não encontrei uma competência completa da base CNPJ no espelho público. " + " | ".join(errors[-4:]))
 
 
 def natural_key(name: str) -> tuple[str, int]:
@@ -561,6 +567,8 @@ def main() -> int:
                 )
 
         metadata = {
+            "official_source": OFFICIAL_BASE_URL,
+            "delivery_source": "Casa dos Dados - espelho público dos Dados Abertos da RFB",
             "targets": len(target_by_cnpj),
             "records_prepared": len(rows),
             "establishments_found": len(establishments),
