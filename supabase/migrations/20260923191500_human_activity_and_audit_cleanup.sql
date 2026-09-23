@@ -19,6 +19,7 @@ declare
   oldj jsonb;
   newj jsonb;
   changed_keys text[];
+  ignored_common_keys text[]:=array['updated_at','updated_by'];
   entity_name text;
   publisher_name text;
   publisher_uuid uuid;
@@ -39,6 +40,14 @@ begin
     if tg_op='DELETE' then return old; else return new; end if;
   end if;
 
+  -- Tarefas geradas por reunião/cadência são efeitos automáticos, não ações humanas diretas.
+  if tg_table_name='tasks' then
+    if (tg_op<>'DELETE' and (new.automation_key is not null or new.cadence_enrollment_id is not null))
+       or (tg_op='DELETE' and (old.automation_key is not null or old.cadence_enrollment_id is not null)) then
+      if tg_op='DELETE' then return old; else return new; end if;
+    end if;
+  end if;
+
   if tg_op='UPDATE' then
     oldj:=to_jsonb(old);
     newj:=to_jsonb(new);
@@ -51,6 +60,7 @@ begin
       into changed_keys
     from jsonb_object_keys(oldj||newj) as k(key)
     where oldj->k.key is distinct from newj->k.key
+      and not(k.key=any(ignored_common_keys))
       and (tg_table_name<>'publishers' or not(k.key=any(ignored_publisher_keys)));
 
     if cardinality(changed_keys)=0 then return new; end if;
@@ -280,9 +290,67 @@ begin
 end;
 $function$;
 
+-- Mudanças automáticas de etapa (reuniões/cadências) não devem parecer ação manual do usuário.
+create or replace function private.set_publisher_stage_by_name(
+  p_organization_id uuid,
+  p_publisher_id uuid,
+  p_stage_name text,
+  p_allow_backward boolean default false
+)
+returns void
+language plpgsql
+security definer
+set search_path to 'public','private','pg_temp'
+as $function$
+declare
+  target_id uuid;
+  target_pos integer;
+  current_pos integer;
+  previous_audit_setting text:=coalesce(current_setting('app.crm_audit_suppress',true),'');
+begin
+  select id,position into target_id,target_pos
+  from public.pipeline_stages
+  where organization_id=p_organization_id and name=p_stage_name and active=true
+  order by position limit 1;
+
+  if target_id is null then return; end if;
+
+  select s.position into current_pos
+  from public.publishers p
+  left join public.pipeline_stages s on s.id=p.stage_id
+  where p.id=p_publisher_id and p.organization_id=p_organization_id;
+
+  if p_allow_backward or current_pos is null or current_pos<target_pos then
+    perform set_config('app.crm_audit_suppress','1',true);
+    update public.publishers
+    set stage_id=target_id,updated_by=auth.uid(),updated_at=now()
+    where id=p_publisher_id and organization_id=p_organization_id;
+    perform set_config('app.crm_audit_suppress',previous_audit_setting,true);
+  end if;
+end;
+$function$;
+
 -- Remove do histórico o ruído já gerado por jobs/sincronizações.
 delete from public.audit_events
 where actor_user_id is null;
+
+-- Remove efeitos automáticos de reunião/cadência que herdaram o usuário da transação.
+delete from public.audit_events a
+using public.tasks t
+where a.entity_type='tasks'
+  and a.entity_id=t.id::text
+  and (t.automation_key is not null or t.cadence_enrollment_id is not null);
+
+delete from public.audit_events a
+where a.entity_type='meetings'
+  and a.action='update'
+  and (
+    coalesce(a.before_data,'{}'::jsonb)
+      - array['updated_at','google_event_id','google_event_url','google_meet_url','google_last_synced_at','google_sync_error','calendar_sync_status']
+  )=(
+    coalesce(a.after_data,'{}'::jsonb)
+      - array['updated_at','google_event_id','google_event_url','google_meet_url','google_last_synced_at','google_sync_error','calendar_sync_status']
+  );
 
 delete from public.audit_events a
 using public.cnpj_sync_runs r
@@ -343,6 +411,48 @@ set label=(
   ||coalesce(' · '||(select coalesce(nullif(btrim(p.commercial_name),''),nullif(btrim(p.trade_name),''),nullif(btrim(p.name),''),nullif(btrim(p.legal_name),'')) from public.interactions i join public.publishers p on p.id=i.publisher_id where i.id::text=a.entity_id),'')
 )
 where a.entity_type='interactions';
+
+-- Deixa reuniões humanas antigas explícitas e compacta apenas os campos alterados.
+update public.audit_events a
+set label=(
+  case
+    when a.action='insert' then 'Agendou reunião'
+    when a.action='delete' then 'Excluiu reunião'
+    when a.after_data->>'status'='completed' and a.before_data->>'status' is distinct from a.after_data->>'status' then 'Concluiu reunião'
+    when a.after_data->>'status'='cancelled' and a.before_data->>'status' is distinct from a.after_data->>'status' then 'Cancelou reunião'
+    when a.before_data->>'scheduled_start' is distinct from a.after_data->>'scheduled_start' then 'Reagendou reunião'
+    else 'Atualizou reunião'
+  end
+  ||coalesce(' · '||(select m.title from public.meetings m where m.id::text=a.entity_id),'')
+  ||coalesce(' · '||(
+      select coalesce(nullif(btrim(p.commercial_name),''),nullif(btrim(p.trade_name),''),nullif(btrim(p.name),''),nullif(btrim(p.legal_name),''))
+      from public.meetings m join public.publishers p on p.id=m.publisher_id
+      where m.id::text=a.entity_id
+    ),'')
+)
+where a.entity_type='meetings';
+
+update public.audit_events a
+set before_data=case
+      when a.action='update' then (
+        select coalesce(jsonb_object_agg(k,a.before_data->k),'{}'::jsonb)
+        from jsonb_object_keys(coalesce(a.before_data,'{}'::jsonb)||coalesce(a.after_data,'{}'::jsonb)) as k
+        where a.before_data->k is distinct from a.after_data->k
+          and k<>all(array['updated_at','google_event_id','google_event_url','google_meet_url','google_last_synced_at','google_sync_error','calendar_sync_status'])
+      )
+      else a.before_data
+    end,
+    after_data=case
+      when a.action='update' then (
+        select coalesce(jsonb_object_agg(k,a.after_data->k),'{}'::jsonb)
+        from jsonb_object_keys(coalesce(a.before_data,'{}'::jsonb)||coalesce(a.after_data,'{}'::jsonb)) as k
+        where a.before_data->k is distinct from a.after_data->k
+          and k<>all(array['updated_at','google_event_id','google_event_url','google_meet_url','google_last_synced_at','google_sync_error','calendar_sync_status'])
+      )
+      else a.after_data
+    end
+where a.entity_type='meetings'
+  and a.action='update';
 
 -- O histórico anual da Receita já tem um resumo em cnpj_sync_runs.
 -- Mantemos o detalhe, mas compactamos o JSON para apenas os campos realmente alterados.
