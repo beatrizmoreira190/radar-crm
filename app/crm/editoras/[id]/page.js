@@ -6,7 +6,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, CircleHelp, Clock3, DatabaseZap
 import { useCrm } from '@/components/CrmProvider';
 import { PtBrDateField, PtBrDateTimeField } from '@/components/PtBrDateFields';
 import MentionTextarea from '@/components/MentionTextarea';
-import { CHANNEL_LABELS, EDITORIAL_PROFILE_CONFIDENCE_LABELS, EDITORIAL_PROFILE_STATUS_LABELS, INTEREST_LABELS, OPPORTUNITY_SERVICE_LABELS, OPPORTUNITY_STAGE_LABELS, PRIORITY_LABELS, PUBLISHER_ARCHIVE_REASON_LABELS, RESULT_LABELS, TASK_TYPE_LABELS, formatDate, publisherStageBadgeClass } from '@/lib/constants';
+import { CHANNEL_LABELS, EDITORIAL_PROFILE_CONFIDENCE_LABELS, EDITORIAL_PROFILE_STATUS_LABELS, INTEREST_LABELS, OPPORTUNITY_SERVICE_LABELS, OPPORTUNITY_STAGE_LABELS, PRIORITY_LABELS, PUBLISHER_ARCHIVE_REASON_LABELS, PUBLISHER_COMMERCIAL_PROFILE_LABELS, RESULT_LABELS, TASK_TYPE_LABELS, formatDate, publisherStageBadgeClass } from '@/lib/constants';
 import PublisherRecordOverview from '@/components/PublisherRecordOverview';
 import PublisherQuickContact from '@/components/PublisherQuickContact';
 import PublisherRadarPanel from '@/components/PublisherRadarPanel';
@@ -61,6 +61,7 @@ const HELP={
   legalName:'Razão social: nome jurídico registrado da empresa, conforme o cadastro do CNPJ.',
   tradeName:'Nome fantasia oficial: denominação registrada na Receita Federal, quando informada no CNPJ.',
   commercialName:'Nome comercial / marca: nome pelo qual a editora se apresenta publicamente, identificado em fontes públicas e mantido separado do nome fantasia oficial.',
+  commercialProfile:'Classificação comercial interna da Radar. Não substitui a natureza jurídica da empresa e pode ser confirmada ou alterada por supervisão/administração.',
   cnpj:'Cadastro Nacional da Pessoa Jurídica usado para identificar legalmente a empresa.',
   location:'Endereço, cidade e estado cadastrados para a editora.',
   registeredProfile:'Classificação administrativa ou cadastral usada na base do CRM.',
@@ -181,6 +182,16 @@ export default function PublisherDetailPage(){
           </div>
         </div>
 
+        <div className="publisher-commercial-profile-row">
+          <div>
+            <small><HelpLabel help={HELP.commercialProfile}>Perfil comercial Radar</HelpLabel></small>
+            <strong>{PUBLISHER_COMMERCIAL_PROFILE_LABELS[publisher.commercial_profile_code]||'Editora / empresa editorial'}</strong>
+            <span>{publisher.commercial_profile_source==='manual'?'Classificação confirmada pela equipe':'Padrão inicial do sistema · ainda não revisado manualmente'}</span>
+            {publisher.commercial_profile_note&&<em>{publisher.commercial_profile_note}</em>}
+          </div>
+          {isManager&&<button type="button" className="btn secondary small" onClick={()=>setModal('commercial-profile')}>Editar perfil</button>}
+        </div>
+
         <div className="info-grid publisher-registration-grid">
           <Info label="CNPJ" value={publisher.cnpj} help={HELP.cnpj}/>
           <Info label="Situação cadastral" value={publisher.registration_status} help="Situação atual do CNPJ informada pela Receita Federal."/>
@@ -248,6 +259,7 @@ export default function PublisherDetailPage(){
     {canCollaborate&&modal==='interaction'&&<InteractionModal supabase={supabase} org={org} publisher={publisher} user={user} team={team} onClose={()=>setModal('')} onSaved={()=>{setModal('');setNotice('Interação registrada.');load()}}/>}
     {canCollaborate&&modal==='task'&&<TaskModal supabase={supabase} org={org} publisher={publisher} user={user} onClose={()=>setModal('')} onSaved={()=>{setModal('');setNotice('Tarefa criada.');load()}}/>}
     {canCollaborate&&modal==='opportunity'&&<OpportunityModal supabase={supabase} org={org} publisher={publisher} user={user} opportunity={editingOpportunity} onClose={closeOpportunity} onSaved={mode=>{closeOpportunity();setNotice(mode==='updated'?'Oportunidade atualizada.':'Oportunidade criada.');load()}}/>}
+    {isManager&&modal==='commercial-profile'&&<CommercialProfileModal supabase={supabase} org={org} publisher={publisher} onClose={()=>setModal('')} onSaved={()=>{setModal('');setNotice('Perfil comercial atualizado.');load()}}/>}
     {canArchivePublisher&&modal==='archive'&&<ArchivePublisherModal supabase={supabase} org={org} publisher={publisher} onClose={()=>setModal('')} onArchived={()=>{setModal('');router.push('/app/editoras');router.refresh()}}/>}
   </div>;
 }
@@ -287,6 +299,34 @@ function SocietaryLinksCard({data}){
       <p className="publisher-societary-footnote">Detecção automática por coincidência exata do nome do sócio no quadro societário sincronizado da Receita Federal.</p>
     </div>
   </details>;
+}
+
+function CommercialProfileModal({supabase,org,publisher,onClose,onSaved}){
+  const [profile,setProfile]=useState(publisher.commercial_profile_code||'publisher_company');
+  const [note,setNote]=useState(publisher.commercial_profile_note||'');
+  const [err,setErr]=useState('');
+  async function save(e){
+    e.preventDefault();setErr('');
+    const {error}=await supabase.rpc('crm_set_publisher_commercial_profile',{
+      p_organization_id:org,
+      p_publisher_id:publisher.id,
+      p_profile_code:profile,
+      p_note:note.trim()||null
+    });
+    if(error)setErr(error.message);else onSaved();
+  }
+  return <Modal title="Editar perfil comercial" onClose={onClose} onSubmit={save} err={err} submitLabel="Salvar perfil">
+    <div className="span-2 commercial-profile-modal-intro"><strong>Classificação comercial da Radar</strong><span>Use o perfil que melhor representa como esta conta deve ser tratada comercialmente. Isso não altera o CNPJ nem a classificação jurídica.</span></div>
+    <label className="span-2">Perfil comercial
+      <select value={profile} onChange={e=>setProfile(e.target.value)}>
+        {Object.entries(PUBLISHER_COMMERCIAL_PROFILE_LABELS).map(([value,label])=><option key={value} value={value}>{label}</option>)}
+      </select>
+    </label>
+    <label className="span-2">Observação interna (opcional)
+      <textarea rows={3} value={note} onChange={e=>setNote(e.target.value)} placeholder="Ex.: autor independente com catálogo próprio; abordagem comercial específica."/>
+    </label>
+    <p className="span-2 commercial-profile-modal-note">Todos os registros existentes começaram como “Editora / empresa editorial” por padrão. Ao salvar, esta classificação passa a ser considerada revisada pela equipe.</p>
+  </Modal>;
 }
 
 function ArchivePublisherModal({supabase,org,publisher,onClose,onArchived}){
