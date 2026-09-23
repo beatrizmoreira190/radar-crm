@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Activity, BarChart3, Bell, BookOpenCheck, Building2, CalendarDays, ClipboardList, FileUp, Gauge, HeartPulse, LayoutDashboard, ListChecks, LogOut, MessageSquareText, Target, UserCircle2, Users, Workflow } from 'lucide-react';
+import { Activity, BarChart3, Bell, BookOpenCheck, Building2, CalendarDays, ClipboardList, DatabaseZap, FileUp, Gauge, HeartPulse, LayoutDashboard, ListChecks, LogOut, MessageSquareText, Target, UserCircle2, Users, Workflow } from 'lucide-react';
 import { useCrm } from './CrmProvider';
 import Avatar from './Avatar';
 
@@ -31,6 +31,7 @@ const NAV_GROUPS = [
   ]},
   { label:'Administração', managerOnly:true, items:[
     ['/app/importar', 'Importar', FileUp],
+    ['/app/atualizacao-cadastral', 'Atualização cadastral', DatabaseZap, {adminOnly:true}],
   ]},
   { label:'Conta e ajuda', items:[
     ['/app/perfil', 'Meu perfil', UserCircle2],
@@ -55,7 +56,8 @@ export default function CrmShell({ children }) {
         if(group.adminOnly&&!isAdmin)return null;
         return <div className="nav-section" key={group.label}>
           <div className="nav-section-title">{group.label}</div>
-          {group.items.map(([href,label,Icon])=>{
+          {group.items.map(([href,label,Icon,options={}])=>{
+            if(options.adminOnly&&!isAdmin)return null;
             const active=href==='/app'?path===href:path.startsWith(href);
             return <Link key={href} href={href} className={active?'active':''}><Icon size={18}/><span>{label}</span>{href==='/app/notificacoes'&&unread>0&&<b className="nav-count">{unread>99?'99+':unread}</b>}</Link>;
           })}
