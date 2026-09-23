@@ -111,27 +111,27 @@ export async function GET(request){
         return query.order('name');
       }),
       fetchPaged(()=>{
-        let query=supabase.from('interactions').select('id,publisher_id,user_id,occurred_at,channel,direction,result,subject,summary,response_summary,opportunity_signal,next_step,next_action_at,interest_level,priority,contact_name_snapshot,duration_minutes,publishers(name)').eq('organization_id',org).gte('occurred_at',since);
+        let query=supabase.from('interactions').select('id,publisher_id,user_id,occurred_at,channel,direction,result,subject,summary,response_summary,opportunity_signal,next_step,next_action_at,interest_level,priority,contact_name_snapshot,duration_minutes,publishers(name,trade_name,commercial_name)').eq('organization_id',org).gte('occurred_at',since);
         if(!isManager)query=query.eq('user_id',user.id);
         return query.order('occurred_at',{ascending:false});
       }),
       fetchPaged(()=>{
-        let query=supabase.from('opportunities').select('id,publisher_id,owner_user_id,created_by,title,service_key,service_type,radar_opportunities_title_count,pnld_notice,pnld_category,pnld_works_count,licitacoes_scope,description,stage,expected_close_date,loss_reason,next_step,next_action_at,created_at,updated_at,publishers(name)').eq('organization_id',org);
+        let query=supabase.from('opportunities').select('id,publisher_id,owner_user_id,created_by,title,service_key,service_type,radar_opportunities_title_count,pnld_notice,pnld_category,pnld_works_count,licitacoes_scope,description,stage,expected_close_date,loss_reason,next_step,next_action_at,created_at,updated_at,publishers(name,trade_name,commercial_name)').eq('organization_id',org);
         if(!isManager)query=query.or(`owner_user_id.eq.${user.id},created_by.eq.${user.id}`);
         return query.order('updated_at',{ascending:false});
       }),
       fetchPaged(()=>{
-        let query=supabase.from('tasks').select('id,publisher_id,assigned_to,created_by,title,description,task_type,due_at,status,priority,completed_at,created_at,cadence_enrollment_id,automation_key,result_code,result_note,publishers(name)').eq('organization_id',org).or(`status.eq.open,status.eq.in_progress,completed_at.gte.${since}`);
+        let query=supabase.from('tasks').select('id,publisher_id,assigned_to,created_by,title,description,task_type,due_at,status,priority,completed_at,created_at,cadence_enrollment_id,automation_key,result_code,result_note,publishers(name,trade_name,commercial_name)').eq('organization_id',org).or(`status.eq.open,status.eq.in_progress,completed_at.gte.${since}`);
         if(!isManager)query=query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
         return query.order('due_at',{ascending:true,nullsFirst:false});
       }),
       fetchPaged(()=>{
-        let query=supabase.from('meetings').select('id,publisher_id,title,meeting_type,scheduled_start,duration_minutes,status,scheduled_by,presenter_user_id,outcome_interest,next_step,follow_up_at,created_at,outcome_notes,publishers(name)').eq('organization_id',org).gte('scheduled_start',since);
+        let query=supabase.from('meetings').select('id,publisher_id,title,meeting_type,scheduled_start,duration_minutes,status,scheduled_by,presenter_user_id,outcome_interest,next_step,follow_up_at,created_at,outcome_notes,publishers(name,trade_name,commercial_name)').eq('organization_id',org).gte('scheduled_start',since);
         if(!isManager)query=query.or(`presenter_user_id.eq.${user.id},scheduled_by.eq.${user.id}`);
         return query.order('scheduled_start',{ascending:false});
       }),
       fetchPaged(()=>{
-        let query=supabase.from('cadence_enrollments').select('id,cadence_id,publisher_id,user_id,status,started_at,completed_at,paused_until,pause_reason,last_result_code,cadences(name,cadence_key),publishers(name)').eq('organization_id',org).gte('started_at',since);
+        let query=supabase.from('cadence_enrollments').select('id,cadence_id,publisher_id,user_id,status,started_at,completed_at,paused_until,pause_reason,last_result_code,cadences(name,cadence_key),publishers(name,trade_name,commercial_name)').eq('organization_id',org).gte('started_at',since);
         if(!isManager)query=query.eq('user_id',user.id);
         return query.order('started_at',{ascending:false});
       }),
@@ -248,7 +248,7 @@ export async function GET(request){
     ]);
 
     const interactionRows=interactions.map(i=>[
-      date(i.occurred_at,true),text(i.publishers?.name),
+      date(i.occurred_at,true),displayName(i.publishers),
       teamMap[i.user_id]?.full_name||teamMap[i.user_id]?.email||'',
       text(i.contact_name_snapshot),CHANNEL_LABELS[i.channel]||text(i.channel),
       DIRECTION_LABELS[i.direction]||text(i.direction),RESULT_LABELS[i.result]||text(i.result),
@@ -258,7 +258,7 @@ export async function GET(request){
     ]);
 
     const opportunityRows=opportunities.map(o=>[
-      text(o.publishers?.name),text(o.title),serviceLabel(o.service_key),stageLabel(o.stage),
+      displayName(o.publishers),text(o.title),serviceLabel(o.service_key),stageLabel(o.stage),
       integer(o.radar_opportunities_title_count),text(o.pnld_notice),text(o.pnld_category),integer(o.pnld_works_count),
       text(o.licitacoes_scope),text(o.service_type),
       teamMap[o.owner_user_id]?.full_name||teamMap[o.owner_user_id]?.email||'',
@@ -267,7 +267,7 @@ export async function GET(request){
     ]);
 
     const taskRows=tasks.map(t=>[
-      text(t.publishers?.name),text(t.title),TASK_TYPE_LABELS[t.task_type]||text(t.task_type),
+      displayName(t.publishers),text(t.title),TASK_TYPE_LABELS[t.task_type]||text(t.task_type),
       TASK_STATUS_LABELS[t.status]||text(t.status),PRIORITY_LABELS[t.priority]||text(t.priority),
       teamMap[t.assigned_to]?.full_name||teamMap[t.assigned_to]?.email||'',
       date(t.due_at,true),date(t.completed_at,true),RESULT_LABELS[t.result_code]||text(t.result_code),
@@ -276,7 +276,7 @@ export async function GET(request){
     ]);
 
     const meetingRows=meetings.map(m=>[
-      date(m.scheduled_start,true),text(m.publishers?.name),text(m.title),text(m.meeting_type),
+      date(m.scheduled_start,true),displayName(m.publishers),text(m.title),text(m.meeting_type),
       MEETING_STATUS_LABELS[m.status]||text(m.status),integer(m.duration_minutes),
       teamMap[m.presenter_user_id]?.full_name||teamMap[m.presenter_user_id]?.email||'',
       teamMap[m.scheduled_by]?.full_name||teamMap[m.scheduled_by]?.email||'',
@@ -285,7 +285,7 @@ export async function GET(request){
     ]);
 
     const cadenceRows=cadenceEnrollments.map(e=>[
-      text(e.publishers?.name),text(e.cadences?.name),
+      displayName(e.publishers),text(e.cadences?.name),
       teamMap[e.user_id]?.full_name||teamMap[e.user_id]?.email||'',
       text(e.status),date(e.started_at,true),date(e.completed_at,true),date(e.paused_until,true),
       text(e.pause_reason),RESULT_LABELS[e.last_result_code]||text(e.last_result_code)
