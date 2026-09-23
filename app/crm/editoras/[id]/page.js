@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowLeft, CheckCircle2, CircleHelp, Clock3, DatabaseZap, Globe2, Instagram, Linkedin, Mail, Phone, Plus, Save, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, CircleHelp, Clock3, DatabaseZap, Globe2, Mail, Phone, Plus, Save, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 import { PtBrDateField, PtBrDateTimeField } from '@/components/PtBrDateFields';
 import MentionTextarea from '@/components/MentionTextarea';
@@ -222,8 +222,8 @@ export default function PublisherDetailPage(){
             <ContactChannel icon={Globe2} label="Site oficial" value={publisher.website?compactExternalLabel(publisher.website):null} href={publisher.website?externalHref(publisher.website):null}/>
             <ContactChannel icon={Mail} label="E-mail principal" value={publisher.general_email} href={publisher.general_email?`mailto:${publisher.general_email}`:null}/>
             <ContactChannel icon={Phone} label="Telefone" value={publisher.phone} href={publisher.phone?`tel:${publisher.phone}`:null}/>
-            <ContactChannel icon={Instagram} label="Instagram" value={publisher.instagram?compactExternalLabel(publisher.instagram):null} href={publisher.instagram?externalHref(publisher.instagram,'instagram'):null}/>
-            <ContactChannel icon={Linkedin} label="LinkedIn" value={publisher.linkedin_url?compactExternalLabel(publisher.linkedin_url):null} href={publisher.linkedin_url?externalHref(publisher.linkedin_url,'linkedin'):null}/>
+            <ContactChannel icon={Globe2} label="Instagram" value={publisher.instagram?compactExternalLabel(publisher.instagram):null} href={publisher.instagram?externalHref(publisher.instagram,'instagram'):null}/>
+            <ContactChannel icon={Globe2} label="LinkedIn" value={publisher.linkedin_url?compactExternalLabel(publisher.linkedin_url):null} href={publisher.linkedin_url?externalHref(publisher.linkedin_url,'linkedin'):null}/>
           </div>
           {(alternateEmails.length>0||publisher.secondary_phone)&&<div className="publisher-extra-channels">
             {alternateEmails.length>0&&<div><small>Outros e-mails</small><div>{alternateEmails.map(email=><a className="text-link" href={`mailto:${email}`} key={email}>{email}</a>)}</div></div>}
