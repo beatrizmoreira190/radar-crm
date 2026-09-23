@@ -84,6 +84,7 @@ function HelpHeading({as='h3',children,help}){const Tag=as;return <div className
 function HelpLabel({children,help}){return <span className="help-label">{children}<HelpTip text={help}/></span>}
 function localInput(value){if(!value)return'';const d=new Date(value);if(Number.isNaN(d.getTime()))return'';const z=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`}
 function dateTimeLabel(value){if(!value)return'—';const d=new Date(value);return Number.isNaN(d.getTime())?'—':d.toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}
+function formatCnpj(value){const d=String(value||'').replace(/\D/g,'');return d.length===14?`${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12)}`:(value||'—')}
 function opportunityServiceDetail(opportunity){
   if(opportunity?.service_key==='radar_oportunidades'&&opportunity.radar_opportunities_title_count)return `${Number(opportunity.radar_opportunities_title_count).toLocaleString('pt-BR')} título${Number(opportunity.radar_opportunities_title_count)===1?'':'s'} em divulgação`;
   if(opportunity?.service_key==='pnld'){
@@ -96,17 +97,18 @@ function opportunityServiceDetail(opportunity){
 
 export default function PublisherDetailPage(){
   const {id}=useParams(); const {supabase,membership,user,teamMap,team,isManager,hasCommercialFunction,activityVersion}=useCrm(); const org=membership?.organization_id;
-  const [publisher,setPublisher]=useState(null); const [contacts,setContacts]=useState([]); const [interactions,setInteractions]=useState([]); const [tasks,setTasks]=useState([]); const [opps,setOpps]=useState([]); const [stages,setStages]=useState([]); const [cnpjVerification,setCnpjVerification]=useState(null);
+  const [publisher,setPublisher]=useState(null); const [contacts,setContacts]=useState([]); const [interactions,setInteractions]=useState([]); const [tasks,setTasks]=useState([]); const [opps,setOpps]=useState([]); const [stages,setStages]=useState([]); const [cnpjVerification,setCnpjVerification]=useState(null); const [societaryLinks,setSocietaryLinks]=useState({related_count:0,shared_owner_count:0,related_publishers:[]});
   const [loading,setLoading]=useState(true); const [notice,setNotice]=useState(''); const [modal,setModal]=useState(''); const [actionsOpen,setActionsOpen]=useState(false); const [editingOpportunity,setEditingOpportunity]=useState(null); const [noteMentions,setNoteMentions]=useState([]); const [edit,setEdit]=useState({priority:'medium',stage_id:'',owner_user_id:'',next_action_at:'',notes:''}); const editHydratedFor=useRef(null); const actionMenuRef=useRef(null);
-  async function load(){if(!org||!id)return;setLoading(true);const [p,c,i,t,o,s,v]=await Promise.all([
+  async function load(){if(!org||!id)return;setLoading(true);const [p,c,i,t,o,s,v,sl]=await Promise.all([
     supabase.from('publishers').select('*').eq('organization_id',org).eq('id',id).maybeSingle(),
     supabase.from('contacts').select('*').eq('organization_id',org).eq('publisher_id',id).eq('active',true).order('is_decision_maker',{ascending:false}).order('full_name'),
     supabase.from('interactions').select('*').eq('organization_id',org).eq('publisher_id',id).order('occurred_at',{ascending:false}).limit(30),
     supabase.from('tasks').select('*').eq('organization_id',org).eq('publisher_id',id).in('status',['open','in_progress']).order('due_at',{ascending:true,nullsFirst:false}).limit(30),
     supabase.from('opportunities').select('*').eq('organization_id',org).eq('publisher_id',id).order('created_at',{ascending:false}),
     supabase.from('pipeline_stages').select('id,name,position,stage_type').eq('organization_id',org).eq('active',true).order('position'),
-    supabase.from('publisher_cnpj_verifications').select('status,source_period,last_verified_at,error_message,last_run_id').eq('organization_id',org).eq('publisher_id',id).maybeSingle()
-  ]);if(p.error)setNotice(p.error.message);setPublisher(p.data||null);setContacts(c.data||[]);setInteractions(i.data||[]);setTasks(t.data||[]);setOpps(o.data||[]);setStages(s.data||[]);setCnpjVerification(v.data||null);if(p.data&&editHydratedFor.current!==p.data.id){setEdit({priority:p.data.priority||'medium',stage_id:p.data.stage_id||'',owner_user_id:p.data.owner_user_id||'',next_action_at:localInput(p.data.next_action_at),notes:p.data.notes||''});editHydratedFor.current=p.data.id}setLoading(false)}
+    supabase.from('publisher_cnpj_verifications').select('status,source_period,last_verified_at,error_message,last_run_id').eq('organization_id',org).eq('publisher_id',id).maybeSingle(),
+    supabase.rpc('crm_publisher_societary_links',{p_organization_id:org,p_publisher_id:id})
+  ]);if(p.error)setNotice(p.error.message);setPublisher(p.data||null);setContacts(c.data||[]);setInteractions(i.data||[]);setTasks(t.data||[]);setOpps(o.data||[]);setStages(s.data||[]);setCnpjVerification(v.data||null);setSocietaryLinks(sl.data||{related_count:0,shared_owner_count:0,related_publishers:[]});if(p.data&&editHydratedFor.current!==p.data.id){setEdit({priority:p.data.priority||'medium',stage_id:p.data.stage_id||'',owner_user_id:p.data.owner_user_id||'',next_action_at:localInput(p.data.next_action_at),notes:p.data.notes||''});editHydratedFor.current=p.data.id}setLoading(false)}
   useEffect(()=>{load()},[org,id,activityVersion]);
   const stageMap=useMemo(()=>Object.fromEntries(stages.map(s=>[s.id,s])),[stages]);
   const canManageAccount=Boolean(publisher&&(isManager||publisher.owner_user_id===user?.id));
@@ -144,7 +146,7 @@ export default function PublisherDetailPage(){
   if(loading&&!publisher)return <div className="page-wrap"><div className="table-empty">Carregando editora…</div></div>;
   if(!publisher)return <div className="page-wrap"><Link href="/app/editoras" className="text-link"><ArrowLeft size={15}/> Voltar</Link><div className="card panel" style={{marginTop:16}}><h2>Editora não encontrada</h2><p className="muted">Ela pode ter sido arquivada ou você não tem acesso a esse registro.</p></div></div>;
   return <div className="page-wrap">
-    <div className="page-head"><div><Link href="/app/editoras" className="text-link"><ArrowLeft size={15}/> Editoras</Link><div className="eyebrow" style={{marginTop:12}}>Ficha comercial</div><h1>{headName}</h1><div className="publisher-head-identity">{publisher.trade_name&&!sameText(publisher.trade_name,headName)&&<span><b>Nome fantasia (Receita):</b> {publisher.trade_name}</span>}{!publisher.trade_name&&<span className="publisher-head-missing">Sem nome fantasia na Receita</span>}{publisher.legal_name&&<span><b>Razão social:</b> {publisher.legal_name}</span>}{locationLabel&&<span>{locationLabel}</span>}</div></div><div className="publisher-head-actions"><div className="chips"><span className="badge dark">Score {publisher.score??0}</span><HelpTip text={HELP.score}/>{publisher.registration_status&&<span className={`badge ${String(publisher.registration_status).toUpperCase()==='BAIXADA'?'red':String(publisher.registration_status).toUpperCase()==='ATIVA'?'green':'amber'}`}>CNPJ {publisher.registration_status}</span>}<span className="badge">{stageMap[publisher.stage_id]?.name||'Sem etapa'}</span><HelpTip text={HELP.stageBadge}/></div>{canCreateAnyAction&&<div className="publisher-action-menu" ref={actionMenuRef}><button type="button" className="btn" aria-haspopup="menu" aria-expanded={actionsOpen} onClick={()=>setActionsOpen(value=>!value)}><Plus size={15}/> Nova ação</button>{actionsOpen&&<div className="publisher-action-popover" role="menu" aria-label="Nova ação">{canCollaborate&&<><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('interaction')}>Registrar interação</button><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('task')}>Criar tarefa</button><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('opportunity')}>Criar oportunidade</button><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('contact')}>Adicionar pessoa de contato</button></>}{canScheduleMeeting&&<button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('meeting')}>Agendar reunião</button>}{canManageMaterials&&<button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('material')}>Adicionar material</button>}</div>}</div>}</div></div>
+    <div className="page-head"><div><Link href="/app/editoras" className="text-link"><ArrowLeft size={15}/> Editoras</Link><div className="eyebrow" style={{marginTop:12}}>Ficha comercial</div><h1>{headName}</h1><div className="publisher-head-identity">{publisher.trade_name&&!sameText(publisher.trade_name,headName)&&<span><b>Nome fantasia (Receita):</b> {publisher.trade_name}</span>}{!publisher.trade_name&&<span className="publisher-head-missing">Sem nome fantasia na Receita</span>}{publisher.legal_name&&<span><b>Razão social:</b> {publisher.legal_name}</span>}{locationLabel&&<span>{locationLabel}</span>}</div></div><div className="publisher-head-actions"><div className="chips"><span className="badge dark">Score {publisher.score??0}</span><HelpTip text={HELP.score}/>{publisher.registration_status&&<span className={`badge ${String(publisher.registration_status).toUpperCase()==='BAIXADA'?'red':String(publisher.registration_status).toUpperCase()==='ATIVA'?'green':'amber'}`}>CNPJ {publisher.registration_status}</span>}{societaryLinks?.related_count>0&&<span className="badge amber">{societaryLinks.related_count} empresa{societaryLinks.related_count===1?'':'s'} relacionada{societaryLinks.related_count===1?'':'s'}</span>}<span className="badge">{stageMap[publisher.stage_id]?.name||'Sem etapa'}</span><HelpTip text={HELP.stageBadge}/></div>{canCreateAnyAction&&<div className="publisher-action-menu" ref={actionMenuRef}><button type="button" className="btn" aria-haspopup="menu" aria-expanded={actionsOpen} onClick={()=>setActionsOpen(value=>!value)}><Plus size={15}/> Nova ação</button>{actionsOpen&&<div className="publisher-action-popover" role="menu" aria-label="Nova ação">{canCollaborate&&<><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('interaction')}>Registrar interação</button><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('task')}>Criar tarefa</button><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('opportunity')}>Criar oportunidade</button><button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('contact')}>Adicionar pessoa de contato</button></>}{canScheduleMeeting&&<button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('meeting')}>Agendar reunião</button>}{canManageMaterials&&<button type="button" role="menuitem" onClick={()=>dispatchPublisherAction('material')}>Adicionar material</button>}</div>}</div>}</div></div>
     {notice&&<div className="notice-bar"><span>{notice}</span><button onClick={()=>setNotice('')}><X size={15}/></button></div>}
     {String(publisher.registration_status||'').toUpperCase()==='BAIXADA'&&<div className="notice error" style={{marginBottom:16,display:'flex',alignItems:'flex-start',gap:10}}><AlertTriangle size={18} style={{marginTop:1,flex:'0 0 auto'}}/><div><strong>CNPJ baixado na Receita Federal</strong><div style={{fontSize:12,marginTop:3}}>Este cadastro consta como <b>BAIXADO</b>{publisher.cnpj_status_date?(' desde '+formatDate(publisher.cnpj_status_date)):''}{publisher.cnpj_status_reason?('. Motivo: '+publisher.cnpj_status_reason):''}.</div></div></div>}
     {!canManageAccount&&<div className="notice-bar" style={{marginBottom:16}}><span>{unassigned?'Esta editora ainda está sem responsável atual. Você pode registrar ações permitidas pela sua função; assuma a conta se você for conduzir o próximo estágio.':`${ownerName} é o responsável atual. Você pode registrar ações permitidas pela sua função; etapa, prioridade e próxima ação principal ficam em modo leitura.`}</span>{unassigned&&hasCommercialFunction('prospecting')&&<button className="btn small" onClick={claimPublisher}>Assumir responsabilidade</button>}</div>}
@@ -194,6 +196,8 @@ export default function PublisherDetailPage(){
         </details>}
       </section>
 
+      {societaryLinks?.related_count>0&&<SocietaryLinksCard data={societaryLinks}/>}
+      
       <section className="card panel publisher-editorial-card">
         <div className="section-title">
           <div><HelpHeading as="h2" help={HELP.editorialProfile}>Perfil editorial</HelpHeading><p className="muted">O que a editora publica e como está classificada editorialmente.</p></div>
@@ -219,6 +223,35 @@ export default function PublisherDetailPage(){
     {canCollaborate&&modal==='task'&&<TaskModal supabase={supabase} org={org} publisher={publisher} user={user} onClose={()=>setModal('')} onSaved={()=>{setModal('');setNotice('Tarefa criada.');load()}}/>}
     {canCollaborate&&modal==='opportunity'&&<OpportunityModal supabase={supabase} org={org} publisher={publisher} user={user} opportunity={editingOpportunity} onClose={closeOpportunity} onSaved={mode=>{closeOpportunity();setNotice(mode==='updated'?'Oportunidade atualizada.':'Oportunidade criada.');load()}}/>}
   </div>;
+}
+
+function SocietaryLinksCard({data}){
+  const rows=Array.isArray(data?.related_publishers)?data.related_publishers:[];
+  const primary=rows.slice(0,6);
+  const extra=rows.slice(6);
+  const row=(item)=><div className="publisher-related-row" key={item.publisher_id}>
+    <div className="publisher-related-main">
+      <Link href={`/app/editoras/${item.publisher_id}`} className="publisher-related-name">{item.display_name||item.legal_name||'Empresa relacionada'}</Link>
+      <div className="publisher-related-meta">
+        <span>CNPJ {formatCnpj(item.cnpj)}</span>
+        {Array.isArray(item.stage_names)&&item.stage_names.length>0&&<span>Etapa{item.stage_names.length===1?'':'s'}: {item.stage_names.join(', ')}</span>}
+        {Number(item.cnpj_count)>1&&<span>{item.cnpj_count} CNPJs/filiais na base</span>}
+        {Number(item.active_opportunities)>0&&<span>{item.active_opportunities} oportunidade{Number(item.active_opportunities)===1?'':'s'} aberta{Number(item.active_opportunities)===1?'':'s'}</span>}
+      </div>
+      <div className="publisher-related-owner">Sócio{(item.shared_owners||[]).length===1?'':'s'} em comum: <b>{(item.shared_owners||[]).join(', ')||'—'}</b></div>
+    </div>
+    {item.registration_status&&<span className={`badge ${String(item.registration_status).toUpperCase()==='ATIVA'?'green':String(item.registration_status).toUpperCase()==='BAIXADA'?'red':'amber'}`}>{item.registration_status}</span>}
+  </div>;
+  return <section className="card panel publisher-societary-card">
+    <div className="section-title">
+      <div><h2>Vínculos societários</h2><p className="muted">Outros CNPJs da base que compartilham sócios com esta empresa.</p></div>
+      <span className="badge amber">{data.related_count} empresa{data.related_count===1?'':'s'} relacionada{data.related_count===1?'':'s'}</span>
+    </div>
+    <div className="publisher-societary-warning"><AlertTriangle size={17}/><div><strong>Atenção comercial</strong><span>Antes de definir escopo ou preço, confira estes CNPJs. Eles podem integrar a mesma estrutura comercial, embora o vínculo societário não confirme sozinho um grupo econômico.</span></div></div>
+    <div className="publisher-related-list">{primary.map(row)}</div>
+    {extra.length>0&&<details className="publisher-related-more"><summary>Ver mais {extra.length} empresa{extra.length===1?'':'s'}</summary><div className="publisher-related-list extra">{extra.map(row)}</div></details>}
+    <p className="publisher-societary-footnote">Detecção automática por coincidência exata do nome do sócio no quadro societário sincronizado da Receita Federal.</p>
+  </section>;
 }
 
 function Info({label,value,help}){return <div className="info-item"><small>{help?<HelpLabel help={help}>{label}</HelpLabel>:label}</small><span>{value||'—'}</span></div>}
