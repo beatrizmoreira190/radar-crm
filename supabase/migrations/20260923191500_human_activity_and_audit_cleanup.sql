@@ -361,8 +361,8 @@ where a.entity_type='publishers'
   and a.actor_user_id=m.scheduled_by
   and a.before_data ? 'stage_id'
   and a.after_data ? 'stage_id'
-  and jsonb_object_length(coalesce(a.before_data,'{}'::jsonb))=1
-  and jsonb_object_length(coalesce(a.after_data,'{}'::jsonb))=1
+  and (select count(*) from jsonb_object_keys(coalesce(a.before_data,'{}'::jsonb)))=1
+  and (select count(*) from jsonb_object_keys(coalesce(a.after_data,'{}'::jsonb)))=1
   and abs(extract(epoch from (a.created_at-m.created_at)))<1;
 
 delete from public.audit_events a
