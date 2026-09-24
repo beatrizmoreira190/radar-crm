@@ -242,6 +242,13 @@ export default function ImportPage(){
   const [validation,setValidation]=useState(null);
   const [result,setResult]=useState(null);
   const [notice,setNotice]=useState('');
+  const [successToast,setSuccessToast]=useState('');
+
+  useEffect(()=>{
+    if(!successToast)return;
+    const timer=setTimeout(()=>setSuccessToast(''),5000);
+    return()=>clearTimeout(timer);
+  },[successToast]);
 
   useEffect(()=>{
     let active=true;
@@ -351,13 +358,18 @@ export default function ImportPage(){
       p_organization_id:org,p_publishers:publishers,p_contacts:contacts,p_mode:'skip',p_source_name:fileName||null
     });
     if(error)setNotice(error.message);
-    else{setResult(data);setNotice('Importação concluída. Editoras e pessoas foram processadas conforme a validação.');}
+    else{
+      setResult(data);
+      const publisherCount=Number(data?.publishers?.inserted||0);
+      const contactCount=Number(data?.contacts?.inserted||0);
+      setSuccessToast(`Importação concluída: ${publisherCount} editora${publisherCount===1?'':'s'} e ${contactCount} pessoa${contactCount===1?'':'s'} criada${contactCount===1?'':'s'}.`);
+    }
     setBusy(false);
   }
 
   function reset(){
     setFileName('');setPublishers([]);setContacts([]);setStructureErrors([]);
-    setValidation(null);setResult(null);setNotice('');
+    setValidation(null);setResult(null);setNotice('');setSuccessToast('');
   }
   function downloadIssues(){
     const details=[...localIssues,...(validation?.details||[])].filter(item=>item.error||item.warning);
@@ -372,6 +384,11 @@ export default function ImportPage(){
   }
 
   return <div className="page-wrap import-v3-page">
+    {successToast&&<div className="import-success-toast" role="status" aria-live="polite">
+      <span className="import-success-toast-icon"><CheckCircle2 size={18}/></span>
+      <div><strong>Importação concluída</strong><span>{successToast}</span></div>
+      <button type="button" aria-label="Fechar aviso de sucesso" onClick={()=>setSuccessToast('')}><X size={15}/></button>
+    </div>}
     <div className="page-head">
       <div><div className="eyebrow">Dados em massa</div><h1>Importar editoras</h1><p>Use o mesmo modelo de dados da página Nova editora, com uma aba para editoras e outra para pessoas vinculadas.</p></div>
       <button className="btn secondary" type="button" onClick={downloadTemplate}><Download size={16}/> Baixar modelo Excel</button>
@@ -459,6 +476,12 @@ export default function ImportPage(){
     </>}
 
     <style jsx>{`
+      .import-success-toast{position:fixed;top:20px;right:20px;z-index:1200;width:min(420px,calc(100vw - 32px));display:grid;grid-template-columns:auto 1fr auto;align-items:start;gap:10px;padding:13px 14px;border:1px solid #abefc6;border-radius:12px;background:#ecfdf3;box-shadow:0 12px 30px rgba(16,24,40,.16);color:#05603a}
+      .import-success-toast-icon{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#d1fadf;color:#067647}
+      .import-success-toast>div{display:grid;gap:2px;padding-top:1px}
+      .import-success-toast strong{font-size:12px;color:#054f31}
+      .import-success-toast span{font-size:11px;line-height:1.4;color:#067647}
+      .import-success-toast button{border:0;background:transparent;color:#067647;cursor:pointer;padding:3px;display:grid;place-items:center}
       .import-how,.import-details{margin-bottom:16px}
       .import-how-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
       .import-rule-strip{margin-top:12px;padding:12px 14px;border-radius:10px;background:#f9fafb;display:grid;gap:3px;font-size:12px}
