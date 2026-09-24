@@ -8,6 +8,7 @@ const sections=[
   ['visao-geral','Visão geral'],
   ['prioridades','Prioridades e Radar Score'],
   ['editoras','Base de editoras'],
+  ['nova-editora','Nova editora'],
   ['ficha','Ficha da editora'],
   ['relacionamento','Pessoas e interações'],
   ['oportunidades','Oportunidades'],
@@ -112,7 +113,7 @@ export default function ManualPage(){
           <div className="manual-table-wrap"><table className="manual-table">
             <thead><tr><th>Ação</th><th>Quem vê / executa</th></tr></thead>
             <tbody>
-              <tr><td>Criar nova editora</td><td>Supervisores e administradores.</td></tr>
+              <tr><td>Criar nova editora</td><td>Todos os usuários ativos do CRM. Alguns campos de gestão, como Responsável atual e Perfil comercial Radar, continuam restritos a gestores.</td></tr>
               <tr><td>Editar etapa, prioridade, responsável atual, próxima ação principal e notas estruturantes</td><td>Gestores ou responsável atual pela editora.</td></tr>
               <tr><td>Registrar interação, criar tarefa, oportunidade e pessoa de contato pela ficha</td><td>Gestores, responsável atual ou usuário com função Prospecção. A autoria de cada registro fica preservada.</td></tr>
               <tr><td>Agendar reunião</td><td>Gestores ou usuário com função Agendamento de reuniões.</td></tr>
@@ -170,7 +171,29 @@ export default function ManualPage(){
           <h3>Assumir responsabilidade atual</h3>
           <p>Quando uma conta está sem responsável atual, alguém da prospecção pode assumir a condução do estágio. Na primeira atribuição, essa pessoa também passa a ser registrada como <b>Prospector de origem</b>. Em handoffs posteriores, o responsável atual pode mudar, mas o prospector de origem permanece preservado.</p>
           <p>O CRM protege a operação contra duas pessoas assumirem a mesma conta ao mesmo tempo: se outra pessoa concluir a ação primeiro, a lista é atualizada e a responsabilidade não é duplicada.</p>
-          <p>Supervisores e administradores também podem criar novas editoras manualmente pelo botão <b>Nova editora</b>.</p>
+          <p>Todos os usuários ativos podem criar uma editora pelo botão <b>Nova editora</b> ou pelo acesso <b>Gestão → Nova editora</b>. O cadastro manual usa CNPJ como chave de negócio e bloqueia a criação de uma segunda editora com o mesmo CNPJ.</p>
+        </Section>
+
+        <Section id="nova-editora" title="Nova editora: cadastro manual completo">
+          <p>A página <Link className="text-link" href="/app/editoras/nova">Nova editora</Link> fica em <b>Gestão</b> e pode ser usada por todos os usuários ativos do CRM. Ela deve ser usada quando uma editora precisa entrar individualmente na base.</p>
+          <h3>Identificação obrigatória</h3>
+          <p>O cadastro só pode ser concluído quando os cinco campos abaixo estiverem preenchidos:</p>
+          <ul>
+            <li><b>Nome principal no CRM;</b></li>
+            <li><b>Nome comercial / marca;</b></li>
+            <li><b>Nome fantasia oficial;</b></li>
+            <li><b>Razão social;</b></li>
+            <li><b>CNPJ.</b></li>
+          </ul>
+          <p>O CNPJ é conferido antes de salvar. Se já existir na base, o CRM bloqueia o novo cadastro e direciona para o registro existente. Se o CNPJ estiver associado a uma editora arquivada, o aviso também é específico.</p>
+          <h3>Perfil editorial</h3>
+          <p>Marque quantos perfis forem necessários. Se uma categoria ainda não existir, use <b>Criar novo perfil editorial</b>. O sistema evita duplicações simples causadas por diferenças de maiúsculas, acentos ou espaços.</p>
+          <h3>Pessoas vinculadas</h3>
+          <p>Use <b>Sócios e responsáveis legais</b> para pessoas com vínculo societário ou representação legal e <b>Outras pessoas de contato</b> para direção editorial, comercial, marketing, financeiro, atendimento e outras funções.</p>
+          <p>As pessoas são cadastradas individualmente. Depois de adicionadas, aparecem como cartões compactos e podem ser editadas. A remoção exige confirmação, reduzindo o risco de exclusão acidental.</p>
+          <Callout title="O que o CRM calcula sozinho">
+            <p>Radar Score, aderências, qualidade dos dados, histórico, último contato, auditoria e demais indicadores derivados não devem ser preenchidos manualmente. Eles são calculados a partir dos dados e da atividade real da conta.</p>
+          </Callout>
         </Section>
 
         <Section id="ficha" title="Ficha da editora">
@@ -426,29 +449,50 @@ export default function ManualPage(){
         </Section>
 
         <Section id="importar" title="Importar editoras com segurança">
-          <p>A página <Link className="text-link" href="/app/importar">Importar</Link> é exclusiva de supervisores e administradores e trabalha com arquivos <b>CSV</b>.</p>
-          <h3>Fluxo correto</h3>
-          <ol>
-            <li><b>Baixe o modelo atualizado.</b></li>
-            <li><b>Preencha a planilha.</b> Nome da editora é obrigatório.</li>
-            <li><b>Escolha o arquivo.</b> O CRM detecta delimitador e lê o cabeçalho.</li>
-            <li><b>Mapeie as colunas.</b> Confirme qual coluna corresponde a cada campo.</li>
-            <li><b>Revise a prévia.</b> O sistema mostra uma amostra antes de qualquer gravação.</li>
-            <li><b>Valide.</b> Esta etapa não altera a base.</li>
-            <li><b>Corrija erros.</b> Se necessário, baixe a lista de inconsistências.</li>
-            <li><b>Confirme a importação.</b> Somente depois da validação aprovada os registros são gravados.</li>
-          </ol>
-          <h3>Como separar campos com vários valores</h3>
-          <p>Use <b>|</b>. Exemplo: <code>Literatura | Infantil | Educação</code>. Isso é usado em campos como perfil editorial, segmentos e e-mails alternativos.</p>
-          <h3>Como o CRM identifica um cadastro existente</h3>
-          <p>A comparação prioriza chaves fortes, como referência de origem e CNPJ. Quando não há uma chave forte, Nome + UF pode ser usado com cautela. Conflitos entre identificadores são bloqueados para revisão.</p>
+          <p>A página <Link className="text-link" href="/app/importar">Importar</Link> é exclusiva de supervisores e administradores e usa um arquivo <b>Excel .xlsx</b> padronizado. O objetivo é fazer em massa o mesmo cadastro estruturado disponível em <b>Nova editora</b>.</p>
+          <h3>O arquivo padrão</h3>
+          <p>Baixe sempre o modelo diretamente da página Importar. Ele possui três abas:</p>
+          <ul>
+            <li><b>LEIA-ME:</b> traz as instruções, formatos aceitos, etapas atuais do pipeline e e-mails ativos da equipe. Essa aba não é importada.</li>
+            <li><b>Editoras:</b> uma linha por editora, com as mesmas informações usadas no cadastro manual.</li>
+            <li><b>Pessoas:</b> uma linha por pessoa vinculada. O CNPJ da editora faz a ligação entre as duas abas.</li>
+          </ul>
+          <Callout title="Não renomeie as abas de dados" tone="warning">
+            <p>As abas <b>Editoras</b> e <b>Pessoas</b> precisam manter esses nomes para o CRM reconhecer o arquivo.</p>
+          </Callout>
+          <h3>Aba Editoras</h3>
+          <p>Os cinco campos obrigatórios são <b>Nome principal no CRM, Nome comercial / marca, Nome fantasia oficial, Razão social e CNPJ</b>. O CNPJ precisa ter 14 dígitos e é a chave usada para localizar o cadastro.</p>
+          <p>Os demais campos seguem a página Nova editora: dados empresariais, endereço, canais institucionais, perfil editorial e acompanhamento comercial.</p>
+          <p>Para informar mais de um <b>Perfil editorial</b>, separe os valores com <b>|</b>. Exemplo: <code>Infantil | Literatura | Paradidático</code>. Perfis ainda inexistentes também podem entrar pela importação e passam a integrar as opções do CRM.</p>
+          <p>Em <b>Responsável atual (e-mail)</b>, use o e-mail de uma pessoa ativa na equipe. Em <b>Etapa do pipeline</b>, use exatamente o nome de uma etapa ativa.</p>
+          <h3>Aba Pessoas</h3>
+          <p>Repita o CNPJ da editora em cada linha. Assim uma editora pode ter quantas pessoas forem necessárias sem criar colunas como “Contato 1”, “Contato 2” e “Contato 3”.</p>
+          <ul>
+            <li><b>Tipo de vínculo:</b> use “Sócio / responsável legal” ou “Outro contato”.</li>
+            <li><b>Sócio / responsável legal:</b> CNPJ, tipo de vínculo, nome e função/cargo são obrigatórios.</li>
+            <li><b>Outro contato:</b> CNPJ, tipo de vínculo e nome são obrigatórios.</li>
+            <li><b>É decisor?:</b> use Sim ou Não.</li>
+            <li><b>Canal preferencial:</b> Telefone, E-mail, WhatsApp, LinkedIn ou Outro.</li>
+          </ul>
+          <h3>Como o CNPJ controla duplicidades</h3>
+          <p>A importação não usa mais Nome + UF nem uma referência técnica como chave principal. <b>O CNPJ é a chave de negócio.</b> Se o CNPJ já existir, o CRM entende que se trata da mesma editora.</p>
           <h3>Ignorar ou atualizar</h3>
           <ul>
-            <li><b>Ignorar e preservar:</b> registros já existentes não são alterados.</li>
-            <li><b>Atualizar somente campos preenchidos:</b> atualiza apenas valores presentes no CSV. Células vazias não apagam o dado atual.</li>
+            <li><b>Ignorar e preservar:</b> CNPJs já existentes não são alterados; pessoas já reconhecidas também são preservadas.</li>
+            <li><b>Atualizar somente campos preenchidos:</b> os dados presentes no Excel atualizam o cadastro existente. Células vazias nunca apagam valores atuais.</li>
           </ul>
-          <p>Radar Score, aderência, potencial, qualidade dos dados e melhor produto <b>não são importados</b>. Eles são calculados pelo sistema após mudanças relevantes.</p>
-          <p>Nomes que aparentam conter HTML ou trechos técnicos são bloqueados para evitar cadastros corrompidos.</p>
+          <h3>Fluxo correto</h3>
+          <ol>
+            <li><b>Baixe o modelo Excel atualizado.</b></li>
+            <li><b>Preencha Editoras e Pessoas.</b></li>
+            <li><b>Selecione o arquivo .xlsx.</b></li>
+            <li><b>Confira a amostra e os erros locais.</b></li>
+            <li><b>Escolha Ignorar ou Atualizar.</b></li>
+            <li><b>Clique em Validar planilha.</b> Nenhum dado é salvo nessa etapa.</li>
+            <li><b>Corrija os erros.</b> Se necessário, baixe a lista de inconsistências.</li>
+            <li><b>Confirme a importação.</b> O botão de importação só é liberado após uma validação sem erros.</li>
+          </ol>
+          <p><b>Radar Score, fits, qualidade dos dados, histórico, auditoria e outros indicadores calculados não fazem parte do Excel.</b> O CRM recalcula esses elementos automaticamente quando os dados relevantes mudam.</p>
         </Section>
 
         <Section id="equipe" title="Equipe, acessos, funções e disponibilidade">
@@ -504,7 +548,7 @@ export default function ManualPage(){
           <Trouble q="A editora que eu tentei assumir foi atribuída a outra pessoa.">Outra pessoa concluiu a ação antes. O CRM evita duas pessoas como responsáveis simultâneas e atualiza a tela.</Trouble>
           <Trouble q="Mudei a etapa errada no Pipeline.">Use <b>Desfazer</b> na confirmação exibida logo após a movimentação. Para etapas de perda, o CRM pede confirmação antes de salvar.</Trouble>
           <Trouble q="A reunião foi salva, mas não entrou no Google Agenda.">A reunião continua válida no CRM. Verifique se a agenda do apresentador está conectada e consulte a mensagem de sincronização exibida no bloco da reunião.</Trouble>
-          <Trouble q="A importação está bloqueada.">Há erros na validação. Abra a tabela de inconsistências ou baixe o CSV de erros, corrija o arquivo e valide novamente. Aviso e erro não são a mesma coisa: erro bloqueia a importação.</Trouble>
+          <Trouble q="A importação está bloqueada.">Há erros na validação. Confira em qual aba e linha o problema ocorreu ou baixe a lista de inconsistências. Corrija o Excel e valide novamente. Aviso e erro não são a mesma coisa: erro bloqueia a importação.</Trouble>
           <Trouble q="Qualidade da base demora alguns segundos.">A análise percorre milhares de registros. Durante uma atualização, os resultados anteriores continuam visíveis. Evite clicar repetidamente em Recalcular.</Trouble>
           <Trouble q="Uma data está inválida.">Use o padrão <b>dd/mm/aaaa</b> e, quando houver horário, preencha também o campo de hora.</Trouble>
           <Trouble q="Um usuário aparece somente com e-mail.">O nome de exibição ainda não foi preenchido. Um administrador pode corrigir em Equipe, ou a própria pessoa pode atualizar Meu perfil.</Trouble>
@@ -527,7 +571,7 @@ export default function ManualPage(){
           <Faq q="Onde estão os lembretes?">Em Minha fila, no bloco <b>Atenção agora</b>.</Faq>
           <Faq q="Onde ficam arquivos e apresentações?">Em Materiais comerciais são guardados os links e o contexto. O arquivo permanece no Drive, Canva, Gamma, Notion ou outra plataforma.</Faq>
           <Faq q="Quem pode importar editoras?">Supervisores e administradores.</Faq>
-          <Faq q="Importar um CSV com célula vazia apaga o dado atual?">No modo de atualização, não. Campos vazios preservam os valores existentes.</Faq>
+          <Faq q="Importar um Excel com célula vazia apaga o dado atual?">No modo de atualização, não. Campos vazios preservam os valores existentes.</Faq>
           <Faq q="Quem pode criar modelos e cadências?">Gestores. Os demais usuários podem usar modelos e iniciar cadências permitidas em seu escopo.</Faq>
         </Section>
       </div>
