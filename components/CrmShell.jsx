@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Activity, BarChart3, Bell, BookOpenCheck, Building2, CalendarDays, ClipboardList, DatabaseZap, FileUp, Gauge, HeartPulse, LayoutDashboard, ListChecks, LogOut, MessageSquareText, Target, UserCircle2, Users, Workflow } from 'lucide-react';
+import { Activity, BarChart3, Bell, BookOpenCheck, Building2, CalendarDays, ClipboardList, DatabaseZap, FileUp, Gauge, HeartPulse, LayoutDashboard, ListChecks, LogOut, MessageSquareText, Plus, Target, UserCircle2, Users, Workflow } from 'lucide-react';
 import { useCrm } from './CrmProvider';
 import Avatar from './Avatar';
 
@@ -25,9 +25,10 @@ const NAV_GROUPS = [
     ['/app/relatorios', 'Relatórios', BarChart3],
     ['/app/atividade', 'Atividade', Activity],
   ]},
-  { label:'Gestão', managerOnly:true, items:[
-    ['/app/qualidade', 'Qualidade da base', HeartPulse],
-    ['/app/equipe', 'Equipe', Users],
+  { label:'Gestão', items:[
+    ['/app/editoras/nova', 'Nova editora', Plus],
+    ['/app/qualidade', 'Qualidade da base', HeartPulse, {managerOnly:true}],
+    ['/app/equipe', 'Equipe', Users, {managerOnly:true}],
   ]},
   { label:'Administração', managerOnly:true, items:[
     ['/app/importar', 'Importar', FileUp],
@@ -58,7 +59,12 @@ export default function CrmShell({ children }) {
           <div className="nav-section-title">{group.label}</div>
           {group.items.map(([href,label,Icon,options={}])=>{
             if(options.adminOnly&&!isAdmin)return null;
-            const active=href==='/app'?path===href:path.startsWith(href);
+            if(options.managerOnly&&!isManager)return null;
+            const active=href==='/app'
+              ? path===href
+              : href==='/app/editoras'
+                ? path.startsWith('/app/editoras')&&path!=='/app/editoras/nova'
+                : path.startsWith(href);
             return <Link key={href} href={href} className={active?'active':''}><Icon size={18}/><span>{label}</span>{href==='/app/notificacoes'&&unread>0&&<b className="nav-count">{unread>99?'99+':unread}</b>}</Link>;
           })}
         </div>;
