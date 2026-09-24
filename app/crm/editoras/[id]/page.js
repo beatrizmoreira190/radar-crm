@@ -228,6 +228,7 @@ export default function PublisherDetailPage(){
         {contacts.length?contacts.map(contact=>{
           const channels=[contact.email,contact.mobile||contact.phone,contact.linkedin_url?'LinkedIn':null].filter(Boolean);
           const societary=String(contact.source_ref||'').startsWith('receita:cnpj:');
+          const manualLegal=String(contact.source_ref||'').startsWith('manual_crm:legal');
           const content=<>
             <div className="contact-row-main">
               <strong>{contact.full_name}{contact.is_decision_maker?' · Decisor':''}</strong>
@@ -235,7 +236,7 @@ export default function PublisherDetailPage(){
               <span>{channels.join(' · ')||'Sem dados de contato profissional'}</span>
             </div>
             <div className="contact-row-side">
-              {societary&&<span className="badge">Receita</span>}
+              {societary&&<span className="badge">Receita</span>}{manualLegal&&<span className="badge blue">Sócio / responsável legal</span>}
               {canCollaborate&&<span className="contact-edit-label">{channels.length?'Editar dados':'Adicionar dados'} →</span>}
             </div>
           </>;
