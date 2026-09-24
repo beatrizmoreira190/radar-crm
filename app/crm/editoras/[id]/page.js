@@ -228,7 +228,7 @@ export default function PublisherDetailPage(){
         {contacts.length?contacts.map(contact=>{
           const channels=[contact.email,contact.mobile||contact.phone,contact.linkedin_url?'LinkedIn':null].filter(Boolean);
           const societary=String(contact.source_ref||'').startsWith('receita:cnpj:');
-          const manualLegal=String(contact.source_ref||'').startsWith('manual_crm:legal');
+          const manualLegal=String(contact.source_ref||'').startsWith('manual_crm:legal')||String(contact.source_ref||'').startsWith('xlsx_import:legal');
           const content=<>
             <div className="contact-row-main">
               <strong>{contact.full_name}{contact.is_decision_maker?' · Decisor':''}</strong>
