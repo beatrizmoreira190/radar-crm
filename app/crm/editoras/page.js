@@ -11,7 +11,7 @@ const PAGE_SIZE = 40;
 const EMPTY_FILTERS = {q:'',stage:'',priority:'',state:'',owner:'',prospector:'',contact:'',scoreMin:'',editorialProfile:'',enrichment:''};
 
 export default function PublishersPage(){
-  const {supabase,membership,user,team,teamMap,isManager}=useCrm();
+  const {supabase,membership,user,team,teamMap}=useCrm();
   const org=membership?.organization_id;
   const [rows,setRows]=useState([]); const [stages,setStages]=useState([]); const [count,setCount]=useState(0);
   const [page,setPage]=useState(1); const [filters,setFilters]=useState(EMPTY_FILTERS); const [moreFilters,setMoreFilters]=useState(false);
@@ -72,7 +72,7 @@ export default function PublishersPage(){
   async function claim(p){const {data,error}=await supabase.from('publishers').update({owner_user_id:user.id,updated_by:user.id,updated_at:new Date().toISOString()}).eq('organization_id',org).eq('id',p.id).is('owner_user_id',null).select('id,owner_user_id').maybeSingle();if(error)setNotice(error.message);else if(!data){setNotice(`${p.name} acabou de ser assumida por outra pessoa. A lista foi atualizada.`);load()}else{setNotice(`Você agora é responsável por ${p.name}.`);load()}}
 
   return <div className="page-wrap">
-    <div className="page-head"><div><div className="eyebrow">Base comercial</div><h1>Editoras</h1><p>Encontre contas por perfil editorial, etapa, localização e responsável para organizar sua prospecção.</p></div>{isManager&&<button className="btn" onClick={()=>setShowNew(true)}><Plus size={16}/> Nova editora</button>}</div>
+    <div className="page-head"><div><div className="eyebrow">Base comercial</div><h1>Editoras</h1><p>Encontre contas por perfil editorial, etapa, localização e responsável para organizar sua prospecção.</p></div><button className="btn" onClick={()=>setShowNew(true)}><Plus size={16}/> Nova editora</button></div>
     {notice&&<div className="notice-bar"><span>{notice}</span><button onClick={()=>setNotice('')}><X size={15}/></button></div>}
 
     <div className="card panel" style={{marginBottom:14,paddingBottom:14}}>
@@ -87,11 +87,69 @@ export default function PublishersPage(){
     <div className="chips" style={{marginBottom:12}}><button className={`chip ${filters.owner==='mine'?'active':''}`} onClick={()=>setF('owner',filters.owner==='mine'?'':'mine')}>Sob minha responsabilidade</button><button className={`chip ${filters.prospector==='mine'?'active':''}`} onClick={()=>setF('prospector',filters.prospector==='mine'?'':'mine')}>Originadas por mim</button><button className={`chip ${filters.owner==='unassigned'?'active':''}`} onClick={()=>setF('owner',filters.owner==='unassigned'?'':'unassigned')}>Sem responsável atual</button><button className={`chip ${filters.contact==='never'?'active':''}`} onClick={()=>setF('contact',filters.contact==='never'?'':'never')}>Nunca contatadas</button><span className="badge">{count.toLocaleString('pt-BR')} resultado{count===1?'':'s'}</span></div>
 
     <section className="card table-card"><table className="data-table"><thead><tr><th>Editora / identificação</th><th>Local</th><th>Perfil editorial</th><th>Etapa</th><th>Prioridade</th><th>Score</th><th>Responsável atual</th><th>Último contato</th></tr></thead><tbody>{rows.map(p=>{const displayName=p.commercial_name||p.trade_name||p.name;const displayLabel=p.commercial_name?'Nome comercial':p.trade_name?'Nome fantasia':'Nome cadastrado';return <tr key={p.id}><td><div className="cell-main"><span style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.04em',color:'#667085'}}>{displayLabel}</span><Link className="row-link" href={`/app/editoras/${p.id}`}>{displayName}</Link><span><b>Razão social:</b> {p.legal_name||'Não informada'}</span><span><b>CNPJ:</b> {p.cnpj||'Não informado'}</span></div></td><td>{[p.city,p.state].filter(Boolean).join(' / ')||'—'}</td><td>{p.editorial_profile?.length?<div className="cell-main"><strong>{p.editorial_profile.slice(0,2).join(' · ')}</strong>{p.editorial_profile.length>2&&<span>+{p.editorial_profile.length-2} perfil{p.editorial_profile.length-2===1?'':'s'}</span>}</div>:p.editorial_profile_status==='review'?<span className="badge amber">Revisar</span>:<span className="muted">—</span>}</td><td><span className={publisherStageBadgeClass(stageMap[p.stage_id])}>{stageMap[p.stage_id]?.name||'Sem etapa'}</span></td><td><span className={`badge ${p.priority==='urgent'||p.priority==='high'?'red':p.priority==='medium'?'amber':''}`}>{PRIORITY_LABELS[p.priority]||p.priority||'—'}</span></td><td><strong>{p.score??0}</strong></td><td>{p.owner_user_id===user?.id?<span className="badge green">Você</span>:p.owner_user_id?(teamMap[p.owner_user_id]?.full_name||teamMap[p.owner_user_id]?.email||'Equipe'):<button className="btn secondary small" onClick={()=>claim(p)}><UserCheck size={13}/> Assumir</button>}</td><td>{formatDate(p.last_contact_at,true)}</td></tr>})}</tbody></table>{!loading&&!rows.length&&<div className="table-empty"><Building2 size={30}/><p>Nenhuma editora encontrada com esses filtros.</p>{hasFilters&&<button type="button" className="btn secondary small" onClick={reset}>Limpar filtros</button>}</div>}{loading&&<div className="table-empty">Carregando editoras…</div>}<Pagination page={page} totalPages={totalPages} onChange={setPage}/></section>
-    {showNew&&<NewPublisherModal supabase={supabase} org={org} user={user} stages={stages} onClose={()=>setShowNew(false)} onSaved={()=>{setShowNew(false);setNotice('Editora criada.');setPage(1);load()}}/>}
+    {showNew&&<NewPublisherModal supabase={supabase} org={org} stages={stages} onClose={()=>setShowNew(false)} onSaved={()=>{setShowNew(false);setNotice('Editora criada manualmente.');setPage(1);load()}}/>}
     {showSaveView&&<SaveViewModal onClose={()=>setShowSaveView(false)} onSave={saveView}/>} 
   </div>;
 }
 
 function SaveViewModal({onClose,onSave}){const [name,setName]=useState('');const [isDefault,setIsDefault]=useState(false);const [busy,setBusy]=useState(false);async function save(e){e.preventDefault();if(busy)return;setBusy(true);try{await onSave(name,isDefault)}finally{setBusy(false)}}return <ModalDialog title="Salvar visão" description="Salva a busca e os filtros atuais somente para você. A página atual não é preservada." onClose={onClose} onSubmit={save} busy={busy}><div className="form-grid"><label className="span-2">Nome da visão<input className="input" autoFocus required value={name} onChange={e=>setName(e.target.value)} placeholder="Ex.: Minhas editoras de SP"/></label><label className="span-2"><span><input type="checkbox" checked={isDefault} onChange={e=>setIsDefault(e.target.checked)}/> Marcar como visão padrão</span></label></div><div className="modal-actions"><button type="button" className="btn secondary" disabled={busy} onClick={onClose}>Cancelar</button><button className="btn" disabled={busy}>{busy?'Salvando…':'Salvar visão'}</button></div></ModalDialog>}
 
-function NewPublisherModal({supabase,org,user,stages,onClose,onSaved}){const [f,setF]=useState({name:'',legal_name:'',trade_name:'',cnpj:'',city:'',state:'',website:'',general_email:'',phone:'',priority:'medium',stage_id:''});const [busy,setBusy]=useState(false);const [err,setErr]=useState('');function s(k,v){setF(x=>({...x,[k]:v}))}async function save(e){e.preventDefault();setBusy(true);setErr('');const payload={organization_id:org,name:f.name.trim(),legal_name:f.legal_name||null,trade_name:f.trade_name||null,cnpj:f.cnpj||null,city:f.city||null,state:f.state||null,website:f.website||null,general_email:f.general_email||null,phone:f.phone||null,priority:f.priority,stage_id:f.stage_id||null,genres:[],alternate_emails:[],archived:false,created_by:user?.id||null,updated_by:user?.id||null};const {error}=await supabase.from('publishers').insert(payload);if(error){setErr(error.message);setBusy(false)}else onSaved()}return <ModalDialog title="Nova editora" description="Cadastre o essencial; os demais dados podem ser completados depois." onClose={onClose} onSubmit={save} busy={busy}>{err&&<div className="notice error" role="alert">{err}</div>}<div className="form-grid"><label className="span-2">Nome no CRM<input className="input" required value={f.name} onChange={e=>s('name',e.target.value)} placeholder="Nome principal para identificar a editora no CRM"/></label><label>Razão social<input className="input" value={f.legal_name} onChange={e=>s('legal_name',e.target.value)} placeholder="Nome jurídico vinculado ao CNPJ"/></label><label>Nome fantasia<input className="input" value={f.trade_name} onChange={e=>s('trade_name',e.target.value)} placeholder="Nome comercial da editora"/></label><label>CNPJ<input className="input" value={f.cnpj} onChange={e=>s('cnpj',e.target.value)}/></label><label>Cidade<input className="input" value={f.city} onChange={e=>s('city',e.target.value)}/></label><label>UF<input className="input" maxLength={2} value={f.state} onChange={e=>s('state',e.target.value.toUpperCase())}/></label><label>Site<input className="input" value={f.website} onChange={e=>s('website',e.target.value)}/></label><label>E-mail geral<input className="input" type="email" value={f.general_email} onChange={e=>s('general_email',e.target.value)}/></label><label>Telefone<input className="input" value={f.phone} onChange={e=>s('phone',e.target.value)}/></label><label>Prioridade<select value={f.priority} onChange={e=>s('priority',e.target.value)}>{Object.entries(PRIORITY_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label><label>Etapa<select value={f.stage_id} onChange={e=>s('stage_id',e.target.value)}><option value="">Sem etapa</option>{stages.map(st=><option key={st.id} value={st.id}>{st.name}</option>)}</select></label></div><div className="modal-actions"><button type="button" className="btn secondary" disabled={busy} onClick={onClose}>Cancelar</button><button className="btn" disabled={busy}>{busy?'Salvando…':'Criar editora'}</button></div></ModalDialog>}
+function NewPublisherModal({supabase,org,stages,onClose,onSaved}){
+  const [f,setF]=useState({name:'',legal_name:'',trade_name:'',cnpj:'',city:'',state:'',website:'',general_email:'',phone:'',priority:'medium',stage_id:''});
+  const [busy,setBusy]=useState(false);
+  const [err,setErr]=useState('');
+  function s(k,v){setF(x=>({...x,[k]:v}))}
+  async function save(e){
+    e.preventDefault();
+    if(busy)return;
+    setBusy(true);
+    setErr('');
+    const {data,error}=await supabase.rpc('crm_create_publisher_manual',{
+      p_organization_id:org,
+      p_name:f.name.trim(),
+      p_legal_name:f.legal_name||null,
+      p_trade_name:f.trade_name||null,
+      p_cnpj:f.cnpj||null,
+      p_city:f.city||null,
+      p_state:f.state||null,
+      p_website:f.website||null,
+      p_general_email:f.general_email||null,
+      p_phone:f.phone||null,
+      p_priority:f.priority,
+      p_stage_id:f.stage_id||null
+    });
+    if(error){
+      setErr(error.message||'Não foi possível criar a editora.');
+      setBusy(false);
+      return;
+    }
+    onSaved(data?.publisher_id||null);
+  }
+  return <ModalDialog
+    title="Nova editora"
+    description="Cadastre manualmente uma editora que não veio da importação. O sistema confere possíveis duplicidades antes de salvar."
+    onClose={onClose}
+    onSubmit={save}
+    busy={busy}
+  >
+    {err&&<div className="notice error" role="alert">{err}</div>}
+    <div className="form-grid">
+      <label className="span-2">Nome principal no CRM<input className="input" autoFocus required value={f.name} onChange={e=>s('name',e.target.value)} placeholder="Nome principal para identificar a editora"/></label>
+      <label>Razão social<input className="input" value={f.legal_name} onChange={e=>s('legal_name',e.target.value)} placeholder="Nome jurídico vinculado ao CNPJ"/></label>
+      <label>Nome fantasia<input className="input" value={f.trade_name} onChange={e=>s('trade_name',e.target.value)} placeholder="Nome fantasia, se houver"/></label>
+      <label>CNPJ<input className="input" inputMode="numeric" value={f.cnpj} onChange={e=>s('cnpj',e.target.value)} placeholder="00.000.000/0000-00"/></label>
+      <label>Cidade<input className="input" value={f.city} onChange={e=>s('city',e.target.value)}/></label>
+      <label>UF<select value={f.state} onChange={e=>s('state',e.target.value)}><option value="">Não informada</option>{BRAZIL_STATES.map(uf=><option key={uf} value={uf}>{uf}</option>)}</select></label>
+      <label>Site<input className="input" value={f.website} onChange={e=>s('website',e.target.value)} placeholder="https://..."/></label>
+      <label>E-mail geral<input className="input" type="email" value={f.general_email} onChange={e=>s('general_email',e.target.value)}/></label>
+      <label>Telefone<input className="input" value={f.phone} onChange={e=>s('phone',e.target.value)}/></label>
+      <label>Prioridade<select value={f.priority} onChange={e=>s('priority',e.target.value)}>{Object.entries(PRIORITY_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
+      <label>Etapa<select value={f.stage_id} onChange={e=>s('stage_id',e.target.value)}><option value="">Sem etapa</option>{stages.map(st=><option key={st.id} value={st.id}>{st.name}</option>)}</select></label>
+    </div>
+    <div className="notice" style={{marginTop:12}}>Dica: informe o CNPJ sempre que possível. Ele é a chave mais segura para evitar cadastros duplicados.</div>
+    <div className="modal-actions">
+      <button type="button" className="btn secondary" disabled={busy} onClick={onClose}>Cancelar</button>
+      <button className="btn" disabled={busy}>{busy?'Salvando…':'Criar editora'}</button>
+    </div>
+  </ModalDialog>
+}
