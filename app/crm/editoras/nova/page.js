@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Building2, Check, Plus, Save, Search, Trash2, UserRound, X } from 'lucide-react';
+import { ArrowLeft, Building2, Check, Pencil, Plus, Save, Search, Trash2, UserRound, X } from 'lucide-react';
 import { useCrm } from '@/components/CrmProvider';
 import { PtBrDateField, PtBrDateTimeField } from '@/components/PtBrDateFields';
+import ModalDialog from '@/components/ModalDialog';
 import {
   BRAZIL_STATES,
   EDITORIAL_PROFILE_OPTIONS,
@@ -65,6 +66,7 @@ export default function NewPublisherPage(){
   const [profileNotice,setProfileNotice]=useState('');
   const [legalContacts,setLegalContacts]=useState([]);
   const [otherContacts,setOtherContacts]=useState([]);
+  const [personEditor,setPersonEditor]=useState(null);
 
   const [checkingCnpj,setCheckingCnpj]=useState(false);
   const [duplicate,setDuplicate]=useState(null);
@@ -148,17 +150,27 @@ export default function NewPublisherPage(){
     setProfileNotice('Novo perfil adicionado. Ele ficará disponível para os próximos cadastros após salvar esta editora.');
   }
 
-  function addPerson(kind){
-    if(kind==='legal')setLegalContacts(prev=>[...prev,newPerson()]);
-    else setOtherContacts(prev=>[...prev,newPerson()]);
+  function openPersonEditor(kind,person=null){
+    setPersonEditor({
+      kind,
+      isNew:!person,
+      person:person?{...person}:newPerson()
+    });
   }
-  function updatePerson(kind,id,key,value){
-    const setter=kind==='legal'?setLegalContacts:setOtherContacts;
-    setter(prev=>prev.map(person=>person.client_id===id?{...person,[key]:value}:person));
+  function savePersonEditor(person){
+    if(!personEditor)return;
+    const setter=personEditor.kind==='legal'?setLegalContacts:setOtherContacts;
+    setter(prev=>personEditor.isNew
+      ? [...prev,person]
+      : prev.map(item=>item.client_id===person.client_id?person:item)
+    );
+    setPersonEditor(null);
   }
-  function removePerson(kind,id){
-    const setter=kind==='legal'?setLegalContacts:setOtherContacts;
-    setter(prev=>prev.filter(person=>person.client_id!==id));
+  function removePersonEditor(){
+    if(!personEditor||personEditor.isNew)return;
+    const setter=personEditor.kind==='legal'?setLegalContacts:setOtherContacts;
+    setter(prev=>prev.filter(item=>item.client_id!==personEditor.person.client_id));
+    setPersonEditor(null);
   }
 
   const identificationComplete=Boolean(
@@ -222,7 +234,8 @@ export default function NewPublisherPage(){
     router.push(id?`/app/editoras/${id}`:'/app/editoras');
   }
 
-  return <form className="page-wrap" onSubmit={save}>
+  return <>
+  <form className="page-wrap" onSubmit={save}>
     <div className="page-head new-publisher-head">
       <div>
         <Link href="/app/editoras" className="text-link"><ArrowLeft size={15}/> Editoras</Link>
@@ -351,18 +364,16 @@ export default function NewPublisherPage(){
             description="Nome e função/vínculo são obrigatórios para cada pessoa adicionada."
             kind="legal"
             people={legalContacts}
-            onAdd={()=>addPerson('legal')}
-            onChange={(id,key,value)=>updatePerson('legal',id,key,value)}
-            onRemove={id=>removePerson('legal',id)}
+            onAdd={()=>openPersonEditor('legal')}
+            onEdit={person=>openPersonEditor('legal',person)}
           />
           <PersonGroup
             title="Outras pessoas de contato"
             description="Direção editorial, comercial, marketing, financeiro, atendimento e outras funções."
             kind="contact"
             people={otherContacts}
-            onAdd={()=>addPerson('contact')}
-            onChange={(id,key,value)=>updatePerson('contact',id,key,value)}
-            onRemove={id=>removePerson('contact',id)}
+            onAdd={()=>openPersonEditor('contact')}
+            onEdit={person=>openPersonEditor('contact',person)}
           />
         </Section>
       </main>
@@ -428,16 +439,29 @@ export default function NewPublisherPage(){
       .people-group-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
       .people-group-head>div{display:grid;gap:3px}
       .people-group-head h3{margin:0;font-size:14px}
-      .people-list{display:grid;gap:10px}
-      .person-card{border:1px solid #eaecf0;border-radius:12px;padding:13px;background:#fcfcfd}
-      .person-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
-      .person-card-title{display:flex;align-items:center;gap:8px;font-size:12px}
-      .person-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px 12px}
-      .person-grid :global(label){display:grid;gap:6px;font-size:11px;font-weight:600;color:#344054}
-      .person-grid .span-2{grid-column:1/-1}
-      .person-flags{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
-      .person-flags label{display:flex!important;grid-template-columns:auto 1fr!important;align-items:center;gap:6px!important}
+      .people-compact-list{display:grid;gap:8px}
+      .person-compact-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;border:1px solid #eaecf0;border-radius:12px;padding:11px 12px;background:#fcfcfd}
+      .person-compact-icon{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#f2f4f7;color:#475467}
+      .person-compact-main{min-width:0;display:grid;gap:2px}
+      .person-compact-name{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+      .person-compact-name strong{font-size:12px;color:#101828}
+      .person-compact-main>span{font-size:11px;color:#475467;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .person-compact-main>small{font-size:10px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .person-edit-btn{white-space:nowrap}
       .people-empty{padding:13px;border:1px dashed #d0d5dd;border-radius:10px;color:#667085;font-size:11px;text-align:center}
+      :global(.person-editor-modal){width:min(720px,calc(100vw - 32px))}
+      :global(.person-editor-modal .person-editor-grid){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+      :global(.person-editor-modal .person-editor-grid label){display:grid;gap:6px;font-size:12px;font-weight:600;color:#344054}
+      :global(.person-editor-modal .person-editor-grid .span-2){grid-column:1/-1}
+      :global(.person-editor-modal .person-decision){display:flex!important;align-items:center}
+      :global(.person-editor-modal .person-decision>span){display:flex;align-items:center;gap:7px;font-weight:500}
+      :global(.person-editor-modal .person-remove-confirm){margin-top:14px;padding:12px;border:1px solid #fda29b;background:#fef3f2;border-radius:10px;display:grid;gap:10px}
+      :global(.person-editor-modal .person-remove-confirm>div:first-child){display:grid;gap:3px;color:#912018}
+      :global(.person-editor-modal .person-remove-confirm span){font-size:11px;color:#b42318}
+      :global(.person-editor-modal .person-remove-actions){display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+      :global(.person-editor-modal .person-modal-actions){justify-content:space-between}
+      :global(.person-editor-modal .person-modal-main-actions){display:flex;gap:8px}
+      :global(.person-editor-modal .person-remove-trigger){color:#b42318}
       .origin-note{display:flex;gap:8px;align-items:flex-start;padding:10px;border-radius:10px;background:#f9fafb;color:#475467;font-size:11px;line-height:1.4}
       :global(.publisher-create-section){padding:18px}
       :global(.publisher-create-section .section-title){margin-bottom:14px}
@@ -457,12 +481,26 @@ export default function NewPublisherPage(){
         .profile-search{max-width:none}
         .profile-boxes{grid-template-columns:1fr;max-height:420px}
         .new-profile-action{grid-template-columns:1fr}
-        .person-grid{grid-template-columns:1fr}
-        .person-grid .span-2{grid-column:auto}
         .people-group-head{flex-direction:column}
+        .person-compact-card{grid-template-columns:auto minmax(0,1fr)}
+        .person-edit-btn{grid-column:1/-1;width:100%}
+        :global(.person-editor-modal .person-editor-grid){grid-template-columns:1fr}
+        :global(.person-editor-modal .person-editor-grid .span-2){grid-column:auto}
+        :global(.person-editor-modal .person-modal-actions){display:grid;gap:8px}
+        :global(.person-editor-modal .person-modal-main-actions){display:grid}
+        :global(.person-editor-modal .person-remove-trigger){width:100%}
       }
     `}</style>
-  </form>;
+  </form>
+    {personEditor&&<PersonEditorModal
+      kind={personEditor.kind}
+      person={personEditor.person}
+      isNew={personEditor.isNew}
+      onClose={()=>setPersonEditor(null)}
+      onSave={savePersonEditor}
+      onRemove={removePersonEditor}
+    />}
+  </>;
 }
 
 function Section({title,description,children}){
@@ -476,30 +514,89 @@ function Field({label,children,className='',required=false}){
   return <label className={className}><span>{label}{required&&<b style={{color:'#b42318'}}> *</b>}</span>{children}</label>;
 }
 
-function PersonGroup({title,description,kind,people,onAdd,onChange,onRemove}){
+function PersonGroup({title,description,kind,people,onAdd,onEdit}){
   const legal=kind==='legal';
   return <div className="people-group">
     <div className="people-group-head">
       <div><h3>{title}</h3><span className="muted" style={{fontSize:11}}>{description}</span></div>
       <button type="button" className="btn secondary small" onClick={onAdd}><Plus size={14}/> Adicionar pessoa</button>
     </div>
-    {people.length?<div className="people-list">{people.map((person,index)=><div className="person-card" key={person.client_id}>
-      <div className="person-card-head">
-        <div className="person-card-title"><UserRound size={16}/><strong>{person.full_name||`Pessoa ${index+1}`}</strong>{legal&&<span className="badge">Sócio / responsável legal</span>}</div>
-        <button type="button" className="btn secondary small" onClick={()=>onRemove(person.client_id)}><Trash2 size={13}/> Remover</button>
-      </div>
-      <div className="person-grid">
-        <Field label="Nome" required><input className="input" required value={person.full_name} onChange={e=>onChange(person.client_id,'full_name',e.target.value)}/></Field>
-        <Field label={legal?'Função / vínculo':'Cargo / função'} required={legal}><input className="input" required={legal} value={person.job_title} onChange={e=>onChange(person.client_id,'job_title',e.target.value)} placeholder={legal?'Ex.: Sócio-administrador, responsável legal':'Ex.: Diretora editorial'}/></Field>
-        <Field label="Área / departamento"><input className="input" value={person.department} onChange={e=>onChange(person.client_id,'department',e.target.value)} placeholder="Ex.: Editorial, Comercial"/></Field>
-        <Field label="E-mail"><input className="input" type="email" value={person.email} onChange={e=>onChange(person.client_id,'email',e.target.value)}/></Field>
-        <Field label="Telefone"><input className="input" value={person.phone} onChange={e=>onChange(person.client_id,'phone',e.target.value)}/></Field>
-        <Field label="Celular / WhatsApp"><input className="input" value={person.mobile} onChange={e=>onChange(person.client_id,'mobile',e.target.value)}/></Field>
-        <Field className="span-2" label="LinkedIn"><input className="input" value={person.linkedin_url} onChange={e=>onChange(person.client_id,'linkedin_url',e.target.value)} placeholder="https://linkedin.com/in/..."/></Field>
-        <Field label="Canal preferencial"><select value={person.preferred_channel} onChange={e=>onChange(person.client_id,'preferred_channel',e.target.value)}><option value="">Não definido</option><option value="phone">Telefone</option><option value="email">E-mail</option><option value="whatsapp">WhatsApp</option><option value="linkedin">LinkedIn</option><option value="other">Outro</option></select></Field>
-        <div className="person-flags"><label><input type="checkbox" checked={person.is_decision_maker} onChange={e=>onChange(person.client_id,'is_decision_maker',e.target.checked)}/> É decisor(a)</label></div>
-        <Field className="span-2" label="Observações"><textarea rows={2} value={person.notes} onChange={e=>onChange(person.client_id,'notes',e.target.value)}/></Field>
-      </div>
-    </div>)}</div>:<div className="people-empty">Nenhuma pessoa adicionada neste grupo.</div>}
+    {people.length?<div className="people-compact-list">{people.map(person=>{
+      const primaryContact=person.mobile||person.phone||person.email||'Sem contato informado';
+      const role=[person.job_title,person.department].filter(Boolean).join(' · ')||'Função não informada';
+      return <div className="person-compact-card" key={person.client_id}>
+        <div className="person-compact-icon"><UserRound size={16}/></div>
+        <div className="person-compact-main">
+          <div className="person-compact-name">
+            <strong>{person.full_name}</strong>
+            {legal&&<span className="badge">Sócio / responsável legal</span>}
+            {person.is_decision_maker&&<span className="badge blue">Decisor</span>}
+          </div>
+          <span>{role}</span>
+          <small>{primaryContact}</small>
+        </div>
+        <button type="button" className="btn secondary small person-edit-btn" onClick={()=>onEdit(person)}><Pencil size={13}/> Editar</button>
+      </div>;
+    })}</div>:<div className="people-empty">Nenhuma pessoa adicionada neste grupo.</div>}
   </div>;
+}
+
+function PersonEditorModal({kind,person,isNew,onClose,onSave,onRemove}){
+  const legal=kind==='legal';
+  const [draft,setDraft]=useState({...person});
+  const [err,setErr]=useState('');
+  const [confirmingRemove,setConfirmingRemove]=useState(false);
+
+  function set(key,value){setDraft(prev=>({...prev,[key]:value}))}
+  function saveDraft(e){
+    e.preventDefault();
+    setErr('');
+    if(!draft.full_name.trim()){
+      setErr('Informe o nome da pessoa.');
+      return;
+    }
+    if(legal&&!draft.job_title.trim()){
+      setErr('Informe a função ou vínculo do sócio/responsável legal.');
+      return;
+    }
+    onSave({...draft,full_name:draft.full_name.trim(),job_title:draft.job_title.trim()});
+  }
+
+  return <ModalDialog
+    title={isNew?'Adicionar pessoa':'Editar pessoa'}
+    description={legal?'Sócio ou responsável legal vinculado à editora.':'Pessoa de contato vinculada à editora.'}
+    onClose={onClose}
+    onSubmit={saveDraft}
+    className="person-editor-modal"
+  >
+    {err&&<div className="notice error" role="alert">{err}</div>}
+    <div className="form-grid person-editor-grid">
+      <Field className="span-2" label="Nome" required><input className="input" autoFocus required value={draft.full_name} onChange={e=>set('full_name',e.target.value)}/></Field>
+      <Field label={legal?'Função / vínculo':'Cargo / função'} required={legal}><input className="input" required={legal} value={draft.job_title} onChange={e=>set('job_title',e.target.value)} placeholder={legal?'Ex.: Sócio-administrador, responsável legal':'Ex.: Diretora editorial'}/></Field>
+      <Field label="Área / departamento"><input className="input" value={draft.department} onChange={e=>set('department',e.target.value)} placeholder="Ex.: Editorial, Comercial"/></Field>
+      <Field label="E-mail"><input className="input" type="email" value={draft.email} onChange={e=>set('email',e.target.value)}/></Field>
+      <Field label="Telefone"><input className="input" value={draft.phone} onChange={e=>set('phone',e.target.value)}/></Field>
+      <Field label="Celular / WhatsApp"><input className="input" value={draft.mobile} onChange={e=>set('mobile',e.target.value)}/></Field>
+      <Field label="Canal preferencial"><select value={draft.preferred_channel} onChange={e=>set('preferred_channel',e.target.value)}><option value="">Não definido</option><option value="phone">Telefone</option><option value="email">E-mail</option><option value="whatsapp">WhatsApp</option><option value="linkedin">LinkedIn</option><option value="other">Outro</option></select></Field>
+      <Field className="span-2" label="LinkedIn"><input className="input" value={draft.linkedin_url} onChange={e=>set('linkedin_url',e.target.value)} placeholder="https://linkedin.com/in/..."/></Field>
+      <label className="span-2 person-decision"><span><input type="checkbox" checked={draft.is_decision_maker} onChange={e=>set('is_decision_maker',e.target.checked)}/> É decisor(a)</span></label>
+      <Field className="span-2" label="Observações"><textarea rows={3} value={draft.notes} onChange={e=>set('notes',e.target.value)}/></Field>
+    </div>
+
+    {!isNew&&confirmingRemove&&<div className="person-remove-confirm">
+      <div><strong>Remover esta pessoa?</strong><span>Ela será retirada deste novo cadastro. Essa ação só afeta os dados ainda não salvos da nova editora.</span></div>
+      <div className="person-remove-actions">
+        <button type="button" className="btn secondary small" onClick={()=>setConfirmingRemove(false)}>Não, manter</button>
+        <button type="button" className="btn danger small" onClick={onRemove}><Trash2 size={13}/> Sim, remover</button>
+      </div>
+    </div>}
+
+    <div className="modal-actions person-modal-actions">
+      {!isNew&&!confirmingRemove?<button type="button" className="btn secondary person-remove-trigger" onClick={()=>setConfirmingRemove(true)}><Trash2 size={14}/> Remover pessoa</button>:<span/>}
+      <div className="person-modal-main-actions">
+        <button type="button" className="btn secondary" onClick={onClose}>Cancelar</button>
+        <button className="btn"><Save size={14}/>{isNew?'Adicionar pessoa':'Salvar alterações'}</button>
+      </div>
+    </div>
+  </ModalDialog>;
 }
