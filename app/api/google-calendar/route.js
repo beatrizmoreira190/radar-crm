@@ -170,16 +170,9 @@ export async function POST(request){
         const start=new Date(meeting.scheduled_start);
         const end=new Date(start.getTime()+Number(meeting.duration_minutes||30)*60000);
         const guests=[...new Set((participants||[]).map(item=>String(item.email||'').trim()).filter(email=>email&&email.includes('@')))];
-        const people=(participants||[]).map(item=>item.email?`${item.full_name} <${item.email}>`:item.full_name).filter(Boolean);
-        const description=[
-          'Reunião agendada pelo Radar CRM.',
-          `Editora: ${meeting.publishers?.name||'—'}`,
-          `Tipo: ${meeting.meeting_type||'presentation'}`,
-          meeting.notes?`Observações: ${meeting.notes}`:null,
-          people.length?`Participantes: ${people.join(', ')}`:null,
-          `CRM: ${new URL(request.url).origin}/app/editoras/${meeting.publisher_id}`
-        ].filter(Boolean).join('\n\n');
-        const eventTitle=`Radar | ${meeting.publishers?.name||'Editora'} — ${meeting.title||'Reunião comercial'}`;
+        const publisherName=meeting.publishers?.name||'Editora';
+        const description=`Reunião comercial com ${publisherName}.`;
+        const eventTitle=`Radar | ${publisherName} — Reunião comercial`;
         const bridgeAction=meeting.google_event_id?'update_event':'create_event';
 
         const result=await callCalendarBridge({

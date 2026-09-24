@@ -236,7 +236,6 @@ export default function ImportPage(){
   const [publishers,setPublishers]=useState([]);
   const [contacts,setContacts]=useState([]);
   const [structureErrors,setStructureErrors]=useState([]);
-  const [mode,setMode]=useState('skip');
   const [reading,setReading]=useState(false);
   const [validating,setValidating]=useState(false);
   const [busy,setBusy]=useState(false);
@@ -257,8 +256,8 @@ export default function ImportPage(){
 
   const localIssues=useMemo(()=>localChecks(publishers,contacts),[publishers,contacts]);
   const totalLocalErrors=localIssues.filter(item=>item.status==='error').length;
-  const importablePublishers=validation?Number(validation.publishers?.inserted||0)+Number(validation.publishers?.updated||0):0;
-  const importableContacts=validation?Number(validation.contacts?.inserted||0)+Number(validation.contacts?.updated||0):0;
+  const importablePublishers=validation?Number(validation.publishers?.inserted||0):0;
+  const importableContacts=validation?Number(validation.contacts?.inserted||0):0;
 
   if(!isManager)return <div className="page-wrap"><div className="card panel"><h2>Acesso restrito</h2><p className="muted">A importação em massa é exclusiva de administradores e supervisores.</p></div></div>;
 
@@ -270,7 +269,7 @@ export default function ImportPage(){
       [xlsxCell('')],
       [header('ABA EDITORAS')],
       [xlsxCell('Uma linha = uma editora. Os cinco campos obrigatórios são: Nome principal no CRM, Nome comercial / marca, Nome fantasia oficial, Razão social e CNPJ.')],
-      [xlsxCell('O CNPJ é a chave da importação. Se já existir, o modo escolhido na tela define se a linha será ignorada ou usada para atualizar o cadastro.')],
+      [xlsxCell('O CNPJ é a chave da importação. Se já existir na base, a editora será preservada e nenhum dado cadastral será alterado.')],
       [xlsxCell('Perfil editorial: para vários perfis, separe com |. Ex.: Infantil | Literatura | Paradidático. Perfis novos também são aceitos.')],
       [xlsxCell('E-mails alternativos: separe com |.')],
       [xlsxCell('Datas: prefira dd/mm/aaaa. Próxima ação: dd/mm/aaaa hh:mm.')],
@@ -286,7 +285,7 @@ export default function ImportPage(){
       [xlsxCell('')],
       [header('REGRAS IMPORTANTES')],
       [xlsxCell('Radar Score, fits, qualidade dos dados, histórico e auditoria não são importados: o CRM calcula esses dados automaticamente.')],
-      [xlsxCell('Células vazias não apagam dados existentes quando o modo “Atualizar” é usado.')],
+      [xlsxCell('A importação cria novas editoras. Editoras já existentes por CNPJ nunca são atualizadas por este processo.')],
       [xlsxCell('Sempre use Validar antes de Importar. A validação não altera a base.')],
       [xlsxCell('')],
       [header('ETAPAS ATUAIS DO PIPELINE')],
@@ -335,7 +334,7 @@ export default function ImportPage(){
     if(!org||!publishers.length||structureErrors.length||totalLocalErrors)return;
     setValidating(true);setNotice('');setValidation(null);setResult(null);
     const {data,error}=await supabase.rpc('crm_preview_import_workbook_v3',{
-      p_organization_id:org,p_publishers:publishers,p_contacts:contacts,p_mode:mode
+      p_organization_id:org,p_publishers:publishers,p_contacts:contacts,p_mode:'skip'
     });
     if(error)setNotice(error.message);
     else{
@@ -349,7 +348,7 @@ export default function ImportPage(){
     if(!org||!validation||Number(validation.errors||0)>0)return;
     setBusy(true);setNotice('');setResult(null);
     const {data,error}=await supabase.rpc('crm_import_workbook_v3',{
-      p_organization_id:org,p_publishers:publishers,p_contacts:contacts,p_mode:mode,p_source_name:fileName||null
+      p_organization_id:org,p_publishers:publishers,p_contacts:contacts,p_mode:'skip',p_source_name:fileName||null
     });
     if(error)setNotice(error.message);
     else{setResult(data);setNotice('Importação concluída. Editoras e pessoas foram processadas conforme a validação.');}
@@ -360,7 +359,6 @@ export default function ImportPage(){
     setFileName('');setPublishers([]);setContacts([]);setStructureErrors([]);
     setValidation(null);setResult(null);setNotice('');
   }
-  function changeMode(value){setMode(value);setValidation(null);setResult(null)}
   function downloadIssues(){
     const details=[...localIssues,...(validation?.details||[])].filter(item=>item.error||item.warning);
     if(!details.length)return;
@@ -386,7 +384,7 @@ export default function ImportPage(){
         <GuideCard number="2" title="Editoras">Uma linha por editora. Os cinco campos de identificação e o CNPJ são obrigatórios.</GuideCard>
         <GuideCard number="3" title="Pessoas">Uma linha por pessoa. O CNPJ liga cada pessoa à editora correta.</GuideCard>
       </div>
-      <div className="import-rule-strip"><strong>CNPJ é a chave.</strong><span>Um mesmo CNPJ nunca cria uma segunda editora. Na validação você escolhe preservar o cadastro atual ou atualizar somente campos preenchidos.</span></div>
+      <div className="import-rule-strip"><strong>CNPJ é a chave.</strong><span>Um mesmo CNPJ nunca cria uma segunda editora. Se já estiver na base, o cadastro existente é sempre preservado; a importação serve para incluir novas editoras e novas pessoas.</span></div>
     </section>
 
     <section className="card panel import-details">
@@ -439,21 +437,7 @@ export default function ImportPage(){
       </section>
 
       <section className="card panel">
-        <div className="panel-head"><div><h2>3. Definir o que fazer com CNPJs já existentes</h2><p>A escolha vale para editoras e pessoas que o CRM reconhecer como já cadastradas.</p></div></div>
-        <div className="import-mode-grid">
-          <label className={'import-mode-option '+(mode==='skip'?'selected':'')}>
-            <input type="radio" name="mode" value="skip" checked={mode==='skip'} onChange={()=>changeMode('skip')}/>
-            <div><strong>Ignorar e preservar</strong><span>Se o CNPJ já existir, a editora atual não é alterada. Pessoas já existentes também são preservadas.</span></div>
-          </label>
-          <label className={'import-mode-option '+(mode==='update'?'selected':'')}>
-            <input type="radio" name="mode" value="update" checked={mode==='update'} onChange={()=>changeMode('update')}/>
-            <div><strong>Atualizar somente campos preenchidos</strong><span>Células vazias nunca apagam informações. O CNPJ apenas localiza o cadastro correto.</span></div>
-          </label>
-        </div>
-      </section>
-
-      <section className="card panel">
-        <div className="panel-head"><div><h2>4. Validar antes de importar</h2><p>A validação verifica obrigatórios, CNPJs, etapas, responsáveis, pessoas e correspondências com a base. <b>Nada é salvo nesta etapa.</b></p></div></div>
+        <div className="panel-head"><div><h2>3. Validar antes de importar</h2><p>A validação verifica obrigatórios, CNPJs, etapas, responsáveis, pessoas e correspondências com a base. <b>Nada é salvo nesta etapa.</b></p></div></div>
         <button className="btn" type="button" disabled={validating||!publishers.length||totalLocalErrors>0} onClick={validate}>
           <CheckCircle2 size={16}/>{validating?'Validando…':'Validar planilha'}
         </button>
@@ -461,8 +445,8 @@ export default function ImportPage(){
       </section>
 
       {validation&&Number(validation.errors||0)===0&&<section className="card panel import-confirm">
-        <div><div className="eyebrow">Pronto para gravar</div><h2>5. Confirmar importação</h2>
-          <p>Serão processadas <b>{importablePublishers.toLocaleString('pt-BR')} editoras</b> e <b>{importableContacts.toLocaleString('pt-BR')} pessoas</b>. {mode==='skip'?'Os registros já existentes serão preservados.':'Os registros existentes receberão somente os campos preenchidos.'}</p>
+        <div><div className="eyebrow">Pronto para gravar</div><h2>4. Confirmar importação</h2>
+          <p>Serão criadas <b>{importablePublishers.toLocaleString('pt-BR')} novas editoras</b> e <b>{importableContacts.toLocaleString('pt-BR')} novas pessoas</b>. Editoras e pessoas já existentes serão preservadas sem alteração.</p>
         </div>
         <button className="btn" type="button" disabled={busy||(!importablePublishers&&!importableContacts)} onClick={runImport}><Upload size={16}/>{busy?'Importando…':'Importar agora'}</button>
       </section>}
@@ -539,7 +523,7 @@ function ValidationSummary({data,onDownloadIssues}){
   return <div style={{marginTop:14,display:'grid',gap:12}}>
     <div className="result-counters" style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:8}}>
       <SummaryStat value={p.inserted||0} label="editoras novas"/>
-      <SummaryStat value={p.updated||0} label="editoras a atualizar"/>
+      <SummaryStat value={p.skipped||0} label="editoras já existentes"/>
       <SummaryStat value={c.inserted||0} label="pessoas novas"/>
       <SummaryStat value={errors} label="erros"/>
     </div>
@@ -556,10 +540,8 @@ function ResultCounters({data}){
   const p=data?.publishers||{},c=data?.contacts||{};
   return <div className="result-counters" style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:8}}>
     <SummaryStat value={p.inserted||0} label="editoras criadas"/>
-    <SummaryStat value={p.updated||0} label="editoras atualizadas"/>
-    <SummaryStat value={p.skipped||0} label="editoras preservadas"/>
+    <SummaryStat value={p.skipped||0} label="editoras já existentes"/>
     <SummaryStat value={c.inserted||0} label="pessoas criadas"/>
-    <SummaryStat value={c.updated||0} label="pessoas atualizadas"/>
-    <SummaryStat value={c.skipped||0} label="pessoas preservadas"/>
+    <SummaryStat value={c.skipped||0} label="pessoas já existentes"/>
   </div>;
 }

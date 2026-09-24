@@ -476,18 +476,15 @@ export default function ManualPage(){
           </ul>
           <h3>Como o CNPJ controla duplicidades</h3>
           <p>A importação não usa mais Nome + UF nem uma referência técnica como chave principal. <b>O CNPJ é a chave de negócio.</b> Se o CNPJ já existir, o CRM entende que se trata da mesma editora.</p>
-          <h3>Ignorar ou atualizar</h3>
-          <ul>
-            <li><b>Ignorar e preservar:</b> CNPJs já existentes não são alterados; pessoas já reconhecidas também são preservadas.</li>
-            <li><b>Atualizar somente campos preenchidos:</b> os dados presentes no Excel atualizam o cadastro existente. Células vazias nunca apagam valores atuais.</li>
-          </ul>
+          <h3>Regra fixa de segurança</h3>
+          <p><b>A importação em massa não atualiza editoras já existentes.</b> Se o CNPJ já estiver na base, todos os dados da editora são preservados. A atualização de dados oficiais deve ser feita pela rotina própria de Atualização cadastral.</p>
+          <p>A aba <b>Pessoas</b> pode, porém, acrescentar contatos novos a uma editora já existente. Se a pessoa já estiver cadastrada naquela editora, ela também é preservada sem alteração.</p>
           <h3>Fluxo correto</h3>
           <ol>
             <li><b>Baixe o modelo Excel atualizado.</b></li>
             <li><b>Preencha Editoras e Pessoas.</b></li>
             <li><b>Selecione o arquivo .xlsx.</b></li>
             <li><b>Confira a amostra e os erros locais.</b></li>
-            <li><b>Escolha Ignorar ou Atualizar.</b></li>
             <li><b>Clique em Validar planilha.</b> Nenhum dado é salvo nessa etapa.</li>
             <li><b>Corrija os erros.</b> Se necessário, baixe a lista de inconsistências.</li>
             <li><b>Confirme a importação.</b> O botão de importação só é liberado após uma validação sem erros.</li>
@@ -521,6 +518,7 @@ export default function ManualPage(){
           <h3>Google Agenda</h3>
           <p>A seção de integração aparece para gestores e apresentadores. A configuração usa uma ponte por Apps Script administrada pela Radar.</p>
           <p>Quando conectada, a integração permite consultar blocos de indisponibilidade e sincronizar reuniões do CRM com a agenda do apresentador.</p>
+          <p>Nos convites enviados pelo Google Agenda, o conteúdo externo é propositalmente enxuto. <b>Observações antes da reunião, materiais, links do CRM e informações técnicas ficam somente no CRM</b> e não são enviados aos convidados da editora.</p>
           <p>O teste de disponibilidade mostra blocos ocupados dos próximos dias sem expor o conteúdo pessoal do compromisso.</p>
           <Callout title="Se a agenda não estiver conectada">
             <p>O CRM continua funcionando. Reuniões podem ser registradas internamente; apenas a consulta/sincronização externa fica indisponível até a configuração ser concluída.</p>
@@ -571,7 +569,7 @@ export default function ManualPage(){
           <Faq q="Onde estão os lembretes?">Em Minha fila, no bloco <b>Atenção agora</b>.</Faq>
           <Faq q="Onde ficam arquivos e apresentações?">Em Materiais comerciais são guardados os links e o contexto. O arquivo permanece no Drive, Canva, Gamma, Notion ou outra plataforma.</Faq>
           <Faq q="Quem pode importar editoras?">Supervisores e administradores.</Faq>
-          <Faq q="Importar um Excel com célula vazia apaga o dado atual?">No modo de atualização, não. Campos vazios preservam os valores existentes.</Faq>
+          <Faq q="O que acontece se o CNPJ do Excel já existir no CRM?">A editora é preservada integralmente e nenhum dado dela é atualizado pela importação. Pessoas novas da aba Pessoas ainda podem ser vinculadas a esse CNPJ.</Faq>
           <Faq q="Quem pode criar modelos e cadências?">Gestores. Os demais usuários podem usar modelos e iniciar cadências permitidas em seu escopo.</Faq>
         </Section>
       </div>
