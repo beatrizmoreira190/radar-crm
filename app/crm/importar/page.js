@@ -1,283 +1,565 @@
 'use client';
-import { useMemo, useState } from 'react';
-import { AlertTriangle, BookOpen, CheckCircle2, ChevronDown, ChevronUp, Database, Download, FileSpreadsheet, Info, ListChecks, RefreshCw, ShieldCheck, Upload, X } from 'lucide-react';
+
+import { useEffect, useMemo, useState } from 'react';
+import {
+  AlertTriangle, Building2, CheckCircle2, ChevronDown, Download, FileSpreadsheet,
+  Info, RefreshCw, Upload, Users, X
+} from 'lucide-react';
+import writeExcelFile from 'write-excel-file/browser';
 import { useCrm } from '@/components/CrmProvider';
-import { BRAZIL_STATES, EDITORIAL_PROFILE_OPTIONS } from '@/lib/constants';
+import { PUBLISHER_COMMERCIAL_PROFILE_LABELS, PRIORITY_LABELS } from '@/lib/constants';
+import { excelSerialToIso, readXlsxWorkbook } from '@/lib/xlsxWorkbook';
 
-const FIELDS=[
-  {key:'',label:'Ignorar coluna',aliases:[]},
-  {key:'name',label:'Nome da editora *',aliases:['nome','editora','nome da editora','publisher','empresa']},
-  {key:'legal_name',label:'Razão social',aliases:['razao social','razão social','nome empresarial']},
-  {key:'trade_name',label:'Nome fantasia',aliases:['nome fantasia','fantasia']},
-  {key:'cnpj',label:'CNPJ',aliases:['cnpj','documento']},
-  {key:'website',label:'Site',aliases:['site','website','url']},
-  {key:'country',label:'País',aliases:['pais','país','country']},
-  {key:'city',label:'Cidade',aliases:['cidade','municipio','município','city']},
-  {key:'state',label:'UF',aliases:['uf','estado','state']},
-  {key:'postal_code',label:'CEP',aliases:['cep','codigo postal','código postal','postal code']},
-  {key:'address_type',label:'Tipo de logradouro',aliases:['tipo de logradouro','tipo logradouro']},
-  {key:'address_street',label:'Logradouro',aliases:['logradouro','endereco','endereço','rua']},
-  {key:'address_number',label:'Número',aliases:['numero','número','nº','no']},
-  {key:'address_complement',label:'Complemento',aliases:['complemento']},
-  {key:'neighborhood',label:'Bairro',aliases:['bairro']},
-  {key:'phone',label:'Telefone',aliases:['telefone','fone','phone','celular']},
-  {key:'secondary_phone',label:'Telefone secundário',aliases:['telefone secundario','telefone secundário','fone 2','telefone 2']},
-  {key:'general_email',label:'E-mail geral',aliases:['email','e-mail','email geral','e-mail geral']},
-  {key:'alternate_emails',label:'E-mails alternativos',aliases:['emails alternativos','e-mails alternativos','outros emails','outros e-mails']},
-  {key:'linkedin_url',label:'LinkedIn',aliases:['linkedin','linkedin url','linkedin_url']},
-  {key:'instagram',label:'Instagram',aliases:['instagram','instagram url']},
-  {key:'ibge_code',label:'Código IBGE',aliases:['codigo ibge','código ibge','ibge']},
-  {key:'cnae_primary',label:'CNAE principal',aliases:['cnae principal','cnae primario','cnae primário']},
-  {key:'cnae_description',label:'Descrição CNAE',aliases:['descricao cnae','descrição cnae']},
-  {key:'cnae_secondary',label:'CNAEs secundários',aliases:['cnae secundario','cnae secundário','cnaes secundarios','cnaes secundários']},
-  {key:'matrix_branch',label:'Matriz / filial',aliases:['matriz filial','matriz / filial','matriz ou filial']},
-  {key:'registration_status',label:'Situação cadastral',aliases:['situacao cadastral','situação cadastral','status cadastral']},
-  {key:'legal_nature',label:'Natureza jurídica',aliases:['natureza juridica','natureza jurídica']},
-  {key:'company_size',label:'Porte',aliases:['porte','tamanho','company size']},
-  {key:'tax_regime',label:'Regime tributário',aliases:['regime tributario','regime tributário']},
-  {key:'share_capital',label:'Capital social',aliases:['capital social']},
-  {key:'estimated_revenue',label:'Faturamento estimado',aliases:['faturamento estimado','receita estimada']},
-  {key:'employee_range',label:'Faixa de funcionários',aliases:['faixa de funcionarios','faixa de funcionários','funcionarios','funcionários']},
-  {key:'owners_names',label:'Sócios / responsáveis',aliases:['socios','sócios','nomes dos socios','nomes dos sócios','responsaveis','responsáveis']},
-  {key:'age_range',label:'Faixa de idade da empresa',aliases:['faixa de idade','idade da empresa']},
-  {key:'catalog_notes',label:'Notas de catálogo',aliases:['notas de catalogo','notas de catálogo','catalogo','catálogo']},
-  {key:'market_segments',label:'Segmentos de atuação',aliases:['segmentos de atuacao','segmentos de atuação','mercados','market segments']},
-  {key:'editorial_profile',label:'Perfil editorial',aliases:['perfil editorial','editorial profile']},
-  {key:'editorial_profile_status',label:'Status do perfil editorial',aliases:['status do perfil editorial','status perfil editorial']},
-  {key:'editorial_profile_confidence',label:'Confiança do perfil editorial',aliases:['confianca do perfil editorial','confiança do perfil editorial','confianca perfil','confiança perfil']},
-  {key:'editorial_profile_notes',label:'Notas do perfil editorial',aliases:['notas do perfil editorial','observacoes perfil editorial','observações perfil editorial']},
-  {key:'priority',label:'Prioridade',aliases:['prioridade','priority']},
-  {key:'stage_name',label:'Etapa do pipeline',aliases:['etapa','etapa do pipeline','status','pipeline','stage']},
-  {key:'notes',label:'Observações comerciais',aliases:['observacoes','observações','notas','notes']},
-  {key:'source_ref',label:'Referência de origem',aliases:['referencia de origem','referência de origem','source ref','source_ref','id origem','id de origem']}
+const PUBLISHER_COLUMNS=[
+  {key:'name',label:'Nome principal no CRM',required:true,width:26},
+  {key:'commercial_name',label:'Nome comercial / marca',required:true,width:26},
+  {key:'trade_name',label:'Nome fantasia oficial',required:true,width:26},
+  {key:'legal_name',label:'Razão social',required:true,width:34},
+  {key:'cnpj',label:'CNPJ',required:true,width:20},
+  {key:'registration_status',label:'Situação cadastral',width:20},
+  {key:'cnpj_status_date',label:'Data da situação cadastral',date:true,width:22},
+  {key:'cnpj_status_reason',label:'Motivo da situação cadastral',width:30},
+  {key:'cnpj_start_date',label:'Data de abertura',date:true,width:18},
+  {key:'matrix_branch',label:'Matriz / filial',width:16},
+  {key:'cnpj_special_status',label:'Situação especial',width:20},
+  {key:'cnpj_special_status_date',label:'Data da situação especial',date:true,width:22},
+  {key:'legal_nature',label:'Natureza jurídica',width:30},
+  {key:'cnae_primary',label:'CNAE principal',width:18},
+  {key:'cnae_description',label:'Descrição do CNAE principal',width:34},
+  {key:'cnae_secondary',label:'CNAEs secundários',width:34},
+  {key:'company_size',label:'Porte empresarial',width:18},
+  {key:'size_label',label:'Classificação de tamanho',width:22},
+  {key:'tax_regime',label:'Regime tributário',width:22},
+  {key:'simples_nacional',label:'Simples Nacional',width:18},
+  {key:'mei',label:'MEI',width:12},
+  {key:'share_capital',label:'Capital social',width:20},
+  {key:'estimated_revenue',label:'Faturamento estimado',width:22},
+  {key:'employee_range',label:'Faixa de funcionários',width:20},
+  {key:'age_range',label:'Tempo / faixa de atuação',width:22},
+  {key:'country',label:'País',width:16},
+  {key:'postal_code',label:'CEP',width:14},
+  {key:'address_type',label:'Tipo de logradouro',width:18},
+  {key:'address_street',label:'Logradouro',width:30},
+  {key:'address_number',label:'Número',width:12},
+  {key:'address_complement',label:'Complemento',width:20},
+  {key:'neighborhood',label:'Bairro',width:20},
+  {key:'city',label:'Cidade',width:22},
+  {key:'state',label:'UF',width:10},
+  {key:'ibge_code',label:'Código IBGE',width:16},
+  {key:'website',label:'Site',width:30},
+  {key:'general_email',label:'E-mail geral',width:28},
+  {key:'alternate_emails',label:'E-mails alternativos',multi:true,width:36},
+  {key:'phone',label:'Telefone principal',width:20},
+  {key:'secondary_phone',label:'Telefone secundário',width:20},
+  {key:'linkedin_url',label:'LinkedIn',width:32},
+  {key:'instagram',label:'Instagram',width:24},
+  {key:'editorial_profile',label:'Perfil editorial',multi:true,width:42},
+  {key:'commercial_profile_code',label:'Perfil comercial Radar',commercialProfile:true,width:34},
+  {key:'commercial_profile_note',label:'Observação do perfil comercial',width:36},
+  {key:'priority',label:'Prioridade',priority:true,width:16},
+  {key:'stage_name',label:'Etapa do pipeline',width:24},
+  {key:'owner_email',label:'Responsável atual (e-mail)',emailLower:true,width:30},
+  {key:'commercial_temperature',label:'Temperatura comercial',temperature:true,width:20},
+  {key:'next_action_at',label:'Próxima ação',dateTime:true,width:22},
+  {key:'notes',label:'Notas comerciais',width:42},
 ];
-const LABELS=Object.fromEntries(FIELDS.map(f=>[f.key,f.label]));
-const LIST_FIELDS=new Set(['alternate_emails','market_segments','editorial_profile']);
-const PROFILE_SET=new Set(EDITORIAL_PROFILE_OPTIONS);
-const STATUS_LABELS={insert:'Nova',update:'Atualizar',skip:'Já existe',error:'Erro',warning:'Aviso'};
 
-function norm(v=''){return String(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase().replace(/\s+/g,' ')}
-function detectDelimiter(text){const line=(text.split(/\r?\n/).find(Boolean)||'');const counts={',':0,';':0,'\t':0};let quoted=false;for(let i=0;i<line.length;i++){if(line[i]==='"')quoted=!quoted;else if(!quoted&&Object.prototype.hasOwnProperty.call(counts,line[i]))counts[line[i]]++}return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0]}
-function parseDelimited(text,delimiter){const out=[];let row=[],cell='',quoted=false;for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='"'){if(quoted&&text[i+1]==='"'){cell+='"';i++}else quoted=!quoted}else if(ch===delimiter&&!quoted){row.push(cell);cell=''}else if((ch==='\n'||ch==='\r')&&!quoted){if(ch==='\r'&&text[i+1]==='\n')i++;row.push(cell);cell='';if(row.some(v=>String(v).trim()!==''))out.push(row);row=[]}else cell+=ch}row.push(cell);if(row.some(v=>String(v).trim()!==''))out.push(row);return out}
-function autoMap(headers){const used=new Set();return headers.map(h=>{const n=norm(h);for(const field of FIELDS){if(!field.key||used.has(field.key))continue;if(field.aliases.some(a=>norm(a)===n)){used.add(field.key);return field.key}}return ''})}
-function splitMulti(value=''){return String(value).split(/\s*\|\s*|\s*,\s*/).map(v=>v.trim()).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i)}
-function cleanCnpj(value=''){return String(value).replace(/\D/g,'')}
-function isBrazil(country=''){const n=norm(country||'Brasil');return !n||n==='brasil'||n==='brazil'}
-function csvEscape(value=''){const s=Array.isArray(value)?value.join(' | '):String(value??'');return /[;"\n\r]/.test(s)?`"${s.replace(/"/g,'""')}"`:s}
-function downloadText(filename,text){const blob=new Blob(['\uFEFF'+text],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();URL.revokeObjectURL(a.href)}
-function displayValue(value){return Array.isArray(value)?(value.join(' · ')||'—'):(value||'—')}
+const CONTACT_COLUMNS=[
+  {key:'publisher_cnpj',label:'CNPJ da editora',required:true,width:20},
+  {key:'contact_kind',label:'Tipo de vínculo',required:true,contactKind:true,width:28},
+  {key:'full_name',label:'Nome',required:true,width:28},
+  {key:'job_title',label:'Função / cargo',width:28},
+  {key:'department',label:'Área / departamento',width:24},
+  {key:'email',label:'E-mail',emailLower:true,width:28},
+  {key:'phone',label:'Telefone',width:20},
+  {key:'mobile',label:'Celular / WhatsApp',width:20},
+  {key:'linkedin_url',label:'LinkedIn',width:32},
+  {key:'preferred_channel',label:'Canal preferencial',channel:true,width:20},
+  {key:'is_decision_maker',label:'É decisor?',boolean:true,width:14},
+  {key:'notes',label:'Observações',width:40},
+];
 
-function localCheck(rows){
-  const errors=[];const warnings=[];const seenSource=new Map();const seenCnpj=new Map();const nameUf=new Map();
-  for(const row of rows){
-    const rowNo=row._row;const name=String(row.name||'').trim();const cnpj=cleanCnpj(row.cnpj);const sourceRef=String(row.source_ref||'').trim();const state=String(row.state||'').trim().toUpperCase();const hasStrong=Boolean(sourceRef||cnpj);
-    if(!name)errors.push({row:rowNo,name:'',status:'error',error:'Nome da editora é obrigatório.'});else if(isSuspiciousPublisherName(name))errors.push({row:rowNo,name,status:'error',error:'Nome da editora contém trecho técnico/HTML e precisa ser revisado antes da importação.'});
-    if(row.cnpj&&cnpj.length!==14)errors.push({row:rowNo,name,status:'error',error:'CNPJ deve conter 14 dígitos.'});
-    if(state&&isBrazil(row.country)&&!BRAZIL_STATES.includes(state))errors.push({row:rowNo,name,status:'error',error:`UF inválida: ${state}.`});
-    if(sourceRef){if(seenSource.has(sourceRef))errors.push({row:rowNo,name,status:'error',error:`Referência de origem repetida no arquivo (também na linha ${seenSource.get(sourceRef)}).`});else seenSource.set(sourceRef,rowNo)}
-    if(cnpj.length===14){if(seenCnpj.has(cnpj))errors.push({row:rowNo,name,status:'error',error:`CNPJ repetido no arquivo (também na linha ${seenCnpj.get(cnpj)}).`});else seenCnpj.set(cnpj,rowNo)}
-    if(name&&state){const k=`${norm(name)}|${state}`;const list=nameUf.get(k)||[];list.push({row:rowNo,name,hasStrong});nameUf.set(k,list)}
-    if(Array.isArray(row.editorial_profile)){const unknown=row.editorial_profile.filter(v=>!PROFILE_SET.has(v));if(unknown.length)warnings.push({row:rowNo,name,status:'warning',warning:`Perfil editorial fora da taxonomia atual: ${unknown.join(', ')}. O valor será importado, mas pode não pontuar no Radar Score.`})}
+const TEMPERATURE_LABELS={cold:'Fria',warm:'Morna',hot:'Quente'};
+const CONTACT_KIND_LABELS={legal:'Sócio / responsável legal',contact:'Outro contato'};
+const CHANNEL_LABELS={phone:'Telefone',email:'E-mail',whatsapp:'WhatsApp',linkedin:'LinkedIn',other:'Outro'};
+const STATUS_LABELS={insert:'Novo',update:'Atualizar',skip:'Já existe',error:'Erro'};
+
+function norm(value=''){
+  return String(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .trim().toLocaleLowerCase('pt-BR').replace(/\s+/g,' ');
+}
+function cleanCnpj(value=''){return String(value==null?'':value).replace(/\D/g,'')}
+function splitMulti(value=''){
+  return String(value==null?'':value).split(/\s*\|\s*|\r?\n/).map(v=>v.trim()).filter(Boolean)
+    .filter((v,i,a)=>a.findIndex(x=>norm(x)===norm(v))===i);
+}
+function ptDateToIso(value=''){
+  const text=String(value==null?'':value).trim();
+  if(!text)return '';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(text))return text;
+  const m=text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(!m)return text;
+  return m[3]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0');
+}
+function ptDateTimeToIso(value=''){
+  const text=String(value==null?'':value).trim();
+  if(!text)return '';
+  if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text))return text;
+  const m=text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/);
+  if(!m)return text;
+  const hh=String(m[4]||'09').padStart(2,'0');
+  const mm=String(m[5]||'00').padStart(2,'0');
+  return m[3]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0')+'T'+hh+':'+mm+':00';
+}
+function reverseMap(map){
+  const out={};
+  Object.entries(map).forEach(([value,label])=>{out[norm(value)]=value;out[norm(label)]=value});
+  return out;
+}
+const COMMERCIAL_PROFILE_MAP=reverseMap(PUBLISHER_COMMERCIAL_PROFILE_LABELS);
+const PRIORITY_MAP=reverseMap(PRIORITY_LABELS);
+const TEMPERATURE_MAP=reverseMap(TEMPERATURE_LABELS);
+const CONTACT_KIND_MAP={
+  ...reverseMap(CONTACT_KIND_LABELS),
+  [norm('socio')]:'legal',
+  [norm('sócio')]:'legal',
+  [norm('responsavel legal')]:'legal',
+  [norm('responsável legal')]:'legal',
+  [norm('contato')]:'contact'
+};
+const CHANNEL_MAP=reverseMap(CHANNEL_LABELS);
+
+function normalizeCell(value,column){
+  if(value===null||value===undefined)return column.multi?[]:'';
+  if(column.multi)return splitMulti(value);
+  if(column.date&&typeof value==='number')return excelSerialToIso(value,false);
+  if(column.dateTime&&typeof value==='number')return excelSerialToIso(value,true);
+  const text=String(value).trim();
+  if(column.date)return ptDateToIso(text);
+  if(column.dateTime)return ptDateTimeToIso(text);
+  if(column.emailLower)return text.toLowerCase();
+  if(column.commercialProfile)return COMMERCIAL_PROFILE_MAP[norm(text)]||text;
+  if(column.priority)return PRIORITY_MAP[norm(text)]||text.toLowerCase();
+  if(column.temperature)return TEMPERATURE_MAP[norm(text)]||text.toLowerCase();
+  if(column.contactKind)return CONTACT_KIND_MAP[norm(text)]||text.toLowerCase();
+  if(column.channel)return CHANNEL_MAP[norm(text)]||text.toLowerCase();
+  if(column.boolean){
+    const n=norm(text);
+    if(['sim','yes','true','1','x'].includes(n))return true;
+    if(['nao','não','no','false','0',''].includes(n))return false;
+    return text;
   }
-  for(const list of nameUf.values()){if(list.length>1&&list.some(x=>!x.hasStrong)){for(const item of list.filter(x=>!x.hasStrong))errors.push({row:item.row,name:item.name,status:'error',error:'Há outra linha com o mesmo Nome + UF e esta linha não possui CNPJ nem referência de origem. Informe uma chave forte ou remova a duplicidade.'})}}
-  return {errors:new Set(errors.map(x=>x.row)).size,warnings:new Set(warnings.map(x=>x.row)).size,details:[...errors,...warnings]};
+  if(column.key==='cnpj'||column.key==='publisher_cnpj')return cleanCnpj(text);
+  if(column.key==='state')return text.toUpperCase();
+  return text;
+}
+
+function findSheet(workbook,name){
+  const target=norm(name);
+  const key=Object.keys(workbook).find(sheet=>norm(sheet)===target);
+  return key?workbook[key]:null;
+}
+
+function parseSheetRows(matrix,columns,sheetName){
+  if(!matrix||!matrix.length)return {rows:[],errors:['A aba '+sheetName+' está vazia.']};
+  const header=matrix[0].map(v=>norm(v).replace(/\s*\*$/,''));
+  const headerIndex=new Map(header.map((value,index)=>[value,index]));
+  const errors=[];
+  const mapping={};
+
+  for(const column of columns){
+    const aliases=[column.label,column.key,...(column.aliases||[])].map(norm);
+    const found=aliases.find(alias=>headerIndex.has(alias));
+    if(found)mapping[column.key]=headerIndex.get(found);
+    else if(column.required)errors.push('A aba '+sheetName+' não possui a coluna obrigatória “'+column.label+'”.');
+  }
+  if(errors.length)return {rows:[],errors};
+
+  const rows=[];
+  matrix.slice(1).forEach((row,index)=>{
+    if(!row.some(value=>String(value==null?'':value).trim()!==''))return;
+    const obj={_row:String(index+2)};
+    columns.forEach(column=>{
+      const colIndex=mapping[column.key];
+      if(colIndex===undefined){obj[column.key]=column.multi?[]:'';return}
+      obj[column.key]=normalizeCell(row[colIndex],column);
+    });
+    rows.push(obj);
+  });
+  return {rows,errors:[]};
+}
+
+function localChecks(publishers,contacts){
+  const details=[];
+  const seenCnpj=new Map();
+  for(const row of publishers){
+    const missing=PUBLISHER_COLUMNS.filter(c=>c.required && !String(row[c.key]==null?'':row[c.key]).trim());
+    if(missing.length)details.push({sheet:'Editoras',row:row._row,name:row.name,status:'error',error:'Campos obrigatórios ausentes: '+missing.map(c=>c.label).join(', ')+'.'});
+    const cnpj=cleanCnpj(row.cnpj);
+    if(cnpj.length!==14)details.push({sheet:'Editoras',row:row._row,name:row.name,status:'error',error:'CNPJ deve conter 14 dígitos.'});
+    else if(seenCnpj.has(cnpj))details.push({sheet:'Editoras',row:row._row,name:row.name,status:'error',error:'CNPJ repetido na aba Editoras (também na linha '+seenCnpj.get(cnpj)+').'});
+    else seenCnpj.set(cnpj,row._row);
+  }
+  const seenPeople=new Map();
+  for(const row of contacts){
+    const cnpj=cleanCnpj(row.publisher_cnpj);
+    if(cnpj.length!==14)details.push({sheet:'Pessoas',row:row._row,name:row.full_name,status:'error',error:'CNPJ da editora deve conter 14 dígitos.'});
+    if(!row.full_name)details.push({sheet:'Pessoas',row:row._row,name:'',status:'error',error:'Nome da pessoa é obrigatório.'});
+    if(!['legal','contact'].includes(row.contact_kind))details.push({sheet:'Pessoas',row:row._row,name:row.full_name,status:'error',error:'Tipo de vínculo deve ser “Sócio / responsável legal” ou “Outro contato”.'});
+    if(row.contact_kind==='legal'&&!row.job_title)details.push({sheet:'Pessoas',row:row._row,name:row.full_name,status:'error',error:'Função / cargo é obrigatória para sócio ou responsável legal.'});
+    const key=cnpj+'|'+norm(row.full_name)+'|'+norm(row.email);
+    if(seenPeople.has(key))details.push({sheet:'Pessoas',row:row._row,name:row.full_name,status:'error',error:'Pessoa repetida na aba Pessoas (também na linha '+seenPeople.get(key)+').'});
+    else seenPeople.set(key,row._row);
+  }
+  return details;
+}
+
+function xlsxCell(value,header=false){
+  return header?{value,fontWeight:'bold',backgroundColor:'#E4E7EC'}:{value};
+}
+function downloadCsv(filename,rows){
+  const esc=value=>{
+    const s=String(value==null?'':value);
+    return /[;"\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
+  };
+  const text='\uFEFF'+rows.map(row=>row.map(esc).join(';')).join('\n')+'\n';
+  const blob=new Blob([text],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=filename;a.click();URL.revokeObjectURL(a.href);
 }
 
 export default function ImportPage(){
-  const {supabase,membership,isManager}=useCrm();const org=membership?.organization_id;
-  const [fileName,setFileName]=useState('');const [headers,setHeaders]=useState([]);const [rawRows,setRawRows]=useState([]);const [mapping,setMapping]=useState([]);
-  const [mode,setMode]=useState('skip');const [validating,setValidating]=useState(false);const [validationProgress,setValidationProgress]=useState(0);const [validation,setValidation]=useState(null);
-  const [progress,setProgress]=useState(0);const [busy,setBusy]=useState(false);const [result,setResult]=useState(null);const [notice,setNotice]=useState('');const [guideOpen,setGuideOpen]=useState(true);
+  const {supabase,membership,isManager,team}=useCrm();
+  const org=membership?.organization_id;
+  const [stages,setStages]=useState([]);
+  const [fileName,setFileName]=useState('');
+  const [publishers,setPublishers]=useState([]);
+  const [contacts,setContacts]=useState([]);
+  const [structureErrors,setStructureErrors]=useState([]);
+  const [mode,setMode]=useState('skip');
+  const [reading,setReading]=useState(false);
+  const [validating,setValidating]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const [validation,setValidation]=useState(null);
+  const [result,setResult]=useState(null);
+  const [notice,setNotice]=useState('');
 
-  const transformed=useMemo(()=>rawRows.map((row,idx)=>{const obj={_row:String(idx+2)};mapping.forEach((key,i)=>{if(!key)return;const value=String(row[i]??'').trim();obj[key]=LIST_FIELDS.has(key)?splitMulti(value):value});return obj}),[rawRows,mapping]);
-  const nameMapped=mapping.includes('name');
-  const mappedKeys=mapping.filter(Boolean);
-  const importCount=validation?Number(validation.inserted||0)+Number(validation.updated||0):0;
-
-  if(!isManager)return <div className="page-wrap"><div className="card panel"><h2>Acesso restrito</h2><p className="muted">A importação de dados cadastrais é exclusiva de administradores e supervisores.</p></div></div>;
-
-  function resetValidation(){setValidation(null);setResult(null);setValidationProgress(0);setProgress(0)}
-  async function choose(e){const file=e.target.files?.[0];if(!file)return;setNotice('');setResult(null);setValidation(null);const text=await file.text();const delimiter=detectDelimiter(text);const matrix=parseDelimited(text,delimiter);if(matrix.length<2){setNotice('O arquivo precisa ter uma linha de cabeçalho e pelo menos uma linha de dados.');return}const hs=matrix[0].map((h,i)=>String(h).replace(/^\uFEFF/,'').trim()||`Coluna ${i+1}`);setFileName(file.name);setHeaders(hs);setRawRows(matrix.slice(1).filter(r=>r.some(v=>String(v).trim())));setMapping(autoMap(hs));setProgress(0);setValidationProgress(0)}
-  function setMap(index,value){setMapping(m=>m.map((x,i)=>i===index?value:(value&&x===value?'':x)));resetValidation()}
-  function changeMode(value){setMode(value);resetValidation()}
-
-  async function runValidation(){
-    if(!nameMapped||!transformed.length||!org)return;
-    setNotice('');setResult(null);setValidating(true);setValidationProgress(0);
-    const local=localCheck(transformed);
-    if(local.errors){setValidation({inserted:0,updated:0,skipped:0,errors:local.errors,warnings:local.warnings,details:local.details,localOnly:true});setNotice('Há problemas no arquivo que precisam ser corrigidos antes da comparação com a base.');setValidating(false);return}
-    const totals={inserted:0,updated:0,skipped:0,errors:0,warnings:local.warnings,details:[...local.details]};const BATCH=300;
-    for(let i=0;i<transformed.length;i+=BATCH){
-      const batch=transformed.slice(i,i+BATCH);
-      const {data,error}=await supabase.rpc('crm_preview_import_publishers_v2',{p_organization_id:org,p_rows:batch,p_mode:mode});
-      if(error){setNotice(`A validação parou no lote ${Math.floor(i/BATCH)+1}: ${error.message}`);setValidating(false);return}
-      totals.inserted+=Number(data?.inserted||0);totals.updated+=Number(data?.updated||0);totals.skipped+=Number(data?.skipped||0);totals.errors+=Number(data?.errors||0);totals.warnings+=Number(data?.warnings||0);totals.details.push(...(data?.details||[]));
-      setValidationProgress(Math.min(100,Math.round((Math.min(i+BATCH,transformed.length)/transformed.length)*100)));
+  useEffect(()=>{
+    let active=true;
+    async function load(){
+      if(!org)return;
+      const {data}=await supabase.from('pipeline_stages').select('id,name,position').eq('organization_id',org).eq('active',true).order('position');
+      if(active)setStages(data||[]);
     }
-    setValidation(totals);setNotice(totals.errors?'A validação encontrou registros que precisam ser corrigidos.':'Validação concluída. Nenhum dado foi salvo ainda.');setValidating(false);
+    load();
+    return()=>{active=false};
+  },[org,supabase]);
+
+  const localIssues=useMemo(()=>localChecks(publishers,contacts),[publishers,contacts]);
+  const totalLocalErrors=localIssues.filter(item=>item.status==='error').length;
+  const importablePublishers=validation?Number(validation.publishers?.inserted||0)+Number(validation.publishers?.updated||0):0;
+  const importableContacts=validation?Number(validation.contacts?.inserted||0)+Number(validation.contacts?.updated||0):0;
+
+  if(!isManager)return <div className="page-wrap"><div className="card panel"><h2>Acesso restrito</h2><p className="muted">A importação em massa é exclusiva de administradores e supervisores.</p></div></div>;
+
+  async function downloadTemplate(){
+    const header=value=>xlsxCell(value,true);
+    const instructions=[
+      [header('MODELO DE IMPORTAÇÃO — RADAR CRM')],
+      [xlsxCell('Use as abas Editoras e Pessoas. Não renomeie essas duas abas.')],
+      [xlsxCell('')],
+      [header('ABA EDITORAS')],
+      [xlsxCell('Uma linha = uma editora. Os cinco campos obrigatórios são: Nome principal no CRM, Nome comercial / marca, Nome fantasia oficial, Razão social e CNPJ.')],
+      [xlsxCell('O CNPJ é a chave da importação. Se já existir, o modo escolhido na tela define se a linha será ignorada ou usada para atualizar o cadastro.')],
+      [xlsxCell('Perfil editorial: para vários perfis, separe com |. Ex.: Infantil | Literatura | Paradidático. Perfis novos também são aceitos.')],
+      [xlsxCell('E-mails alternativos: separe com |.')],
+      [xlsxCell('Datas: prefira dd/mm/aaaa. Próxima ação: dd/mm/aaaa hh:mm.')],
+      [xlsxCell('Etapa do pipeline: use exatamente um nome existente no CRM.')],
+      [xlsxCell('Responsável atual: informe o e-mail de uma pessoa ativa da equipe Radar.')],
+      [xlsxCell('')],
+      [header('ABA PESSOAS')],
+      [xlsxCell('Uma linha = uma pessoa. Repita o CNPJ da editora para vincular quantas pessoas forem necessárias.')],
+      [xlsxCell('Tipo de vínculo: use “Sócio / responsável legal” ou “Outro contato”.')],
+      [xlsxCell('Para sócio / responsável legal, Nome e Função / cargo são obrigatórios. Para outro contato, apenas Nome é obrigatório.')],
+      [xlsxCell('É decisor?: use Sim ou Não.')],
+      [xlsxCell('Canal preferencial: Telefone, E-mail, WhatsApp, LinkedIn ou Outro.')],
+      [xlsxCell('')],
+      [header('REGRAS IMPORTANTES')],
+      [xlsxCell('Radar Score, fits, qualidade dos dados, histórico e auditoria não são importados: o CRM calcula esses dados automaticamente.')],
+      [xlsxCell('Células vazias não apagam dados existentes quando o modo “Atualizar” é usado.')],
+      [xlsxCell('Sempre use Validar antes de Importar. A validação não altera a base.')],
+      [xlsxCell('')],
+      [header('ETAPAS ATUAIS DO PIPELINE')],
+      [xlsxCell(stages.length?stages.map(s=>s.name).join(' | '):'Consulte o CRM no momento do preenchimento.')],
+      [header('E-MAILS ATIVOS DA EQUIPE')],
+      [xlsxCell(team.filter(m=>m.active&&m.email).map(m=>m.email).join(' | ')||'Consulte a página Equipe.')],
+    ];
+    const publisherData=[PUBLISHER_COLUMNS.map(c=>header(c.label+(c.required?' *':'')))];
+    const peopleData=[CONTACT_COLUMNS.map(c=>header(c.label+(c.required?' *':'')))];
+
+    await writeExcelFile([
+      {data:instructions,sheet:'LEIA-ME',columns:[{width:120}],stickyRowsCount:1,showGridLines:false},
+      {data:publisherData,sheet:'Editoras',columns:PUBLISHER_COLUMNS.map(c=>({width:c.width||22})),stickyRowsCount:1},
+      {data:peopleData,sheet:'Pessoas',columns:CONTACT_COLUMNS.map(c=>({width:c.width||22})),stickyRowsCount:1},
+    ]).toFile('modelo-importacao-editoras-radar.xlsx');
+  }
+
+  async function choose(event){
+    const file=event.target.files?.[0];
+    if(!file)return;
+    setReading(true);setNotice('');setValidation(null);setResult(null);setStructureErrors([]);
+    try{
+      const workbook=await readXlsxWorkbook(file);
+      const publisherSheet=findSheet(workbook,'Editoras');
+      const peopleSheet=findSheet(workbook,'Pessoas');
+      const errors=[];
+      if(!publisherSheet)errors.push('A aba “Editoras” não foi encontrada.');
+      if(!peopleSheet)errors.push('A aba “Pessoas” não foi encontrada.');
+      if(errors.length){
+        setFileName(file.name);setPublishers([]);setContacts([]);setStructureErrors(errors);return;
+      }
+      const p=parseSheetRows(publisherSheet,PUBLISHER_COLUMNS,'Editoras');
+      const c=parseSheetRows(peopleSheet,CONTACT_COLUMNS,'Pessoas');
+      const structural=[...p.errors,...c.errors];
+      setFileName(file.name);setPublishers(p.rows);setContacts(c.rows);setStructureErrors(structural);
+      setNotice(structural.length?'O arquivo foi lido, mas a estrutura precisa ser corrigida.':'Arquivo lido. Revise o resumo e valide antes de importar.');
+    }catch(error){
+      setFileName(file.name);setPublishers([]);setContacts([]);
+      setStructureErrors([error.message||'Não foi possível ler o arquivo Excel.']);
+    }finally{
+      setReading(false);event.target.value='';
+    }
+  }
+
+  async function validate(){
+    if(!org||!publishers.length||structureErrors.length||totalLocalErrors)return;
+    setValidating(true);setNotice('');setValidation(null);setResult(null);
+    const {data,error}=await supabase.rpc('crm_preview_import_workbook_v3',{
+      p_organization_id:org,p_publishers:publishers,p_contacts:contacts,p_mode:mode
+    });
+    if(error)setNotice(error.message);
+    else{
+      setValidation(data);
+      setNotice(Number(data?.errors||0)>0?'A validação encontrou erros. Corrija a planilha antes de importar.':'Validação concluída. Nenhum dado foi salvo ainda.');
+    }
+    setValidating(false);
   }
 
   async function runImport(){
-    if(!validation||validation.errors||!importCount)return;
-    setBusy(true);setNotice('');setResult(null);setProgress(0);const totals={inserted:0,updated:0,skipped:0,errors:0,warnings:0,details:[]};const BATCH=200;
-    for(let i=0;i<transformed.length;i+=BATCH){
-      const batch=transformed.slice(i,i+BATCH);
-      const {data,error}=await supabase.rpc('crm_import_publishers_v2',{p_organization_id:org,p_rows:batch,p_mode:mode,p_source_name:fileName||null});
-      if(error){setNotice(`A importação parou no lote ${Math.floor(i/BATCH)+1}: ${error.message}`);setBusy(false);return}
-      totals.inserted+=Number(data?.inserted||0);totals.updated+=Number(data?.updated||0);totals.skipped+=Number(data?.skipped||0);totals.errors+=Number(data?.errors||0);totals.warnings+=Number(data?.warnings||0);totals.details.push(...(data?.details||[]));setProgress(Math.min(100,Math.round((Math.min(i+BATCH,transformed.length)/transformed.length)*100)));
-    }
-    setResult(totals);setNotice(totals.errors?'Importação concluída com alguns erros. Confira o resultado abaixo.':'Importação concluída. O Radar Score é recalculado automaticamente quando dados relevantes mudam.');setBusy(false);
+    if(!org||!validation||Number(validation.errors||0)>0)return;
+    setBusy(true);setNotice('');setResult(null);
+    const {data,error}=await supabase.rpc('crm_import_workbook_v3',{
+      p_organization_id:org,p_publishers:publishers,p_contacts:contacts,p_mode:mode,p_source_name:fileName||null
+    });
+    if(error)setNotice(error.message);
+    else{setResult(data);setNotice('Importação concluída. Editoras e pessoas foram processadas conforme a validação.');}
+    setBusy(false);
   }
 
-  function downloadTemplate(){
-    const header=['Nome da editora','Razão social','Nome fantasia','CNPJ','Site','País','Cidade','UF','CEP','Logradouro','Número','Complemento','Bairro','Telefone','Telefone secundário','E-mail geral','E-mails alternativos','LinkedIn','Instagram','CNAE principal','Descrição CNAE','CNAEs secundários','Situação cadastral','Natureza jurídica','Porte','Faturamento estimado','Faixa de funcionários','Sócios / responsáveis','Segmentos de atuação','Perfil editorial','Status do perfil editorial','Confiança do perfil editorial','Notas do perfil editorial','Prioridade','Etapa do pipeline','Observações','Referência de origem'];
-    const example=['Editora Exemplo Ltda','Editora Exemplo Ltda','Editora Exemplo','00000000000000','https://exemplo.com','Brasil','São Paulo','SP','00000-000','Rua Exemplo','100','','Centro','(11) 0000-0000','','contato@exemplo.com','comercial@exemplo.com | financeiro@exemplo.com','','@editoraexemplo','','','','ATIVA','','Médio','','','Ana Exemplo','Escolar | Trade/Livrarias','Literatura | Infantil','Confirmado','Alta','Classificação revisada pela equipe.','Média','A prospectar','Linha de exemplo','fonte-0001'];
-    downloadText('modelo-importacao-editoras-v2.csv',header.map(csvEscape).join(';')+'\n'+example.map(csvEscape).join(';')+'\n');
+  function reset(){
+    setFileName('');setPublishers([]);setContacts([]);setStructureErrors([]);
+    setValidation(null);setResult(null);setNotice('');
   }
+  function changeMode(value){setMode(value);setValidation(null);setResult(null)}
   function downloadIssues(){
-    const details=(validation?.details||[]).filter(d=>d.error||d.warning);if(!details.length)return;
-    const rows=[['Linha','Editora','Situação','Identificada por','Erro / aviso'],...details.map(d=>[d.row,d.name,STATUS_LABELS[d.status]||d.status||'',d.matched_by||'',d.error||d.warning||''])];
-    downloadText('inconsistencias-importacao-editoras.csv',rows.map(r=>r.map(csvEscape).join(';')).join('\n')+'\n');
+    const details=[...localIssues,...(validation?.details||[])].filter(item=>item.error||item.warning);
+    if(!details.length)return;
+    downloadCsv('inconsistencias-importacao-editoras.csv',[
+      ['Aba','Linha','Registro','Situação','Identificado por','Erro / aviso'],
+      ...details.map(item=>[
+        item.sheet||'',item.row||'',item.name||'',STATUS_LABELS[item.status]||item.status||'',
+        item.matched_by||'',item.error||item.warning||''
+      ])
+    ]);
   }
 
-  return <div className="page-wrap">
-    <div className="page-head"><div><div className="eyebrow">Dados em massa</div><h1>Importar editoras</h1><p>Valide a planilha, compare com a base e só depois confirme a gravação. Campos vazios nunca apagam dados existentes.</p></div><button className="btn secondary" onClick={downloadTemplate}><Download size={16}/> Baixar modelo atualizado</button></div>
-    <ImportGuide open={guideOpen} onToggle={()=>setGuideOpen(v=>!v)} onDownloadTemplate={downloadTemplate}/>
-    {notice&&<div className="notice-bar"><span>{notice}</span><button onClick={()=>setNotice('')}><X size={15}/></button></div>}
+  return <div className="page-wrap import-v3-page">
+    <div className="page-head">
+      <div><div className="eyebrow">Dados em massa</div><h1>Importar editoras</h1><p>Use o mesmo modelo de dados da página Nova editora, com uma aba para editoras e outra para pessoas vinculadas.</p></div>
+      <button className="btn secondary" type="button" onClick={downloadTemplate}><Download size={16}/> Baixar modelo Excel</button>
+    </div>
 
-    <section className="card panel import-upload">
-      <div className="panel-head"><div><h2>1. Escolher arquivo</h2><p>Use um CSV com cabeçalho. Em campos com vários valores, use <strong>|</strong> para separar cada item. Ex.: <strong>Literatura | Infantil | Educação</strong>.</p></div><FileSpreadsheet size={21}/></div>
-      <label className="import-drop"><Upload size={25}/><strong>{fileName||'Selecionar arquivo CSV'}</strong><span>{fileName?`${rawRows.length.toLocaleString('pt-BR')} linhas encontradas`:'Clique para procurar no computador'}</span><input type="file" accept=".csv,text/csv,text/plain" onChange={choose}/></label>
+    <section className="card panel import-how">
+      <div className="panel-head"><div><h2>Como funciona</h2><p>O arquivo padrão é um Excel <b>.xlsx</b> com três abas.</p></div><Info size={20}/></div>
+      <div className="import-how-grid">
+        <GuideCard number="1" title="LEIA-ME">Explica as regras, formatos e valores aceitos. Não é importada.</GuideCard>
+        <GuideCard number="2" title="Editoras">Uma linha por editora. Os cinco campos de identificação e o CNPJ são obrigatórios.</GuideCard>
+        <GuideCard number="3" title="Pessoas">Uma linha por pessoa. O CNPJ liga cada pessoa à editora correta.</GuideCard>
+      </div>
+      <div className="import-rule-strip"><strong>CNPJ é a chave.</strong><span>Um mesmo CNPJ nunca cria uma segunda editora. Na validação você escolhe preservar o cadastro atual ou atualizar somente campos preenchidos.</span></div>
     </section>
 
-    {headers.length>0&&<>
-      <section className="card panel" style={{marginTop:16}}>
-        <div className="panel-head"><div><h2>2. Mapear colunas</h2><p>Associe as colunas da planilha aos campos atuais do CRM. Score e indicadores Radar não podem ser importados: eles são calculados automaticamente.</p></div><span className={`badge ${nameMapped?'green':'red'}`}>{nameMapped?'Nome mapeado':'Mapeie o nome'}</span></div>
-        <div className="mapping-grid">{headers.map((h,i)=><label key={`${h}-${i}`}><span>{h}</span><select value={mapping[i]||''} onChange={e=>setMap(i,e.target.value)}>{FIELDS.map(field=><option key={field.key||'ignore'} value={field.key}>{field.label}</option>)}</select></label>)}</div>
-      </section>
-
-      <section className="card panel" style={{marginTop:16}}>
-        <div className="panel-head"><div><h2>3. Conferir amostra</h2><p>Veja como as primeiras linhas serão interpretadas antes da validação.</p></div><span className="badge">{mappedKeys.length} campo{mappedKeys.length===1?'':'s'} mapeado{mappedKeys.length===1?'':'s'}</span></div>
-        <div className="import-preview-wrap"><table className="data-table import-preview"><thead><tr>{mapping.map((key,i)=>key?<th key={`${key}-${i}`}>{LABELS[key]||key}</th>:null)}</tr></thead><tbody>{transformed.slice(0,8).map((r,idx)=><tr key={idx}>{mapping.map((key,i)=>key?<td key={`${key}-${i}`}>{displayValue(r[key])}</td>:null)}</tr>)}</tbody></table></div>
-        {transformed.length>8&&<p className="muted import-preview-note">Mostrando 8 de {transformed.length.toLocaleString('pt-BR')} linhas.</p>}
-      </section>
-
-      <section className="card panel" style={{marginTop:16}}>
-        <div className="panel-head"><div><h2>4. Validar antes de salvar</h2><p>O CRM verifica formato, duplicidades e correspondência com editoras já existentes. Esta etapa não altera a base.</p></div><ShieldCheck size={22}/></div>
-        <div className="form-grid" style={{marginTop:10}}>
-          <label className="span-2">Quando a editora já existir<select value={mode} onChange={e=>changeMode(e.target.value)}><option value="skip">Ignorar e preservar todo o cadastro atual</option><option value="update">Atualizar somente os campos preenchidos no CSV</option></select></label>
+    <section className="card panel import-details">
+      <details>
+        <summary><span>Ver colunas e regras da aba Editoras</span><ChevronDown size={17}/></summary>
+        <div className="column-guide">
+          <p><b>Obrigatórios:</b> {PUBLISHER_COLUMNS.filter(c=>c.required).map(c=>c.label).join(' · ')}.</p>
+          <p><b>Perfil editorial:</b> use <code>|</code> para separar vários perfis. Categorias ainda inexistentes podem ser importadas e passam a aparecer nas opções do CRM.</p>
+          <p><b>Etapa do pipeline:</b> precisa corresponder ao nome de uma etapa ativa. <b>Responsável atual:</b> use o e-mail cadastrado na equipe.</p>
+          <div className="column-chips">{PUBLISHER_COLUMNS.map(c=><span key={c.key}>{c.label}{c.required?' *':''}</span>)}</div>
         </div>
-        <div style={{display:'flex',gap:10,alignItems:'center',marginTop:14,flexWrap:'wrap'}}><button className="btn" disabled={validating||!nameMapped||!transformed.length} onClick={runValidation}>{validating?`Validando… ${validationProgress}%`:<><ShieldCheck size={16}/> Validar {transformed.length.toLocaleString('pt-BR')} registros</>}</button>{validation?.details?.some(d=>d.error||d.warning)&&<button className="btn secondary" onClick={downloadIssues}><Download size={15}/> Baixar inconsistências</button>}</div>
-        {validating&&<div className="import-progress" style={{marginTop:12}}><div style={{width:`${validationProgress}%`}}/></div>}
-        {validation&&<div style={{marginTop:16}}>
-          <div className="import-result-grid"><Result label="Novas" value={validation.inserted}/><Result label="Atualizações" value={validation.updated}/><Result label="Já existentes" value={validation.skipped}/><Result label="Erros" value={validation.errors}/><Result label="Avisos" value={validation.warnings}/></div>
-          {!validation.errors&&<div className="notice-bar" style={{marginTop:12}}><span><CheckCircle2 size={15}/> Validação aprovada. Você ainda não salvou nenhuma alteração.</span></div>}
-          {validation.errors>0&&<div className="notice error" style={{marginTop:12}}><AlertTriangle size={15}/> Corrija os erros antes de importar.</div>}
-          {validation.details?.length>0&&<ValidationTable details={validation.details}/>}
-        </div>}
+      </details>
+      <details>
+        <summary><span>Ver colunas e regras da aba Pessoas</span><ChevronDown size={17}/></summary>
+        <div className="column-guide">
+          <p>Repita o CNPJ da editora em cada pessoa. Use <b>Sócio / responsável legal</b> ou <b>Outro contato</b> no tipo de vínculo.</p>
+          <p>Para sócios/responsáveis legais, <b>Nome</b> e <b>Função / cargo</b> são obrigatórios. Para outros contatos, apenas o nome é obrigatório.</p>
+          <div className="column-chips">{CONTACT_COLUMNS.map(c=><span key={c.key}>{c.label}{c.required?' *':''}</span>)}</div>
+        </div>
+      </details>
+    </section>
+
+    {notice&&<div className="notice-bar"><span>{notice}</span><button onClick={()=>setNotice('')}><X size={15}/></button></div>}
+
+    <section className="card panel">
+      <div className="panel-head"><div><h2>1. Escolher o arquivo</h2><p>Use o modelo Excel disponibilizado acima. As abas <b>Editoras</b> e <b>Pessoas</b> não devem ser renomeadas.</p></div><FileSpreadsheet size={21}/></div>
+      <label className="import-drop-v3">
+        <Upload size={25}/><strong>{reading?'Lendo arquivo…':fileName||'Selecionar arquivo .xlsx'}</strong>
+        <span>{fileName&&!reading?(publishers.length.toLocaleString('pt-BR')+' editoras · '+contacts.length.toLocaleString('pt-BR')+' pessoas'):'Clique para procurar no computador'}</span>
+        <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={reading} onChange={choose}/>
+      </label>
+      {structureErrors.length>0&&<div className="import-errors-box"><strong>Problemas na estrutura do arquivo</strong>{structureErrors.map((error,index)=><span key={index}>• {error}</span>)}</div>}
+    </section>
+
+    {fileName&&structureErrors.length===0&&<>
+      <section className="card panel import-summary-card">
+        <div className="panel-head"><div><h2>2. Conferir o conteúdo</h2><p>O CRM mostra o que encontrou antes de comparar com a base.</p></div></div>
+        <div className="import-summary-grid">
+          <SummaryStat icon={<Building2 size={18}/>} value={publishers.length} label="editoras na planilha"/>
+          <SummaryStat icon={<Users size={18}/>} value={contacts.length} label="pessoas vinculadas"/>
+          <SummaryStat icon={<AlertTriangle size={18}/>} value={totalLocalErrors} label="erros locais"/>
+        </div>
+        {publishers.length>0&&<PreviewTable title="Amostra da aba Editoras" rows={publishers.slice(0,5)} columns={[
+          ['name','Nome principal'],['commercial_name','Nome comercial'],['cnpj','CNPJ'],['editorial_profile','Perfil editorial']
+        ]}/>}
+        {contacts.length>0&&<PreviewTable title="Amostra da aba Pessoas" rows={contacts.slice(0,5)} columns={[
+          ['publisher_cnpj','CNPJ'],['contact_kind','Vínculo'],['full_name','Nome'],['job_title','Função / cargo']
+        ]}/>}
+        {totalLocalErrors>0&&<IssuesList details={localIssues}/>}
       </section>
 
-      <section className="card panel import-confirm" style={{marginTop:16}}>
-        <div><h2>5. Importar</h2><p>{validation?validation.errors?'A importação está bloqueada até a correção dos erros.':`Prontos para gravar ${importCount.toLocaleString('pt-BR')} registros. Editoras existentes serão ${mode==='update'?'atualizadas somente nos campos preenchidos':'preservadas'}.`:'Faça a validação acima antes de liberar a importação.'}</p></div>
-        <button className="btn" disabled={busy||!validation||validation.errors>0||!importCount} onClick={runImport}>{busy?`Importando… ${progress}%`:<><Upload size={16}/> Confirmar importação{importCount?` · ${importCount.toLocaleString('pt-BR')}`:''}</>}</button>
-        {busy&&<div className="import-progress"><div style={{width:`${progress}%`}}/></div>}
+      <section className="card panel">
+        <div className="panel-head"><div><h2>3. Definir o que fazer com CNPJs já existentes</h2><p>A escolha vale para editoras e pessoas que o CRM reconhecer como já cadastradas.</p></div></div>
+        <div className="import-mode-grid">
+          <label className={'import-mode-option '+(mode==='skip'?'selected':'')}>
+            <input type="radio" name="mode" value="skip" checked={mode==='skip'} onChange={()=>changeMode('skip')}/>
+            <div><strong>Ignorar e preservar</strong><span>Se o CNPJ já existir, a editora atual não é alterada. Pessoas já existentes também são preservadas.</span></div>
+          </label>
+          <label className={'import-mode-option '+(mode==='update'?'selected':'')}>
+            <input type="radio" name="mode" value="update" checked={mode==='update'} onChange={()=>changeMode('update')}/>
+            <div><strong>Atualizar somente campos preenchidos</strong><span>Células vazias nunca apagam informações. O CNPJ apenas localiza o cadastro correto.</span></div>
+          </label>
+        </div>
       </section>
+
+      <section className="card panel">
+        <div className="panel-head"><div><h2>4. Validar antes de importar</h2><p>A validação verifica obrigatórios, CNPJs, etapas, responsáveis, pessoas e correspondências com a base. <b>Nada é salvo nesta etapa.</b></p></div></div>
+        <button className="btn" type="button" disabled={validating||!publishers.length||totalLocalErrors>0} onClick={validate}>
+          <CheckCircle2 size={16}/>{validating?'Validando…':'Validar planilha'}
+        </button>
+        {validation&&<ValidationSummary data={validation} onDownloadIssues={downloadIssues}/>}
+      </section>
+
+      {validation&&Number(validation.errors||0)===0&&<section className="card panel import-confirm">
+        <div><div className="eyebrow">Pronto para gravar</div><h2>5. Confirmar importação</h2>
+          <p>Serão processadas <b>{importablePublishers.toLocaleString('pt-BR')} editoras</b> e <b>{importableContacts.toLocaleString('pt-BR')} pessoas</b>. {mode==='skip'?'Os registros já existentes serão preservados.':'Os registros existentes receberão somente os campos preenchidos.'}</p>
+        </div>
+        <button className="btn" type="button" disabled={busy||(!importablePublishers&&!importableContacts)} onClick={runImport}><Upload size={16}/>{busy?'Importando…':'Importar agora'}</button>
+      </section>}
+
+      {result&&<section className="card panel import-result">
+        <CheckCircle2 size={24}/><div><h2>Importação concluída</h2><p>O CRM recalcula automaticamente os indicadores derivados quando os dados relevantes mudam.</p></div>
+        <ResultCounters data={result}/>
+        <button className="btn secondary" type="button" onClick={reset}><RefreshCw size={15}/> Importar outro arquivo</button>
+      </section>}
     </>}
 
-    {result&&<section className="card panel import-result" style={{marginTop:16}}>
-      <div className="panel-head"><div><h2>Resultado da importação</h2><p>Confira o que foi efetivamente gravado. Alterações em dados relevantes disparam o recálculo automático do Radar Score.</p></div><CheckCircle2 size={24}/></div>
-      <div className="import-result-grid"><Result label="Inseridas" value={result.inserted}/><Result label="Atualizadas" value={result.updated}/><Result label="Ignoradas" value={result.skipped}/><Result label="Erros" value={result.errors}/><Result label="Avisos" value={result.warnings}/></div>
-      {result.details?.length>0&&<ValidationTable details={result.details}/>}
-    </section>}
-  </div>
+    <style jsx>{`
+      .import-how,.import-details{margin-bottom:16px}
+      .import-how-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+      .import-rule-strip{margin-top:12px;padding:12px 14px;border-radius:10px;background:#f9fafb;display:grid;gap:3px;font-size:12px}
+      .import-rule-strip span{color:#667085}
+      .import-details{padding:0;overflow:hidden}
+      .import-details details+details{border-top:1px solid #eaecf0}
+      .import-details summary{list-style:none;cursor:pointer;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:13px}
+      .import-details summary::-webkit-details-marker{display:none}
+      .column-guide{padding:0 18px 16px;font-size:12px;color:#475467}
+      .column-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+      .column-chips span{padding:5px 8px;border:1px solid #eaecf0;border-radius:999px;background:#fff;font-size:10px;color:#475467}
+      .import-drop-v3{margin-top:14px;border:1px dashed #98a2b3;border-radius:12px;min-height:130px;display:grid;place-items:center;align-content:center;gap:5px;cursor:pointer;text-align:center;background:#fcfcfd}
+      .import-drop-v3 input{display:none}
+      .import-drop-v3 span{font-size:11px;color:#667085}
+      .import-errors-box{margin-top:12px;padding:12px;border-radius:10px;background:#fef3f2;border:1px solid #fda29b;color:#912018;display:grid;gap:4px;font-size:11px}
+      .import-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}
+      .import-mode-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+      .import-mode-option{display:grid!important;grid-template-columns:auto 1fr!important;gap:10px!important;align-items:flex-start;border:1px solid #eaecf0;border-radius:12px;padding:14px;cursor:pointer}
+      .import-mode-option.selected{border-color:#84adff;background:#f5f8ff}
+      .import-mode-option div{display:grid;gap:4px}
+      .import-mode-option span{font-size:11px;color:#667085;font-weight:400}
+      .import-confirm{margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:20px}
+      .import-confirm h2{margin:4px 0}.import-confirm p{margin:0;color:#667085;font-size:12px}
+      .import-result{margin-top:16px;display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start}
+      .import-result h2{margin:0 0 3px}.import-result p{margin:0;color:#667085;font-size:12px}
+      .import-result :global(.result-counters){grid-column:1/-1}
+      .import-result :global(.btn){grid-column:1/-1;justify-self:start}
+      @media(max-width:900px){.import-how-grid,.import-summary-grid,.import-mode-grid{grid-template-columns:1fr}.import-confirm{align-items:stretch;flex-direction:column}.import-confirm :global(.btn){width:100%}}
+    `}</style>
+  </div>;
 }
 
-
-function ImportGuide({open,onToggle,onDownloadTemplate}){
-  return <section className="card panel import-guide">
-    <div className="import-guide-head">
-      <div className="import-guide-heading">
-        <div className="import-guide-icon"><BookOpen size={22}/></div>
-        <div><div className="import-guide-kicker">Guia de preenchimento</div><h2>Como preparar uma importação sem colocar a base em risco</h2><p>Este roteiro foi pensado para quem vai administrar a base no futuro. Siga a ordem abaixo e use o modelo sempre que possível.</p></div>
-      </div>
-      <button className="btn secondary small" type="button" onClick={onToggle}>{open?'Ocultar guia':'Abrir guia completo'} {open?<ChevronUp size={15}/>:<ChevronDown size={15}/>}</button>
+function GuideCard({number,title,children}){
+  return <div style={{border:'1px solid #eaecf0',borderRadius:12,padding:13,display:'grid',gap:5}}>
+    <span className="badge" style={{justifySelf:'start'}}>{number}</span><strong style={{fontSize:13}}>{title}</strong><span className="muted" style={{fontSize:11}}>{children}</span>
+  </div>;
+}
+function SummaryStat({icon,value,label}){
+  return <div style={{border:'1px solid #eaecf0',borderRadius:12,padding:13,display:'flex',gap:10,alignItems:'center'}}>
+    {icon&&<span style={{color:'#475467'}}>{icon}</span>}<div><strong style={{display:'block',fontSize:20}}>{Number(value||0).toLocaleString('pt-BR')}</strong><small className="muted">{label}</small></div>
+  </div>;
+}
+function PreviewTable({title,rows,columns}){
+  return <div style={{marginTop:14}}><h3 style={{fontSize:12,margin:'0 0 8px'}}>{title}</h3><div style={{overflowX:'auto'}}>
+    <table className="data-table"><thead><tr>{columns.map(([key,label])=><th key={key}>{label}</th>)}</tr></thead>
+      <tbody>{rows.map((row,index)=><tr key={index}>{columns.map(([key])=><td key={key}>{Array.isArray(row[key])?(row[key].join(' · ')||'—'):(row[key]||'—')}</td>)}</tr>)}</tbody>
+    </table>
+  </div></div>;
+}
+function IssuesList({details=[]}){
+  const issues=details.filter(item=>item.error||item.warning);
+  if(!issues.length)return null;
+  return <div style={{marginTop:12}}><h3 style={{fontSize:12}}>Problemas encontrados antes da validação</h3>
+    <div style={{display:'grid',gap:6}}>{issues.slice(0,20).map((item,index)=><div key={index} className="notice error" style={{margin:0,fontSize:11}}><b>{item.sheet} · linha {item.row}</b> — {item.error||item.warning}</div>)}</div>
+    {issues.length>20&&<p className="muted" style={{fontSize:11}}>Mais {issues.length-20} ocorrência(s) não exibidas aqui.</p>}
+  </div>;
+}
+function ValidationSummary({data,onDownloadIssues}){
+  const errors=Number(data?.errors||0),warnings=Number(data?.warnings||0);
+  const p=data?.publishers||{},c=data?.contacts||{};
+  const details=(data?.details||[]).filter(item=>item.error||item.warning);
+  return <div style={{marginTop:14,display:'grid',gap:12}}>
+    <div className="result-counters" style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:8}}>
+      <SummaryStat value={p.inserted||0} label="editoras novas"/>
+      <SummaryStat value={p.updated||0} label="editoras a atualizar"/>
+      <SummaryStat value={c.inserted||0} label="pessoas novas"/>
+      <SummaryStat value={errors} label="erros"/>
     </div>
-
-    <div className="import-guide-steps">
-      <GuideStep number="1" title="Baixe o modelo" text="Comece pelo modelo atualizado para já ter os nomes de colunas que o CRM reconhece."/>
-      <GuideStep number="2" title="Preencha a planilha" text="Nome da editora é obrigatório. Os demais campos podem ficar vazios quando a informação não estiver disponível."/>
-      <GuideStep number="3" title="Separe listas com |" text="Perfil editorial, segmentos de atuação e e-mails alternativos aceitam vários valores na mesma célula."/>
-      <GuideStep number="4" title="Valide antes de importar" text="A validação compara com a base e mostra novas, duplicadas, atualizações, avisos e erros sem salvar nada."/>
+    <div className={'notice '+(errors?'error':'')} style={{margin:0}}>
+      {errors?<><b>Validação bloqueada.</b> Há {errors} erro(s) que precisam ser corrigidos.</>:<><b>Validação aprovada.</b> {warnings?(warnings+' aviso(s) merecem conferência, mas não bloqueiam a importação.'):'Nenhum erro encontrado.'}</>}
     </div>
-
-    {open&&<div className="import-guide-body">
-      <div className="import-guide-highlight">
-        <div className="import-guide-highlight-copy"><Info size={18}/><div><strong>A regra mais importante para campos com vários valores</strong><p>Use a barra vertical <b>|</b> entre os itens. Cada trecho vira um valor separado dentro do CRM.</p></div></div>
-        <div className="import-guide-code"><code>Literatura | Infantil | Educação</code><span>O CRM grava 3 perfis editoriais diferentes.</span></div>
-      </div>
-
-      <div className="import-guide-examples">
-        <GuideExample title="Perfil editorial" example="Literatura | Infantil | Cultura afro-brasileira" text="Descreve o que a editora publica. Use, de preferência, os termos exatos da taxonomia do Radar Score."/>
-        <GuideExample title="Segmentos de atuação" example="Escolar | Universitário | Trade/Livrarias" text="Descreve os mercados em que a editora atua. Não é a mesma coisa que perfil editorial."/>
-        <GuideExample title="E-mails alternativos" example="comercial@editora.com | financeiro@editora.com" text="Use para contatos institucionais adicionais. O e-mail principal continua em “E-mail geral”."/>
-      </div>
-
-      <div className="import-guide-section">
-        <div className="section-title"><div><h3>Regras que evitam os erros mais comuns</h3><p className="muted">O importador faz algumas proteções automaticamente, mas a qualidade da planilha continua fazendo diferença.</p></div></div>
-        <div className="import-guide-rules">
-          <GuideRule icon={<Database size={17}/>} title="Como o CRM identifica uma editora existente">
-            Primeiro procura pela <b>Referência de origem</b>; depois pelo <b>CNPJ</b>; e, quando não há uma chave forte, por <b>Nome + UF</b>. Se CNPJ e referência apontarem para editoras diferentes, a linha é bloqueada para revisão.
-          </GuideRule>
-          <GuideRule icon={<RefreshCw size={17}/>} title="Atualizar não significa apagar">
-            No modo <b>Atualizar somente os campos preenchidos</b>, célula vazia preserva o dado que já existe. Ex.: se o CSV não tiver telefone, o telefone atual da editora continua intacto.
-          </GuideRule>
-          <GuideRule icon={<ListChecks size={17}/>} title="Status, confiança, prioridade e pipeline">
-            Prioridade: <b>Baixa, Média, Alta ou Urgente</b>. Status do perfil: <b>Confirmado, Parcial, Não identificado ou Revisar</b>. Confiança: <b>Baixa, Média ou Alta</b>. A etapa do pipeline precisa ter o mesmo nome de uma etapa ativa do CRM.
-          </GuideRule>
-          <GuideRule icon={<ShieldCheck size={17}/>} title="Radar Score nunca é digitado na planilha">
-            Score, Radar Fit, potencial comercial, qualidade dos dados, aderência por produto e melhor produto são calculados pelo sistema. Quando dados relevantes mudam, o CRM recalcula esses indicadores automaticamente.
-          </GuideRule>
-        </div>
-      </div>
-
-      <details className="import-guide-details">
-        <summary>Dicionário rápido dos campos mais importantes</summary>
-        <div className="import-guide-field-table">
-          <GuideField field="Nome da editora" format="Texto — obrigatório" example="Editora Horizonte" note="Sem este campo a linha não pode ser importada."/>
-          <GuideField field="CNPJ" format="14 dígitos, com ou sem pontuação" example="12.345.678/0001-90" note="É uma das principais chaves para localizar duplicatas."/>
-          <GuideField field="Referência de origem" format="Código estável da fonte" example="base-2026-00451" note="Se a mesma fonte for importada de novo, mantenha a mesma referência. Não crie um código novo para a mesma editora."/>
-          <GuideField field="Perfil editorial" format="Lista separada por |" example="Literatura | Infantil" note="Influência diretamente a aderência editorial no Radar Score. Use a taxonomia oficial sempre que possível."/>
-          <GuideField field="Status do perfil editorial" format="Confirmado / Parcial / Não identificado / Revisar" example="Confirmado" note="Se houve pesquisa suficiente, indique o status. Se ainda não houve classificação, pode deixar em branco."/>
-          <GuideField field="Confiança do perfil editorial" format="Alta / Média / Baixa" example="Alta" note="Indica a segurança da classificação. Se o perfil ainda não foi pesquisado, deixe em branco."/>
-          <GuideField field="Segmentos de atuação" format="Lista separada por |" example="Escolar | Trade/Livrarias" note="Mercado de atuação comercial; não confundir com o conteúdo publicado."/>
-          <GuideField field="Prioridade" format="Baixa / Média / Alta / Urgente" example="Média" note="Em uma editora já existente, deixar em branco preserva a prioridade atual."/>
-          <GuideField field="Etapa do pipeline" format="Nome de etapa ativa" example="A prospectar" note="Se o nome não existir no CRM, a etapa é ignorada e aparece como aviso."/>
-          <GuideField field="E-mails alternativos" format="Lista separada por |" example="comercial@editora.com | financeiro@editora.com" note="Use somente para e-mails adicionais. O principal deve ficar em E-mail geral."/>
-        </div>
-      </details>
-
-      <details className="import-guide-details">
-        <summary>Ver os perfis editoriais reconhecidos pelo Radar Score</summary>
-        <p className="muted">Para evitar aviso e garantir que a classificação participe corretamente do Radar Score, copie os nomes abaixo exatamente como aparecem.</p>
-        <div className="import-guide-taxonomy">{EDITORIAL_PROFILE_OPTIONS.map(item=><span className="badge blue" key={item}>{item}</span>)}</div>
-      </details>
-
-      <div className="import-guide-bottom">
-        <div><strong>Checklist antes de confirmar</strong><span>1) Nome preenchido · 2) CNPJ conferido · 3) listas separadas por | · 4) perfis editoriais padronizados · 5) validação sem erros.</span></div>
-        <button className="btn secondary" type="button" onClick={onDownloadTemplate}><Download size={15}/> Baixar modelo</button>
-      </div>
-    </div>}
-  </section>
+    {details.length>0&&<div style={{overflowX:'auto'}}><table className="data-table"><thead><tr><th>Aba</th><th>Linha</th><th>Registro</th><th>Situação</th><th>Mensagem</th></tr></thead>
+      <tbody>{details.slice(0,100).map((item,index)=><tr key={index}><td>{item.sheet}</td><td>{item.row}</td><td>{item.name||'—'}</td><td>{STATUS_LABELS[item.status]||item.status}</td><td>{item.error||item.warning}</td></tr>)}</tbody>
+    </table></div>}
+    {details.length>0&&<button type="button" className="btn secondary small" onClick={onDownloadIssues} style={{justifySelf:'start'}}><Download size={14}/> Baixar inconsistências</button>}
+  </div>;
 }
-
-function GuideStep({number,title,text}){return <div className="import-guide-step"><span>{number}</span><div><strong>{title}</strong><p>{text}</p></div></div>}
-function GuideExample({title,example,text}){return <div className="import-guide-example"><strong>{title}</strong><code>{example}</code><p>{text}</p></div>}
-function GuideRule({icon,title,children}){return <div className="import-guide-rule"><div className="import-guide-rule-icon">{icon}</div><div><strong>{title}</strong><p>{children}</p></div></div>}
-function GuideField({field,format,example,note}){return <div className="import-guide-field-row"><strong>{field}</strong><span>{format}</span><code>{example}</code><p>{note}</p></div>}
-
-function ValidationTable({details}){
-  const visible=details.filter(d=>d.error||d.warning||d.status==='skip'||d.status==='update').slice(0,30);
-  if(!visible.length)return null;
-  return <div className="import-preview-wrap" style={{marginTop:14}}><table className="data-table import-preview"><thead><tr><th>Linha</th><th>Editora</th><th>Situação</th><th>Identificada por</th><th>Observação</th></tr></thead><tbody>{visible.map((d,i)=><tr key={`${d.row}-${i}`}><td>{d.row}</td><td>{d.name||'—'}</td><td><span className={`badge ${d.status==='error'?'red':d.status==='update'?'amber':d.status==='skip'?'':'green'}`}>{STATUS_LABELS[d.status]||d.status||'—'}</span></td><td>{d.matched_by||'—'}</td><td>{d.error||d.warning||'—'}</td></tr>)}</tbody></table>{details.length>30&&<p className="muted import-preview-note">Mostrando 30 de {details.length.toLocaleString('pt-BR')} ocorrências. Use “Baixar inconsistências” para revisar o arquivo completo.</p>}</div>
+function ResultCounters({data}){
+  const p=data?.publishers||{},c=data?.contacts||{};
+  return <div className="result-counters" style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:8}}>
+    <SummaryStat value={p.inserted||0} label="editoras criadas"/>
+    <SummaryStat value={p.updated||0} label="editoras atualizadas"/>
+    <SummaryStat value={p.skipped||0} label="editoras preservadas"/>
+    <SummaryStat value={c.inserted||0} label="pessoas criadas"/>
+    <SummaryStat value={c.updated||0} label="pessoas atualizadas"/>
+    <SummaryStat value={c.skipped||0} label="pessoas preservadas"/>
+  </div>;
 }
-function Result({label,value}){return <div><span>{label}</span><strong>{Number(value||0).toLocaleString('pt-BR')}</strong></div>}
