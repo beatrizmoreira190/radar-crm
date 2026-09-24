@@ -458,7 +458,7 @@ export default function NewPublisherPage(){
       :global(.person-editor-modal .person-remove-confirm){margin-top:14px;padding:12px;border:1px solid #fda29b;background:#fef3f2;border-radius:10px;display:grid;gap:10px}
       :global(.person-editor-modal .person-remove-confirm>div:first-child){display:grid;gap:3px;color:#912018}
       :global(.person-editor-modal .person-remove-confirm span){font-size:11px;color:#b42318}
-      :global(.person-editor-modal .person-remove-actions){display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+      :global(.person-editor-modal .person-remove-actions){display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}\n      :global(.person-editor-modal .person-remove-confirm-btn){background:#d92d20!important;border-color:#d92d20!important;color:#fff!important}
       :global(.person-editor-modal .person-modal-actions){justify-content:space-between}
       :global(.person-editor-modal .person-modal-main-actions){display:flex;gap:8px}
       :global(.person-editor-modal .person-remove-trigger){color:#b42318}
@@ -587,7 +587,7 @@ function PersonEditorModal({kind,person,isNew,onClose,onSave,onRemove}){
       <div><strong>Remover esta pessoa?</strong><span>Ela será retirada deste novo cadastro. Essa ação só afeta os dados ainda não salvos da nova editora.</span></div>
       <div className="person-remove-actions">
         <button type="button" className="btn secondary small" onClick={()=>setConfirmingRemove(false)}>Não, manter</button>
-        <button type="button" className="btn danger small" onClick={onRemove}><Trash2 size={13}/> Sim, remover</button>
+        <button type="button" className="btn secondary small person-remove-confirm-btn" onClick={onRemove}><Trash2 size={13}/> Sim, remover</button>
       </div>
     </div>}
 
