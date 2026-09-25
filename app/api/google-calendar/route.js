@@ -117,6 +117,43 @@ export async function POST(request){
       return NextResponse.json({ok:true,userId:targetId});
     }
 
+    if(action==='reminder_status'){
+      const {targetId}=await calendarTarget(supabase,membership,user,requestedUserId);
+      const {data:connection,error:connectionError}=await supabase.from('google_calendar_connections')
+        .select('bridge_url,bridge_key,bridge_status,google_account_email')
+        .eq('organization_id',membership.organization_id).eq('user_id',targetId).maybeSingle();
+      if(connectionError)throw connectionError;
+      if(!connection||connection.bridge_status!=='connected'||!connection.bridge_url||!connection.bridge_key){
+        return NextResponse.json({ok:true,connected:false,remindersEnabled:false,upgradeRequired:false});
+      }
+      try{
+        const result=await callCalendarBridge({
+          url:connection.bridge_url,key:connection.bridge_key,action:'reminder_status'
+        });
+        return NextResponse.json({
+          ok:true,
+          connected:true,
+          remindersEnabled:Boolean(result.remindersEnabled),
+          triggerCount:Number(result.triggerCount||0),
+          remainingDailyQuota:Number(result.remainingDailyQuota||0),
+          bridgeVersion:result.bridgeVersion||null,
+          calendarEmail:result.account||connection.google_account_email||null,
+          upgradeRequired:false
+        });
+      }catch(error){
+        if(error.code==='CALENDAR_BRIDGE_FAILED'||error.code==='CALENDAR_BRIDGE_BAD_RESPONSE'){
+          return NextResponse.json({
+            ok:true,
+            connected:true,
+            remindersEnabled:false,
+            upgradeRequired:true,
+            calendarEmail:connection.google_account_email||null
+          });
+        }
+        throw error;
+      }
+    }
+
     if(action==='sync_meeting'){
       const meetingId=String(body.meetingId||'').trim();
       if(!meetingId){const error=new Error('Reunião não informada.');error.code='MEETING_REQUIRED';throw error}
