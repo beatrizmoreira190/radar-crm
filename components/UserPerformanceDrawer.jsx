@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { Activity, Building2, CalendarClock, CheckCircle2, Clock3, GitBranch, ListChecks, MessageSquare, X } from 'lucide-react';
 import Avatar from '@/components/Avatar';
@@ -48,6 +49,7 @@ export default function UserPerformanceDrawer({userId,onClose}){
   const [data,setData]=useState(null);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState('');
+  const [mounted,setMounted]=useState(false);
 
   useEffect(()=>{
     if(!userId||!org||!isManager)return;
@@ -66,7 +68,25 @@ export default function UserPerformanceDrawer({userId,onClose}){
     return()=>{cancelled=true};
   },[userId,org,days,isManager,supabase]);
 
+  useEffect(()=>{setMounted(true)},[]);
+
   useEffect(()=>{if(userId)setTab('overview')},[userId]);
+
+  useEffect(()=>{
+    if(!mounted||!userId||!isManager)return;
+    const previous=document.body.style.overflow;
+    document.body.style.overflow='hidden';
+    return()=>{document.body.style.overflow=previous};
+  },[mounted,userId,isManager]);
+
+  useEffect(()=>{
+    if(!mounted||!userId||!isManager)return;
+    function onKeyDown(event){
+      if(event.key==='Escape')onClose?.();
+    }
+    window.addEventListener('keydown',onKeyDown);
+    return()=>window.removeEventListener('keydown',onKeyDown);
+  },[mounted,userId,isManager,onClose]);
 
   const member=data?.member||teamMap[userId]||{};
   const summary=data?.summary||{};
@@ -76,7 +96,7 @@ export default function UserPerformanceDrawer({userId,onClose}){
   const historyDate=data?.history_available_since?shortDate(data.history_available_since):null;
   const dayMax=useMemo(()=>Math.max(1,...(data?.daily_activity||[]).map(x=>Number(x.actions)||0)),[data]);
 
-  if(!userId||!isManager)return null;
+  if(!mounted||!userId||!isManager)return null;
 
   function openPublisher(id){
     if(!id)return;
@@ -84,7 +104,7 @@ export default function UserPerformanceDrawer({userId,onClose}){
     router.push(`/app/editoras/${id}`);
   }
 
-  return <div className="upd-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)onClose?.()}}>
+  return createPortal(<div className="upd-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)onClose?.()}}>
     <aside className="upd-drawer" role="dialog" aria-modal="true" aria-label="Desempenho individual">
       <header className="upd-head">
         <div className="upd-person">
@@ -185,23 +205,23 @@ export default function UserPerformanceDrawer({userId,onClose}){
         </>:!error&&<div className="upd-empty">Sem dados para esta pessoa.</div>}
       </div>
 
-      <style jsx>{`
-        .upd-backdrop{position:fixed;inset:0;background:rgba(16,24,40,.42);z-index:1200;display:flex;justify-content:flex-end}
-        .upd-drawer{width:min(880px,94vw);height:100vh;background:#f8fafc;box-shadow:-18px 0 45px rgba(16,24,40,.18);display:flex;flex-direction:column;overflow:hidden}
+      <style jsx global>{`
+        .upd-backdrop{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;background:rgba(16,24,40,.46);z-index:2147483000!important;display:flex!important;justify-content:flex-end!important;align-items:stretch!important;margin:0!important;padding:0!important}
+        .upd-drawer{position:relative!important;width:min(880px,94vw)!important;max-width:94vw!important;height:100dvh!important;max-height:100dvh!important;margin:0!important;background:#f8fafc;box-shadow:-18px 0 45px rgba(16,24,40,.22);display:flex!important;flex-direction:column!important;overflow:hidden!important}
         .upd-head{background:#fff;border-bottom:1px solid #eaecf0;padding:18px 20px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
         .upd-person{display:flex;gap:12px;align-items:center}.upd-person>div{display:grid}.upd-person small{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#667085;font-weight:700}.upd-person h2{font-size:20px;margin:2px 0;color:#101828}.upd-person span{font-size:11px;color:#667085}
         .upd-toolbar{background:#fff;padding:9px 20px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #eaecf0}.upd-toolbar>span{font-size:10px;font-weight:700;color:#667085;margin-right:3px}.upd-toolbar button,.upd-tabs button{border:1px solid #d0d5dd;background:#fff;border-radius:999px;padding:5px 9px;font-size:10px;font-weight:700;color:#475467;cursor:pointer}.upd-toolbar button.active,.upd-tabs button.active{background:#344054;color:#fff;border-color:#344054}
         .upd-tabs{background:#fff;padding:0 20px 10px;display:flex;gap:5px;overflow:auto;border-bottom:1px solid #eaecf0}.upd-tabs button{white-space:nowrap;border-radius:7px}
-        .upd-content{padding:16px 20px 28px;overflow:auto;display:grid;gap:14px}.upd-loading,.upd-empty{padding:34px;text-align:center;color:#667085;background:#fff;border:1px solid #eaecf0;border-radius:12px}.upd-history-note{font-size:10px;line-height:1.5;color:#667085;background:#fffaeb;border:1px solid #fedf89;border-radius:9px;padding:8px 10px}
-        .upd-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.upd-stat{background:#fff;border:1px solid #eaecf0;border-radius:11px;padding:11px;display:grid;grid-template-columns:32px 1fr;gap:8px}.upd-stat-icon{width:30px;height:30px;border-radius:8px;background:#f2f4f7;display:grid;place-items:center;color:#475467}.upd-stat :global(svg){width:15px}.upd-stat div{display:grid}.upd-stat small{font-size:9px;color:#667085}.upd-stat strong{font-size:19px;color:#101828;margin:1px 0}.upd-stat em{font-style:normal;font-size:9px;color:#667085}
+        .upd-content{flex:1 1 auto!important;min-height:0!important;padding:16px 20px 28px;overflow:auto!important;display:grid!important;align-content:start!important;gap:14px}.upd-loading,.upd-empty{padding:34px;text-align:center;color:#667085;background:#fff;border:1px solid #eaecf0;border-radius:12px}.upd-history-note{font-size:10px;line-height:1.5;color:#667085;background:#fffaeb;border:1px solid #fedf89;border-radius:9px;padding:8px 10px}
+        .upd-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.upd-stat{background:#fff;border:1px solid #eaecf0;border-radius:11px;padding:11px;display:grid!important;grid-template-columns:32px minmax(0,1fr)!important;gap:8px;align-items:start}.upd-stat-icon{width:30px;height:30px;border-radius:8px;background:#f2f4f7;display:grid;place-items:center;color:#475467}.upd-stat :global(svg){width:15px}.upd-stat>div{display:grid!important;min-width:0!important;gap:1px!important}.upd-stat small{display:block!important;font-size:9px;color:#667085;line-height:1.25}.upd-stat strong{display:block!important;font-size:19px;color:#101828;margin:1px 0;line-height:1.1}.upd-stat em{display:block!important;font-style:normal;font-size:9px;color:#667085;line-height:1.3}
         .upd-section,.upd-list-section{background:#fff;border:1px solid #eaecf0;border-radius:12px;padding:14px;display:grid;gap:10px}.upd-section-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.upd-section-head h3{font-size:13px;margin:0;color:#101828}.upd-section-head p{font-size:10px;color:#667085;margin:3px 0 0;line-height:1.4}
         .upd-speed-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.upd-speed-grid>div{background:#f9fafb;border:1px solid #f2f4f7;border-radius:9px;padding:10px;display:grid}.upd-speed-grid small{font-size:9px;color:#667085}.upd-speed-grid strong{font-size:14px;margin-top:3px;color:#344054}
         .upd-days{display:grid;gap:6px}.upd-day{display:grid;grid-template-columns:68px minmax(0,1fr) 28px;gap:8px;align-items:center;font-size:9px;color:#667085}.upd-day>div{height:7px;border-radius:999px;background:#f2f4f7;overflow:hidden}.upd-day i{display:block;height:100%;background:#475467;border-radius:999px}.upd-day strong{text-align:right;color:#344054}
         .upd-record-list{display:grid;gap:7px}.upd-record{border:1px solid #eaecf0;border-radius:9px;background:#fff;padding:10px;text-align:left;display:grid;gap:6px;color:inherit}.upd-record.clickable{cursor:pointer;width:100%}.upd-record.clickable:hover{border-color:#98a2b3;background:#fcfcfd}.upd-record>div:first-child{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.upd-record strong{font-size:11px;color:#344054}.upd-record span{font-size:9px;color:#667085}.upd-record p{font-size:10px;color:#475467;margin:0}.upd-record-meta{display:flex;gap:6px 12px;flex-wrap:wrap}.upd-record-meta .upd-time{font-weight:700;color:#344054}
         .upd-timeline{display:grid}.upd-timeline article{position:relative;display:grid;grid-template-columns:18px 1fr;gap:7px;padding:0 0 12px}.upd-timeline article:before{content:'';position:absolute;left:5px;top:10px;bottom:-2px;width:1px;background:#eaecf0}.upd-timeline article:last-child:before{display:none}.upd-dot{width:11px;height:11px;border:3px solid #fff;border-radius:50%;background:#667085;box-shadow:0 0 0 1px #d0d5dd;margin-top:2px;z-index:1}.upd-timeline article>div{display:grid;gap:2px}.upd-timeline strong{font-size:10px;color:#344054}.upd-timeline small{font-size:9px;color:#98a2b3}.upd-timeline button{width:max-content;padding:0;border:0;background:none;color:#175cd3;font-size:9px;font-weight:700;cursor:pointer}
-        @media(max-width:720px){.upd-stats,.upd-speed-grid{grid-template-columns:1fr 1fr}.upd-drawer{width:100vw}.upd-head,.upd-toolbar,.upd-tabs,.upd-content{padding-left:12px;padding-right:12px}.upd-record>div:first-child{display:grid}}
+        @media(max-width:720px){.upd-stats,.upd-speed-grid{grid-template-columns:1fr 1fr}.upd-drawer{width:100vw!important;max-width:100vw!important}.upd-head,.upd-toolbar,.upd-tabs,.upd-content{padding-left:12px;padding-right:12px}.upd-record>div:first-child{display:grid}}
         @media(max-width:460px){.upd-stats,.upd-speed-grid{grid-template-columns:1fr}}
       `}</style>
     </aside>
-  </div>;
+  </div>,document.body);
 }
