@@ -27,6 +27,8 @@ function TeamCalendarAdmin({member}){
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState('');
   const [copied,setCopied]=useState(false);
+  const [reminder,setReminder]=useState({loading:false,checked:false,enabled:false,upgradeRequired:false,quota:null});
+  const [showScriptUpgrade,setShowScriptUpgrade]=useState(false);
 
   async function accessToken(){const {data:{session}}=await supabase.auth.getSession();return session?.access_token||''}
   async function request(method='GET',body){
@@ -44,7 +46,30 @@ function TeamCalendarAdmin({member}){
       const data=await request();
       setCalendar({loading:false,...data});
       if(data.connection?.bridge_url)setBridgeUrl(data.connection.bridge_url);
+      if(data.connection?.bridge_status==='connected'){
+        await checkReminders(true);
+      }else{
+        setReminder({loading:false,checked:false,enabled:false,upgradeRequired:false,quota:null});
+      }
     }catch(error){setCalendar(x=>({...x,loading:false}));setMessage(error.message)}
+  }
+  async function checkReminders(silent=false){
+    if(!silent)setReminder(x=>({...x,loading:true}));
+    try{
+      const data=await request('POST',{action:'reminder_status'});
+      setReminder({
+        loading:false,
+        checked:true,
+        enabled:Boolean(data.remindersEnabled),
+        upgradeRequired:Boolean(data.upgradeRequired),
+        quota:Number.isFinite(Number(data.remainingDailyQuota))?Number(data.remainingDailyQuota):null
+      });
+      return data;
+    }catch(error){
+      setReminder({loading:false,checked:true,enabled:false,upgradeRequired:true,quota:null});
+      if(!silent)setMessage(error.message||'Não foi possível verificar os lembretes automáticos.');
+      return null;
+    }
   }
   useEffect(()=>{load()},[member.user_id]);
 
@@ -68,7 +93,7 @@ function TeamCalendarAdmin({member}){
     setBusy(true);setMessage('Testando a conexão…');
     try{
       const data=await request('POST',{action:'save_bridge',bridgeUrl:bridgeUrl.trim()});
-      setMessage(`Google Agenda conectado${data.email?` em ${data.email}`:''}.`);
+      setMessage(`Google Agenda conectado${data.email?` em ${data.email}`:''}. O lembrete automático ficará ativo após a autorização do script.`);
       await load();
     }catch(error){setMessage(error.message)}finally{setBusy(false)}
   }
@@ -83,15 +108,34 @@ function TeamCalendarAdmin({member}){
   const pending=calendar.connection?.bridge_status==='pending';
   return <div className="calendar-admin">
     <div className="calendar-admin-title"><CalendarDays size={16}/><div><strong>Google Agenda</strong><small>Integração administrada pelo CRM.</small></div><span className={`badge ${connected?'green':pending?'amber':''}`}>{calendar.loading?'Verificando…':connected?'Conectado':pending?'Configuração pendente':'Não configurado'}</span></div>
-    {connected&&<div className="calendar-admin-meta"><span><b>Conta:</b> {calendar.connection.google_account_email||'Conta autorizada'}</span><span><b>Último teste:</b> {calendar.connection.last_verified_at?new Date(calendar.connection.last_verified_at).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'—'}</span></div>}
+    {connected&&<div className="calendar-admin-meta"><span><b>Conta:</b> {calendar.connection.google_account_email||'Conta autorizada'}</span><span><b>Último teste:</b> {calendar.connection.last_verified_at?new Date(calendar.connection.last_verified_at).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'—'}</span><span><b>Lembrete 24h:</b> {reminder.loading?'Verificando…':reminder.enabled?'Ativo':reminder.upgradeRequired?'Atualização necessária':reminder.checked?'Aguardando ativação':'—'}</span></div>}
     {message&&<div className="notice" style={{margin:0}}>{message}</div>}
     {calendar.scriptCode&&(!connected||pending)&&<div className="calendar-setup">
       <div className="calendar-setup-head"><strong>Código do Apps Script</strong><button className="btn secondary small" type="button" onClick={copyScript}><Copy size={13}/>{copied?'Copiado':'Copiar código'}</button></div>
       <textarea className="input" readOnly rows={7} value={calendar.scriptCode}/>
       <div className="calendar-setup-actions"><a className="btn secondary small" href="https://script.google.com/create" target="_blank" rel="noreferrer"><ExternalLink size={13}/> Abrir Apps Script</a><input className="input" value={bridgeUrl} onChange={e=>setBridgeUrl(e.target.value)} placeholder="Cole a URL /exec"/><button className="btn small" type="button" disabled={busy||!bridgeUrl.trim()} onClick={saveBridge}>{busy?'Testando…':'Salvar e testar'}</button></div>
-      <small>O script deve ser autorizado e implantado usando a conta Google cuja agenda será sincronizada.</small>
+      <small>O script deve ser autorizado e implantado usando a conta Google cuja agenda será sincronizada. Antes de implantar, execute a função <b>authorizeRadar</b> uma vez para autorizar Agenda e envio de e-mail e criar o lembrete automático.</small>
     </div>}
-    <div className="calendar-admin-actions">{!pending&&<button className="btn secondary small" type="button" disabled={busy||calendar.loading} onClick={prepare}>{connected?'Reconfigurar integração':'Configurar Google Agenda'}</button>}{connected&&<button className="btn secondary small" type="button" disabled={busy} onClick={disconnect}><Unlink size={13}/> Desconectar integração</button>}</div>
+    {connected&&reminder.upgradeRequired&&<div className="notice" style={{margin:0}}>A integração atual ainda não possui o lembrete automático por e-mail. Atualize o Apps Script uma vez para ativá-lo.</div>}
+    {connected&&reminder.checked&&!reminder.enabled&&!reminder.upgradeRequired&&<div className="notice" style={{margin:0}}>O script já suporta lembretes, mas o gatilho ainda não está ativo. Execute <b>authorizeRadar</b> uma vez no Apps Script.</div>}
+    {connected&&showScriptUpgrade&&<div className="calendar-setup">
+      <div className="calendar-setup-head"><strong>Atualizar Apps Script para lembretes</strong><button className="btn secondary small" type="button" onClick={copyScript}><Copy size={13}/>{copied?'Copiado':'Copiar código atualizado'}</button></div>
+      <ol style={{margin:'0 0 8px 18px',padding:0,fontSize:11,color:'#475467',lineHeight:1.6}}>
+        <li>Abra o projeto do Apps Script já conectado a esta conta.</li>
+        <li>Substitua todo o código pelo código atualizado abaixo e salve.</li>
+        <li>Execute a função <b>authorizeRadar</b> uma vez e aceite a permissão de envio de e-mail.</li>
+        <li>Em <b>Implantar → Gerenciar implantações</b>, edite a implantação e publique uma nova versão. A URL /exec permanece a mesma.</li>
+        <li>Volte ao CRM e clique em <b>Verificar lembrete</b>.</li>
+      </ol>
+      <textarea className="input" readOnly rows={7} value={calendar.scriptCode||''}/>
+      <div className="calendar-setup-actions"><a className="btn secondary small" href="https://script.google.com" target="_blank" rel="noreferrer"><ExternalLink size={13}/> Abrir Apps Script</a></div>
+    </div>}
+    <div className="calendar-admin-actions">
+      {!pending&&<button className="btn secondary small" type="button" disabled={busy||calendar.loading} onClick={prepare}>{connected?'Reconfigurar integração':'Configurar Google Agenda'}</button>}
+      {connected&&<button className="btn secondary small" type="button" disabled={reminder.loading} onClick={()=>checkReminders(false)}>{reminder.loading?'Verificando…':'Verificar lembrete'}</button>}
+      {connected&&<button className="btn secondary small" type="button" onClick={()=>setShowScriptUpgrade(x=>!x)}>{showScriptUpgrade?'Ocultar código':'Atualizar script de lembretes'}</button>}
+      {connected&&<button className="btn secondary small" type="button" disabled={busy} onClick={disconnect}><Unlink size={13}/> Desconectar integração</button>}
+    </div>
   </div>;
 }
 
