@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Activity, ArrowRight, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
 import Avatar from '@/components/Avatar';
+import UserPerformanceDrawer from '@/components/UserPerformanceDrawer';
 import { useCrm } from '@/components/CrmProvider';
 import {
   CHANNEL_LABELS,
@@ -190,7 +191,7 @@ function pageItems(page,totalPages){
 }
 
 export default function ActivityPage(){
-  const {supabase,membership,teamMap,activityVersion}=useCrm();
+  const {supabase,membership,teamMap,activityVersion,isManager}=useCrm();
   const org=membership?.organization_id;
   const [rows,setRows]=useState([]);
   const [stageMap,setStageMap]=useState({});
@@ -200,6 +201,8 @@ export default function ActivityPage(){
   const [total,setTotal]=useState(0);
   const [loading,setLoading]=useState(true);
   const [notice,setNotice]=useState('');
+  const [selectedActivity,setSelectedActivity]=useState(null);
+  const [performanceUser,setPerformanceUser]=useState('');
 
   useEffect(()=>{
     const timer=setTimeout(()=>{
@@ -338,6 +341,18 @@ export default function ActivityPage(){
     return {title:explicitLabel||('Atualizou '+entity.toLowerCase()),changes:changeList,detail:ctx};
   }
 
+  function snapshotFields(row){
+    const source=row.action==='delete'?(row.before_data||{}):(row.after_data||{});
+    const keys=[...new Set([...FIELD_ORDER,...Object.keys(source)])];
+    return keys
+      .filter(field=>fieldAllowed(row.entity_type,field))
+      .filter(field=>source[field]!=null&&source[field]!==''&&!(Array.isArray(source[field])&&source[field].length===0))
+      .map(field=>{
+        const cfg=configFor(row.entity_type,field)||{label:field.replaceAll('_',' '),type:'text'};
+        return {field,label:cfg.label,value:humanValue(field,source[field],row.entity_type)};
+      });
+  }
+
   const enriched=useMemo(()=>rows.map(row=>({...row,_description:describe(row)})),[rows,stageMap,teamMap]);
   const totalPages=Math.max(1,Math.ceil(total/PAGE_SIZE));
   const firstRecord=total?((page-1)*PAGE_SIZE)+1:0;
@@ -364,11 +379,11 @@ export default function ActivityPage(){
         {enriched.map(row=>{
           const description=row._description;
           const person=actor(row.actor_user_id);
-          return <article className="activity-detailed-row" key={row.id}>
+          return <article className={`activity-detailed-row ${isManager?'manager-clickable':''}`} key={row.id} onClick={isManager?()=>setSelectedActivity(row):undefined} onKeyDown={isManager?e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setSelectedActivity(row)}}:undefined} tabIndex={isManager?0:undefined} role={isManager?'button':undefined} aria-label={isManager?`Ver detalhes: ${description.title}`:undefined}>
             <Avatar member={person} size={38}/>
             <div className="activity-detailed-main">
               <div className="activity-detailed-head">
-                <div><strong>{person.full_name||person.email||'Sistema'}</strong><span className="badge">{entityLabel(row.entity_type)}</span></div>
+                <div>{isManager&&row.actor_user_id?<button type="button" className="activity-person-link" onClick={e=>{e.stopPropagation();setPerformanceUser(row.actor_user_id)}} title="Ver desempenho individual">{person.full_name||person.email||'Sistema'}</button>:<strong>{person.full_name||person.email||'Sistema'}</strong>}<span className="badge">{entityLabel(row.entity_type)}</span></div>
                 <small title={new Date(row.created_at).toLocaleString('pt-BR')}>{timeAgo(row.created_at)} · {formatDate(row.created_at,true)}</small>
               </div>
               <div className="activity-detailed-title">{description.title}</div>
@@ -399,5 +414,56 @@ export default function ActivityPage(){
         <small>Página {page} de {totalPages}</small>
       </div>}
     </section>
+
+    {selectedActivity&&isManager&&(()=>{
+      const row=selectedActivity;
+      const person=actor(row.actor_user_id);
+      const description=describe(row);
+      const fields=snapshotFields(row);
+      return <div className="activity-modal-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setSelectedActivity(null)}}>
+        <div className="activity-detail-modal" role="dialog" aria-modal="true" aria-label="Detalhes da atividade">
+          <header>
+            <div><small>Detalhe da atividade</small><h2>{description.title}</h2></div>
+            <button type="button" className="icon-btn" onClick={()=>setSelectedActivity(null)} aria-label="Fechar detalhes"><X size={17}/></button>
+          </header>
+          <div className="activity-modal-body">
+            <div className="activity-detail-summary">
+              <Avatar member={person} size={42}/>
+              <div><button type="button" className="activity-person-link large" onClick={()=>{setSelectedActivity(null);setPerformanceUser(row.actor_user_id)}}>{person.full_name||person.email||'Sistema'}</button><span>{entityLabel(row.entity_type)} · {row.action==='insert'?'Criação':row.action==='delete'?'Exclusão':'Atualização'}</span><small>{formatDate(row.created_at,true)}</small></div>
+            </div>
+            {row.action==='update'&&description.changes.length>0?<section className="activity-detail-section">
+              <h3>O que foi alterado</h3>
+              <div className="activity-modal-changes">{description.changes.map(change=><div key={change.field}><b>{change.label}</b><span>{change.before}</span><ArrowRight size={13}/><strong>{change.after}</strong></div>)}</div>
+            </section>:fields.length>0?<section className="activity-detail-section">
+              <h3>{row.action==='delete'?'Dados antes da exclusão':'Informações registradas'}</h3>
+              <div className="activity-detail-fields">{fields.map(field=><div key={field.field}><small>{field.label}</small><strong>{field.value}</strong></div>)}</div>
+            </section>:null}
+            <section className="activity-detail-section technical">
+              <h3>Referência do registro</h3>
+              <div className="activity-detail-fields"><div><small>Tipo</small><strong>{entityLabel(row.entity_type)}</strong></div><div><small>Identificador</small><strong>{row.entity_id||'—'}</strong></div></div>
+            </section>
+          </div>
+        </div>
+      </div>;
+    })()}
+
+    {performanceUser&&isManager&&<UserPerformanceDrawer userId={performanceUser} onClose={()=>setPerformanceUser('')}/>}
+
+    <style jsx>{`
+      .activity-detailed-row.manager-clickable{cursor:pointer;border-radius:9px;transition:background .15s ease}
+      .activity-detailed-row.manager-clickable:hover{background:#f9fafb}
+      .activity-detailed-row.manager-clickable:focus-visible{outline:2px solid #84adff;outline-offset:2px}
+      .activity-person-link{border:0;background:none;padding:0;color:#175cd3;font:inherit;font-weight:700;cursor:pointer;text-align:left}
+      .activity-person-link:hover{text-decoration:underline}.activity-person-link.large{font-size:12px}
+      .activity-modal-backdrop{position:fixed;inset:0;background:rgba(16,24,40,.42);z-index:1250;display:grid;place-items:center;padding:20px}
+      .activity-detail-modal{width:min(760px,96vw);max-height:88vh;overflow:hidden;background:#fff;border-radius:14px;box-shadow:0 24px 70px rgba(16,24,40,.25);display:flex;flex-direction:column}
+      .activity-detail-modal>header{padding:16px 18px;border-bottom:1px solid #eaecf0;display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+      .activity-detail-modal>header small{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#667085;font-weight:700}.activity-detail-modal>header h2{font-size:16px;line-height:1.35;margin:3px 0 0;color:#101828}
+      .activity-modal-body{padding:16px 18px 22px;overflow:auto;display:grid;gap:14px}.activity-detail-summary{display:grid;grid-template-columns:42px 1fr;gap:10px;align-items:center}.activity-detail-summary>div{display:grid;gap:2px}.activity-detail-summary span,.activity-detail-summary small{font-size:10px;color:#667085}
+      .activity-detail-section{border-top:1px solid #eaecf0;padding-top:12px;display:grid;gap:8px}.activity-detail-section h3{font-size:11px;color:#344054;margin:0}.activity-detail-section.technical{opacity:.8}
+      .activity-modal-changes{display:grid;gap:7px}.activity-modal-changes>div{display:grid;grid-template-columns:140px minmax(0,1fr) 18px minmax(0,1fr);gap:7px;align-items:center;border:1px solid #eaecf0;border-radius:8px;padding:8px;font-size:10px}.activity-modal-changes b{color:#475467}.activity-modal-changes span{color:#667085}.activity-modal-changes strong{color:#027a48}
+      .activity-detail-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.activity-detail-fields>div{border:1px solid #eaecf0;border-radius:8px;padding:8px;display:grid;gap:3px}.activity-detail-fields small{font-size:9px;color:#667085}.activity-detail-fields strong{font-size:10px;color:#344054;overflow-wrap:anywhere}
+      @media(max-width:650px){.activity-modal-changes{gap:10px}.activity-modal-changes>div{grid-template-columns:1fr}.activity-modal-changes :global(svg){transform:rotate(90deg)}.activity-detail-fields{grid-template-columns:1fr}.activity-modal-backdrop{padding:8px}}
+    `}</style>
   </div>;
 }
